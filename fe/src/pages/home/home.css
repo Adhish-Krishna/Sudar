@@ -1,0 +1,137 @@
+.home-container {
+  padding: 2rem;
+  background-color: var(--background-color);
+  min-height: calc(100vh - 80px);
+}
+
+.subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2rem;
+  max-width: 1200px;
+}
+
+.subject-card {
+  height: 200px;
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.subject-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Subject gradient backgrounds */
+.subject-card.from-cyan-500.to-blue-600 {
+  background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+  color: white;
+}
+
+.subject-card.from-orange-500.to-red-600 {
+  background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+  color: white;
+}
+
+.subject-card.from-blue-500.to-indigo-600 {
+  background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%);
+  color: white;
+}
+
+.subject-star {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+}
+
+.star-icon {
+  width: 24px;
+  height: 24px;
+  opacity: 0.8;
+}
+
+.subject-name {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin: 0;
+  text-align: center;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+/* Add new subject card */
+.add-card {
+  background-color: transparent;
+  border: 2px dashed var(--border-color);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.add-card:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.add-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plus-icon {
+  width: 48px;
+  height: 48px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .home-container {
+    padding: 1rem;
+  }
+  
+  .subjects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+  
+  .subject-card {
+    height: 160px;
+    padding: 1rem;
+  }
+  
+  .subject-name {
+    font-size: 1.5rem;
+  }
+  
+  .plus-icon {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .subjects-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .subject-card {
+    height: 140px;
+  }
+  
+  .subject-name {
+    font-size: 1.25rem;
+  }
+}
