@@ -1,0 +1,155 @@
+.subject-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.subject-header-card {
+  border-radius: var(--border-radius-lg);
+  padding: 2rem;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.subject-header-card.from-cyan-500.to-blue-600 {
+  background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+}
+
+.subject-header-card.from-orange-500.to-red-600 {
+  background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+}
+
+.subject-header-card.from-blue-500.to-indigo-600 {
+  background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%);
+}
+
+.subject-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 0;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.recent-activity-section {
+  background-color: var(--surface-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 1.5rem 0;
+  color: var(--text-color);
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--background-color);
+  border-radius: var(--border-radius);
+  transition: background-color 0.2s ease;
+}
+
+.activity-item:hover {
+  background-color: var(--border-color);
+}
+
+.activity-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--border-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  color: white;
+}
+
+.activity-icon.document {
+  background-color: var(--primary-color);
+}
+
+.activity-icon.video {
+  background-color: var(--warning-color);
+}
+
+.activity-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.activity-date {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .subject-title {
+    font-size: 2rem;
+  }
+  
+  .subject-header-card {
+    padding: 1.5rem;
+  }
+  
+  .recent-activity-section {
+    padding: 1rem;
+  }
+  
+  .activity-item {
+    padding: 0.75rem;
+  }
+  
+  .activity-icon {
+    width: 40px;
+    height: 40px;
+    margin-right: 0.75rem;
+  }
+  
+  .activity-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .subject-title {
+    font-size: 1.75rem;
+  }
+  
+  .activity-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .activity-icon {
+    margin-right: 0;
+  }
+  
+  .activity-date {
+    align-self: flex-end;
+  }
+}
