@@ -15,7 +15,7 @@ def scrapWebsite(url: str | list, query: str):
   urls = [url] if isinstance(url,str) else url
   response = tavily_client.extract(urls=urls, include_images=False)
   for res in response["results"]:
-    context += f"URL: {res["url"]}\n Raw Conent: {res['raw_content']}\n"
+    context += f"URL: {res['url']}\n Raw Content: {res['raw_content']}\n"
   context += f"\n Answer the below query using the above context: \n Query: {query}"
   return context
 

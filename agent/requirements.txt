@@ -3,4 +3,8 @@ langchain-docling
 langchain-huggingface
 langchain-chroma
 langchain-community
+langchain-ollama
 tavily-python
+python-dotenv
+rich
+requests
