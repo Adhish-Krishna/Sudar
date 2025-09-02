@@ -1,0 +1,6 @@
+deepagents
+langchain-docling
+langchain-huggingface
+langchain-chroma
+langchain-community
+tavily-python
