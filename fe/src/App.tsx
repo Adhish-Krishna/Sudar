@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './pages/login/login';
 import Home from './pages/home/Home';
@@ -13,18 +13,61 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route 
-            path="/*" 
+            path="/home" 
             element={
               <MainLayout>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/classes" element={<Classes />} />
-                  <Route path="/subject/:subjectId" element={<SubjectPage />} />
-                  <Route path="/students" element={<div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-color)'}}><h1>Manage Students</h1><p>Coming Soon...</p></div>} />
-                  <Route path="/doubt-clearance" element={<div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-color)'}}><h1>Doubt Clearance</h1><p>Coming Soon...</p></div>} />
-                  <Route path="/ai-character" element={<div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-color)'}}><h1>AI Character</h1><p>Coming Soon...</p></div>} />
-                </Routes>
+                <Home />
+              </MainLayout>
+            } 
+          />
+          <Route 
+            path="/classes" 
+            element={
+              <MainLayout>
+                <Classes />
+              </MainLayout>
+            } 
+          />
+          <Route 
+            path="/subject/:subjectId" 
+            element={
+              <MainLayout>
+                <SubjectPage />
+              </MainLayout>
+            } 
+          />
+          <Route 
+            path="/students" 
+            element={
+              <MainLayout>
+                <div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-color)'}}>
+                  <h1>Manage Students</h1>
+                  <p>Coming Soon...</p>
+                </div>
+              </MainLayout>
+            } 
+          />
+          <Route 
+            path="/doubt-clearance" 
+            element={
+              <MainLayout>
+                <div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-color)'}}>
+                  <h1>Doubt Clearance</h1>
+                  <p>Coming Soon...</p>
+                </div>
+              </MainLayout>
+            } 
+          />
+          <Route 
+            path="/ai-character" 
+            element={
+              <MainLayout>
+                <div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-color)'}}>
+                  <h1>AI Character</h1>
+                  <p>Coming Soon...</p>
+                </div>
               </MainLayout>
             } 
           />
