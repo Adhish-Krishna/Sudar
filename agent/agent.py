@@ -41,7 +41,7 @@ class SudarAIAgent:
         """Initialize Qwen3:4b model via Ollama"""
         try:
             model = ChatOllama(
-                model="qwen3:4b",  # Using your available qwen3:4b model
+                model=os.getenv("OLLAMA_MODEL"),  # Using your available qwen3:4b model
                 temperature=0.7,
                 base_url="http://localhost:11434",
                 verbose=False,  # Reduce verbosity
@@ -140,7 +140,7 @@ Save the final worksheet using SaveContent tool.""",
     
     def chat(self, message: str, thread_id: str = "default", debug: bool = False):
         """
-        Chat with the Sudar AI Agent
+        Chat with the Sudar AI Agent with streaming intermediate responses
         
         Args:
             message (str): User's message/query
@@ -155,39 +155,166 @@ Save the final worksheet using SaveContent tool.""",
         try:
             rprint(f"[blue]User:[/blue] {message}")
             rprint("[cyan]Sudar is thinking...[/cyan]")
+            print()
             
             if debug:
-                rprint("[dim]Debug: Starting agent invocation...[/dim]")
+                rprint("[dim]Debug: Starting agent streaming...[/dim]")
             
-            # Use invoke instead of stream for more reliable response
-            result = self.agent.invoke(
+            # Stream the response to show intermediate steps
+            final_response = ""
+            
+            for chunk in self.agent.stream(
                 {"messages": [{"role": "user", "content": message}]}, 
-                config=config
-            )
+                config=config,
+                stream_mode="values"  # Stream all intermediate values
+            ):
+                if debug:
+                    rprint(f"[dim]Debug: Chunk keys: {list(chunk.keys())}[/dim]")
+                
+                # Handle messages (main responses and sub-agent calls)
+                if "messages" in chunk and chunk["messages"]:
+                    last_message = chunk["messages"][-1]
+                    
+                    # Check if it's a tool call (sub-agent invocation)
+                    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+                        for tool_call in last_message.tool_calls:
+                            tool_name = tool_call.get('name', 'Unknown Tool')
+                            rprint(f"[yellow]🔧 Calling: {tool_name}[/yellow]")
+                            if debug:
+                                rprint(f"[dim]   Args: {tool_call.get('args', {})}[/dim]")
+                    
+                    # Check if it's a regular message with content
+                    elif hasattr(last_message, 'content') and last_message.content:
+                        content = last_message.content.strip()
+                        if content:
+                            # Check if it's from a sub-agent or main agent
+                            message_type = getattr(last_message, 'name', None)
+                            if message_type:
+                                rprint(f"[magenta]🤖 {message_type}:[/magenta] {content}")
+                            else:
+                                rprint(f"[green]🧠 Sudar:[/green] {content}")
+                            final_response = content
+                    
+                    # Handle tool responses
+                    elif hasattr(last_message, 'name') and last_message.name:
+                        tool_name = last_message.name
+                        content = getattr(last_message, 'content', '')
+                        if content:
+                            # Truncate long tool responses for readability
+                            if len(content) > 200:
+                                display_content = content[:200] + "..."
+                            else:
+                                display_content = content
+                            rprint(f"[cyan]📊 {tool_name} result:[/cyan] {display_content}")
+                
+                # Handle planning steps (todos)
+                if "todos" in chunk and chunk["todos"]:
+                    rprint("[blue]📋 Planning:[/blue]")
+                    for i, todo in enumerate(chunk["todos"], 1):
+                        rprint(f"   {i}. {todo}")
+                    print()
+                
+                # Handle file operations
+                if "files" in chunk and chunk["files"]:
+                    files = chunk["files"]
+                    for filename, _ in files.items():
+                        rprint(f"[green]💾 Saved file: {filename}[/green]")
             
-            if debug:
-                rprint(f"[dim]Debug: Agent result keys: {result.keys()}[/dim]")
-            
-            # Extract the final response
-            if "messages" in result and result["messages"]:
-                final_message = result["messages"][-1]
-                if hasattr(final_message, 'content'):
-                    response_content = final_message.content
-                    rprint(f"[green]Sudar:[/green] {response_content}")
-                    return response_content
-                else:
-                    rprint(f"[green]Sudar:[/green] {str(final_message)}")
-                    return str(final_message)
+            print()
+            if final_response:
+                return final_response
             else:
-                rprint("[yellow]Sudar: I processed your request but didn't generate a text response.[/yellow]")
+                rprint("[yellow]✅ Task completed successfully[/yellow]")
                 return "Task completed"
                         
         except Exception as e:
-            rprint(f"[red]Error during chat: {e}[/red]")
+            rprint(f"[red]❌ Error during chat: {e}[/red]")
             if debug:
                 import traceback
                 rprint(f"[red]Full traceback:\n{traceback.format_exc()}[/red]")
             return f"I apologize, but I encountered an error: {e}"
+    
+    def chat_verbose(self, message: str, thread_id: str = "default"):
+        """
+        Verbose chat with detailed streaming of all agent steps
+        """
+        config = {"configurable": {"thread_id": thread_id}}
+        
+        try:
+            rprint(f"[blue]User:[/blue] {message}")
+            rprint("[cyan]🚀 Starting Sudar AI processing...[/cyan]")
+            print("=" * 60)
+            
+            step_count = 0
+            final_response = ""
+            
+            # Stream with different modes to catch all events
+            for chunk in self.agent.stream(
+                {"messages": [{"role": "user", "content": message}]}, 
+                config=config,
+                stream_mode="updates"  # Shows updates as they happen
+            ):
+                step_count += 1
+                
+                for node_name, node_output in chunk.items():
+                    rprint(f"[bold yellow]Step {step_count}: {node_name}[/bold yellow]")
+                    
+                    # Handle different types of outputs
+                    if "messages" in node_output:
+                        messages = node_output["messages"]
+                        if messages:
+                            last_msg = messages[-1]
+                            
+                            # Tool calls (sub-agent invocations)
+                            if hasattr(last_msg, 'tool_calls') and last_msg.tool_calls:
+                                for tool_call in last_msg.tool_calls:
+                                    tool_name = tool_call.get('name', 'Unknown')
+                                    args = tool_call.get('args', {})
+                                    rprint(f"  [magenta]🔧 Invoking: {tool_name}[/magenta]")
+                                    if args:
+                                        rprint(f"  [dim]   Arguments: {str(args)[:100]}...[/dim]")
+                            
+                            # Regular content
+                            elif hasattr(last_msg, 'content') and last_msg.content:
+                                content = last_msg.content.strip()
+                                if content:
+                                    # Check if it's a sub-agent response
+                                    if hasattr(last_msg, 'name') and last_msg.name:
+                                        rprint(f"  [cyan]🤖 {last_msg.name}:[/cyan] {content[:200]}...")
+                                    else:
+                                        rprint(f"  [green]💭 Response:[/green] {content}")
+                                        final_response = content
+                            
+                            # Tool responses
+                            elif hasattr(last_msg, 'name') and hasattr(last_msg, 'content'):
+                                tool_name = last_msg.name
+                                result = last_msg.content
+                                rprint(f"  [blue]📊 {tool_name} completed[/blue]")
+                                if len(result) > 100:
+                                    rprint(f"  [dim]   Result: {result[:100]}...[/dim]")
+                    
+                    # Planning updates
+                    if "todos" in node_output and node_output["todos"]:
+                        rprint(f"  [yellow]📋 Updated Plan:[/yellow]")
+                        for i, todo in enumerate(node_output["todos"], 1):
+                            rprint(f"    {i}. {todo}")
+                    
+                    # File operations
+                    if "files" in node_output and node_output["files"]:
+                        for filename in node_output["files"].keys():
+                            rprint(f"  [green]💾 File saved: {filename}[/green]")
+                    
+                    print("-" * 40)
+            
+            print("=" * 60)
+            rprint("[bold green]🎉 Processing complete![/bold green]")
+            return final_response
+                        
+        except Exception as e:
+            rprint(f"[red]❌ Error in verbose chat: {e}[/red]")
+            import traceback
+            rprint(f"[red]Traceback:\n{traceback.format_exc()}[/red]")
+            return f"Error: {e}"
     
     def invoke(self, message: str, thread_id: str = "default"):
         """
@@ -226,8 +353,10 @@ def main():
             return
         
         rprint("[bold green]🚀 Sudar AI Agent is ready![/bold green]")
-        rprint("[yellow]Type 'quit' or 'exit' to end the conversation[/yellow]")
-        rprint("[yellow]Type 'debug' to enable debug mode[/yellow]")
+        rprint("[yellow]Commands:[/yellow]")
+        rprint("[yellow]  'quit' or 'exit' - End conversation[/yellow]")
+        rprint("[yellow]  'debug' - Toggle debug mode[/yellow]")
+        rprint("[yellow]  'verbose' - Toggle verbose streaming mode[/yellow]")
         rprint("[dim]Example queries:[/dim]")
         rprint("[dim]- Research machine learning fundamentals[/dim]")
         rprint("[dim]- Create a worksheet about photosynthesis for grade 8[/dim]")
@@ -235,6 +364,7 @@ def main():
         print()
         
         debug_mode = False
+        verbose_mode = False
         
         # Interactive chat loop
         while True:
@@ -250,11 +380,19 @@ def main():
                     rprint(f"[yellow]Debug mode: {'ON' if debug_mode else 'OFF'}[/yellow]")
                     continue
                     
+                if user_input.lower() == 'verbose':
+                    verbose_mode = not verbose_mode
+                    rprint(f"[yellow]Verbose streaming: {'ON' if verbose_mode else 'OFF'}[/yellow]")
+                    continue
+                    
                 if not user_input:
                     continue
                     
-                # Chat with Sudar
-                sudar.chat(user_input, debug=debug_mode)
+                # Chat with Sudar using appropriate mode
+                if verbose_mode:
+                    sudar.chat_verbose(user_input)
+                else:
+                    sudar.chat(user_input, debug=debug_mode)
                 print()
                 
             except KeyboardInterrupt:
