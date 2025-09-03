@@ -13,24 +13,176 @@ interface Activity {
 }
 
 const SubjectDetail = ({ subjectName, subjectId }: SubjectDetailProps) => {
-  // TODO: Replace with API call to fetch recent activities
-  const recentActivities: Activity[] = [
-    {
-      id: '1',
-      title: 'Tamizhar Thozhilnutpam Unit test -2',
-      date: '29 July, 2025',
-      type: 'document'
-    },
-    {
-      id: '2',
-      title: 'Tamizhar Thozhilnutpam',
-      date: '29 July, 2025',
-      type: 'video'
-    }
-  ];
+  // Get subject-specific activities based on subjectId
+  const getSubjectActivities = (id: string): Activity[] => {
+    const subjectActivities: Record<string, Activity[]> = {
+      '1': [ // Mathematics
+        {
+          id: '1',
+          title: 'Algebra - Linear Equations Worksheet',
+          date: '29 July, 2025',
+          type: 'document'
+        },
+        {
+          id: '2',
+          title: 'Calculus Introduction Video',
+          date: '28 July, 2025',
+          type: 'video'
+        },
+        {
+          id: '3',
+          title: 'Geometry - Triangles Quiz',
+          date: '27 July, 2025',
+          type: 'document'
+        }
+      ],
+      '2': [ // Science
+        {
+          id: '1',
+          title: 'Physics - Newton\'s Laws Experiment',
+          date: '30 July, 2025',
+          type: 'video'
+        },
+        {
+          id: '2',
+          title: 'Chemistry - Periodic Table Assignment',
+          date: '29 July, 2025',
+          type: 'document'
+        },
+        {
+          id: '3',
+          title: 'Biology - Cell Structure Video',
+          date: '28 July, 2025',
+          type: 'video'
+        }
+      ],
+      '3': [ // English
+        {
+          id: '1',
+          title: 'Shakespeare - Romeo and Juliet Analysis',
+          date: '31 July, 2025',
+          type: 'document'
+        },
+        {
+          id: '2',
+          title: 'Grammar - Tenses Practice',
+          date: '30 July, 2025',
+          type: 'document'
+        },
+        {
+          id: '3',
+          title: 'Poetry - Literary Devices Video',
+          date: '29 July, 2025',
+          type: 'video'
+        }
+      ],
+      '4': [ // History
+        {
+          id: '1',
+          title: 'World War II - Key Events Timeline',
+          date: '01 August, 2025',
+          type: 'document'
+        },
+        {
+          id: '2',
+          title: 'Ancient Civilizations Documentary',
+          date: '31 July, 2025',
+          type: 'video'
+        },
+        {
+          id: '3',
+          title: 'Industrial Revolution Assignment',
+          date: '30 July, 2025',
+          type: 'document'
+        }
+      ],
+      '5': [ // Geography
+        {
+          id: '1',
+          title: 'Climate Change Impact Study',
+          date: '02 August, 2025',
+          type: 'document'
+        },
+        {
+          id: '2',
+          title: 'Mountain Formation Video',
+          date: '01 August, 2025',
+          type: 'video'
+        },
+        {
+          id: '3',
+          title: 'World Capitals Quiz',
+          date: '31 July, 2025',
+          type: 'document'
+        }
+      ],
+      '6': [ // Computer Science
+        {
+          id: '1',
+          title: 'Python Programming - Loops Tutorial',
+          date: '03 August, 2025',
+          type: 'video'
+        },
+        {
+          id: '2',
+          title: 'Data Structures - Arrays Assignment',
+          date: '02 August, 2025',
+          type: 'document'
+        },
+        {
+          id: '3',
+          title: 'Algorithm Design Workshop',
+          date: '01 August, 2025',
+          type: 'video'
+        }
+      ],
+      // Legacy support for old string IDs
+      'math': [
+        {
+          id: '1',
+          title: 'Algebra - Linear Equations Worksheet',
+          date: '29 July, 2025',
+          type: 'document'
+        }
+      ],
+      'science': [
+        {
+          id: '1',
+          title: 'Physics - Newton\'s Laws Experiment',
+          date: '30 July, 2025',
+          type: 'video'
+        }
+      ],
+      'tamil': [
+        {
+          id: '1',
+          title: 'Tamizhar Thozhilnutpam Unit test -2',
+          date: '29 July, 2025',
+          type: 'document'
+        },
+        {
+          id: '2',
+          title: 'Tamizhar Thozhilnutpam',
+          date: '29 July, 2025',
+          type: 'video'
+        }
+      ]
+    };
+    
+    return subjectActivities[id] || [];
+  };
+
+  const recentActivities = getSubjectActivities(subjectId);
 
   const getSubjectGradient = (id: string): string => {
     const gradients: Record<string, string> = {
+      '1': 'from-cyan-500 to-blue-600',     // Mathematics
+      '2': 'from-orange-500 to-red-600',    // Science
+      '3': 'from-green-500 to-teal-600',    // English
+      '4': 'from-purple-500 to-indigo-600', // History
+      '5': 'from-blue-500 to-cyan-600',     // Geography
+      '6': 'from-gray-500 to-slate-600',    // Computer Science
+      // Legacy support
       'math': 'from-cyan-500 to-blue-600',
       'science': 'from-orange-500 to-red-600',
       'tamil': 'from-blue-500 to-indigo-600'

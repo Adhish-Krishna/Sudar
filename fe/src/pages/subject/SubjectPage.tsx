@@ -14,6 +14,13 @@ const SubjectPage = () => {
   // TODO: Replace with API call to fetch subject details
   const getSubjectName = (id: string | undefined): string => {
     const subjects: Record<string, string> = {
+      '1': 'MATHEMATICS',
+      '2': 'SCIENCE', 
+      '3': 'ENGLISH',
+      '4': 'HISTORY',
+      '5': 'GEOGRAPHY',
+      '6': 'COMPUTER SCIENCE',
+      // Legacy support for old string IDs
       'math': 'MATHEMATICS',
       'science': 'SCIENCE', 
       'tamil': 'TAMIL'

@@ -1,0 +1,135 @@
+.classes-container {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.classes-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.classes-header h1 {
+  color: var(--text-color);
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.classes-header p {
+  color: var(--text-color-secondary);
+  font-size: 1.1rem;
+}
+
+.subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  padding: 1rem 0;
+}
+
+.subject-card {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.subject-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--subject-color);
+  transition: all 0.2s ease;
+}
+
+.subject-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: var(--subject-color);
+}
+
+.subject-card:hover::before {
+  height: 4px;
+}
+
+.subject-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+  color: var(--subject-color);
+}
+
+.subject-card:hover .subject-icon {
+  transform: scale(1.05);
+}
+
+.subject-card h3 {
+  color: var(--text-color);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  transition: color 0.2s ease;
+}
+
+.subject-card:hover h3 {
+  color: var(--subject-color);
+}
+
+.subject-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--subject-color);
+  color: white;
+  padding: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.subject-card:hover .subject-overlay {
+  opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .classes-container {
+    padding: 1rem;
+  }
+  
+  .classes-header h1 {
+    font-size: 2rem;
+  }
+  
+  .subjects-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .subject-card {
+    min-height: 150px;
+    padding: 1.5rem;
+  }
+  
+  .subject-icon {
+    font-size: 2.5rem;
+  }
+}
