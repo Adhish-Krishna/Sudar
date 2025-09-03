@@ -16,12 +16,15 @@
 }
 
 .main-content.expanded {
-  margin-left: 250px;
+  margin-left: 260px;
 }
 
 .page-content {
   flex: 1;
   padding: 0;
+  margin-top: 70px; /* Account for fixed header height */
+  background-color: var(--background-color);
+  min-height: calc(100vh - 70px);
 }
 
 /* Mobile responsiveness */
@@ -29,5 +32,9 @@
   .main-content.collapsed,
   .main-content.expanded {
     margin-left: 0;
+  }
+  
+  .page-content {
+    margin-top: 70px;
   }
 }
