@@ -3,13 +3,14 @@
   left: 0;
   top: 0;
   height: 100vh;
-  background-color: var(--text-color);
-  color: white;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
   z-index: 1000;
   border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar.collapsed {
@@ -17,28 +18,34 @@
 }
 
 .sidebar.expanded {
-  width: 250px;
+  width: 260px;
 }
 
 .sidebar-header {
-  padding: 1rem;
+  padding: 1.25rem;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: center;
+  background: var(--surface-color);
 }
 
 .hamburger-btn {
   background: none;
   border: none;
-  color: white;
+  color: var(--sidebar-text);
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: var(--border-radius);
-  transition: background-color 0.2s ease;
+  padding: 0.625rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hamburger-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--sidebar-hover);
+  color: var(--primary-color);
+  transform: scale(1.05);
 }
 
 .hamburger-btn svg {
@@ -48,39 +55,46 @@
 
 .sidebar-nav {
   flex: 1;
-  padding: 1rem 0;
+  padding: 1.5rem 0;
+  overflow-y: auto;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  margin: 0.25rem 0.5rem;
-  border-radius: var(--border-radius);
+  padding: 0.875rem 1.25rem;
+  margin: 0.375rem 0.75rem;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s ease;
   text-decoration: none;
-  color: inherit;
+  color: var(--sidebar-text);
   position: relative;
+  font-weight: 500;
 }
 
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background: var(--sidebar-hover);
+  color: var(--text-color);
+  transform: translateX(4px);
 }
 
 .nav-item.active {
-  background-color: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-color) 0%, #4f46e5 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
 .nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  left: -0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
   width: 4px;
-  background-color: var(--primary-color);
-  border-radius: 0 2px 2px 0;
+  height: 24px;
+  background: linear-gradient(to bottom, #60a5fa, var(--primary-color));
+  border-radius: 2px;
 }
 
 .nav-icon {
@@ -90,49 +104,73 @@
   width: 24px;
   height: 24px;
   margin-right: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.1);
 }
 
 .nav-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.5;
 }
 
 .nav-text {
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   white-space: nowrap;
+  letter-spacing: 0.025em;
 }
 
 .subject-list {
-  margin-left: 1rem;
+  margin-left: 1.25rem;
   border-left: 2px solid var(--border-color);
-  padding-left: 1rem;
+  padding-left: 1.25rem;
+  margin-top: 0.5rem;
 }
 
 .subject-item {
   display: block;
-  padding: 0.5rem 1rem;
+  padding: 0.625rem 1rem;
   margin: 0.25rem 0;
-  border-radius: var(--border-radius);
+  border-radius: 8px;
   text-decoration: none;
   color: var(--text-muted);
   font-size: 0.875rem;
+  font-weight: 500;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .subject-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background: var(--sidebar-hover);
   color: var(--primary-color);
+  transform: translateX(2px);
 }
 
 .subject-item.active {
-  background-color: var(--primary-color);
-  color: white;
+  background: var(--sidebar-hover);
+  color: var(--text-color);
+  border-left: 3px solid var(--primary-color);
 }
 
-.sidebar-bottom {
-  padding: 1rem 0;
-  border-top: 1px solid var(--border-color);
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.expanded {
+    transform: translateX(0);
+    width: 280px;
+  }
+  
+  .sidebar.collapsed {
+    transform: translateX(-100%);
+  }
 }
 
 /* Mobile responsiveness */

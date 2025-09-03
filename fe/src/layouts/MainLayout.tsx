@@ -21,7 +21,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
         onToggle={toggleSidebar} 
       />
       <div className={`main-content ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}>
-        <Header />
+        <Header sidebarExpanded={isSidebarExpanded} />
         <div className="page-content">
           {children}
         </div>

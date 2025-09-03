@@ -1,5 +1,5 @@
 :root {
-  /* Color Variables */
+  /* Light Theme Variables */
   --primary-color: #3b82f6;
   --primary-hover: #2563eb;
   --secondary-color: #6b7280;
@@ -11,6 +11,16 @@
   --success-color: #10b981;
   --error-color: #ef4444;
   --warning-color: #f59e0b;
+  
+  /* Theme-specific variables */
+  --header-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #374151;
+  --sidebar-hover: rgba(59, 130, 246, 0.15);
+  --search-bg: #f1f5f9;
+  --search-focus-bg: #ffffff;
+  --button-bg: #f8fafc;
+  --user-profile-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   
   /* Shadow Variables */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -29,6 +39,31 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark Theme Variables */
+[data-theme="dark"] {
+  --primary-color: #60a5fa;
+  --primary-hover: #3b82f6;
+  --secondary-color: #9ca3af;
+  --background-color: #0f172a;
+  --surface-color: #1e293b;
+  --text-color: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --success-color: #34d399;
+  --error-color: #f87171;
+  --warning-color: #fbbf24;
+  
+  /* Theme-specific variables for dark mode */
+  --header-bg: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  --sidebar-bg: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  --sidebar-text: #cbd5e1;
+  --sidebar-hover: rgba(96, 165, 250, 0.15);
+  --search-bg: #334155;
+  --search-focus-bg: #475569;
+  --button-bg: #334155;
+  --user-profile-bg: linear-gradient(135deg, #334155 0%, #475569 100%);
 }
 
 * {
