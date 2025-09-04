@@ -1,0 +1,40 @@
+.main-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--background-color);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.collapsed {
+  margin-left: 80px;
+}
+
+.main-content.expanded {
+  margin-left: 260px;
+}
+
+.page-content {
+  flex: 1;
+  padding: 0;
+  margin-top: 70px; /* Account for fixed header height */
+  background-color: var(--background-color);
+  min-height: calc(100vh - 70px);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .main-content.collapsed,
+  .main-content.expanded {
+    margin-left: 0;
+  }
+  
+  .page-content {
+    margin-top: 70px;
+  }
+}

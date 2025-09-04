@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './login.css';
 import SudarLogo from '../../assets/Sudar.png';
 import loginTeacherImage from '../../assets/login_teacher.png';
@@ -7,6 +8,7 @@ import Button from '../../components/Button';
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,7 +16,8 @@ const Login: React.FC = () => {
     // Placeholder for API call - to be implemented later
     console.log('Login attempt with:', { email, password });
     
-    // TODO: Add API call here
+    // For now, simply navigate to home page after form submission
+    // TODO: Add proper authentication logic here
     // Example:
     // try {
     //   const response = await fetch('/api/login', {
@@ -25,10 +28,15 @@ const Login: React.FC = () => {
     //     body: JSON.stringify({ email, password }),
     //   });
     //   const data = await response.json();
-    //   // Handle response
+    //   if (data.success) {
+    //     navigate('/');
+    //   }
     // } catch (error) {
     //   console.error('Login error:', error);
     // }
+    
+    // Temporary: Navigate to home page immediately
+    navigate('/home');
   };
 
   const handleForgotPassword = () => {
