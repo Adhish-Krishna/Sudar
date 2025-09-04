@@ -8,3 +8,4 @@ tavily-python
 python-dotenv
 rich
 requests
+sentence-transformers
