@@ -1,4 +1,3 @@
-deepagents
 langchain-docling
 langchain-huggingface
 langchain-chroma
@@ -9,3 +8,4 @@ python-dotenv
 rich
 requests
 sentence-transformers
+langgraph-supervisor
