@@ -10,3 +10,5 @@ requests
 sentence-transformers
 langgraph-supervisor
 langchain-google-genai
+langhain-groq
+mem0ai

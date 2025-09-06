@@ -7,23 +7,27 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
 from subagents import ReActSubAgent
 from prompts import contentResearcherPrompt, worksheetGeneratorPrompt, supervisorPrompt
+from langchain_groq import ChatGroq
 
 # Load the environment variables
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_MODEL_NAME = os.getenv("GOOGLE_MODEL_NAME")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME")
 
 class SUDARAgent:
     def __init__(self):
-        self.MODEL_PROVIDER = MODEL_PROVIDER
-        self.OLLAMA_MODEL = OLLAMA_MODEL
-        self.GOOGLE_API_KEY = GOOGLE_API_KEY
-        self.memory = InMemorySaver()
-        self.llm_model = ChatGoogleGenerativeAI(
-            model = "gemini-2.5-flash"
-        )
+        self.llm_model = ChatOllama(model = OLLAMA_MODEL)
+        if MODEL_PROVIDER == 'groq':
+            self.llm_model = ChatGroq(model = GROQ_MODEL_NAME)
+        elif MODEL_PROVIDER == 'google':
+            self.llm_model = ChatGoogleGenerativeAI(model=GOOGLE_MODEL_NAME)
 
+        self.memory = InMemorySaver()
+   
         self.AGENT_CONFIG = {
             "temperature": 0.7,
             "max_tokens": 2048,

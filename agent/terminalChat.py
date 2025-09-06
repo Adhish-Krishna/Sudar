@@ -23,7 +23,8 @@ def chat():
                         }
                     ]
                 },
-                config=config
+                config=config,
+                stream_mode="updates",
             ):
                 agents = ["supervisor", "ContentResearcher", "WorksheetGenerator"]
                 for ag in agents:
