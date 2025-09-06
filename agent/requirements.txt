@@ -9,3 +9,4 @@ rich
 requests
 sentence-transformers
 langgraph-supervisor
+langchain-google-genai

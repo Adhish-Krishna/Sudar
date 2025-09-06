@@ -5,17 +5,23 @@ import os
 from dotenv import load_dotenv
 from tools import DocumentRetrieverTool, WebSearchTool, WebScraperTool, SaveContentTool
 from langgraph.checkpoint.memory import InMemorySaver
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Load the environment variables
 load_dotenv()
-
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama")
 
 class SUDARAgent:
     def __init__(self):
-        self.MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama")
-        self.OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+        self.MODEL_PROVIDER = MODEL_PROVIDER
+        self.OLLAMA_MODEL = OLLAMA_MODEL
+        self.GOOGLE_API_KEY = GOOGLE_API_KEY
         self.memory = InMemorySaver()
-        self.llm_model = ChatOllama(model=self.OLLAMA_MODEL)
+        self.llm_model = ChatGoogleGenerativeAI(
+            model = "gemini-2.5-flash"
+        )
         self.AGENT_CONFIG = {
             "temperature": 0.7,
             "max_tokens": 2048,
@@ -121,10 +127,11 @@ class SUDARAgent:
         Always ensure worksheets are educationally sound, engaging, and tailored to the specific grade level and subject matter, AND always save the generated content using the SaveContentTool."""
         )
 
-        #SUDARV agent (orchestrator)
+        #SUDAR agent (orchestrator)
         self.orchestrator = create_supervisor(
             agents = [self.worksheet_generator_agent, self.content_researcher_agent],
             model = self.llm_model,
+            tools=[SaveContentTool],
             prompt = """You are the Orchestrator Agent - the master coordinator for the Sudar AI educational system.
 
         Your primary role is to understand user queries and intelligently plan the execution workflow by coordinating between specialized agents.
