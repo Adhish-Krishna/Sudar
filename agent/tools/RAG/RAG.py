@@ -1,5 +1,5 @@
-from tools.RAG.Chunking import ChunkDocument
-from tools.RAG.Retrieve import RetrieveChunks
+from .Chunking import ChunkDocument
+from .Retrieve import RetrieveChunks
 from rich import print as rprint
 from typing import Union
 from pydantic import BaseModel, Field

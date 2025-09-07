@@ -2,11 +2,11 @@ from langchain_ollama import ChatOllama
 from langgraph_supervisor import create_supervisor
 import os
 from dotenv import load_dotenv
-from tools import DocumentRetrieverTool, WebSearchTool, WebScraperTool, SaveContentTool
+from .tools import DocumentRetrieverTool, WebSearchTool, WebScraperTool, SaveContentTool
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
-from subagents import ReActSubAgent
-from prompts import contentResearcherPrompt, worksheetGeneratorPrompt, supervisorPrompt
+from .subagents import ReActSubAgent
+from .prompts import contentResearcherPrompt, worksheetGeneratorPrompt, supervisorPrompt
 from langchain_groq import ChatGroq
 
 # Load the environment variables

@@ -7,9 +7,8 @@ from langchain_core.tools import StructuredTool
 
 load_dotenv()
 
-tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-
 def scrapWebsite(url: str | list, query: str):
+  tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
   rprint("[green]Scrapping the website...[green]")
   context = ""
   urls = [url] if isinstance(url,str) else url

@@ -2,7 +2,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 import os
 from datetime import datetime
-from utils.util import sanitize_collection_name, extract_filename
+from ...utils.util import sanitize_collection_name, extract_filename
 from rich.console import Console
 
 console = Console()

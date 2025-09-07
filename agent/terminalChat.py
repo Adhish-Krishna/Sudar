@@ -1,4 +1,4 @@
-from sudar import SUDARAgent
+from .sudar import SUDARAgent
 
 def chat():
     agent = SUDARAgent()
