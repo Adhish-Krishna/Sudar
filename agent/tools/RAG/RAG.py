@@ -6,12 +6,14 @@ from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
 import os
 
-def RAG(filepath: str, query: str) -> Union[str, None]:
+def RAG(filepath: str, query: str, user_id: str = "teacher001", chat_id: str = "1") -> Union[str, None]:
   '''
   Retrieves context from the vector database based on the given query
   Arguments:
     filepath: str - the filepath of the document to query about
     query : str - the query from the user
+    user_id: str - the user identifier for filtering (default: "teacher001")
+    chat_id: str - the chat identifier for filtering (default: "1")
   Output:
     context : str | None - the retrieved context from the vector database or else return None
   '''
@@ -20,7 +22,7 @@ def RAG(filepath: str, query: str) -> Union[str, None]:
   try:
     context = ""
     # Parse and chunk the document
-    chunking = ChunkDocument(filepath)
+    chunking = ChunkDocument(filepath, user_id, chat_id)
 
     if not chunking.parseDocument():
       try:
@@ -32,7 +34,7 @@ def RAG(filepath: str, query: str) -> Union[str, None]:
 
     # Retrieve context based on the query
     try:
-      retrieve = RetrieveChunks(filepath, query)
+      retrieve = RetrieveChunks(filepath, query, user_id, chat_id)
       chunks: list = retrieve.retrieveChunks()
     except Exception as e:
       rprint(f"[red]Error during chunk retrieval: {str(e)}[/red]")
