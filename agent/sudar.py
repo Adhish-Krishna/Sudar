@@ -34,8 +34,7 @@ class SUDARAgent:
         self.memory = MongoDBSaver(
             client=self.client,
             connection_string=MONGO_DB_URI,
-            db_name="SUDAR",
-            checkpoint_collection_name="sudar-chats"
+            db_name="SUDAR"
         )
    
         self.AGENT_CONFIG = {
