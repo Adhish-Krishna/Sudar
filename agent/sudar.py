@@ -8,6 +8,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from .subagents import ReActSubAgent
 from .prompts import contentResearcherPrompt, worksheetGeneratorPrompt, supervisorPrompt
 from langchain_groq import ChatGroq
+from langgraph.checkpoint.mongodb import MongoDBSaver
+from pymongo import MongoClient
 
 # Load the environment variables
 load_dotenv()
@@ -17,16 +19,24 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME")
+MONGO_DB_URI = os.getenv("MONGO_DB_URI")
 
 class SUDARAgent:
     def __init__(self):
+
         self.llm_model = ChatOllama(model = OLLAMA_MODEL)
         if MODEL_PROVIDER == 'groq':
             self.llm_model = ChatGroq(model = GROQ_MODEL_NAME)
         elif MODEL_PROVIDER == 'google':
             self.llm_model = ChatGoogleGenerativeAI(model=GOOGLE_MODEL_NAME)
 
-        self.memory = InMemorySaver()
+        self.client = MongoClient(MONGO_DB_URI)
+        self.memory = MongoDBSaver(
+            client=self.client,
+            connection_string=MONGO_DB_URI,
+            db_name="SUDAR",
+            checkpoint_collection_name="sudar-chats"
+        )
    
         self.AGENT_CONFIG = {
             "temperature": 0.7,
@@ -39,12 +49,12 @@ class SUDARAgent:
         self.worksheet_generator = ReActSubAgent()
     
         self.orchestrator = create_supervisor(
-            agents = [self.content_researcher(self.llm_model, "ContentResearcher", self.memory, [DocumentRetrieverTool, WebScraperTool, WebSearchTool], contentResearcherPrompt), self.worksheet_generator(self.llm_model, "WorksheetGenerator", self.memory, [SaveContentTool], worksheetGeneratorPrompt)],
+            agents = [self.content_researcher(self.llm_model, "ContentResearcher",[DocumentRetrieverTool, WebScraperTool, WebSearchTool], contentResearcherPrompt), self.worksheet_generator(self.llm_model, "WorksheetGenerator", [SaveContentTool], worksheetGeneratorPrompt)],
             model = self.llm_model,
             tools=[SaveContentTool],
             prompt = supervisorPrompt,
-        add_handoff_back_messages=True,
-        output_mode="full_history"
+            add_handoff_back_messages=True,
+            output_mode="full_history"
         )
 
     def get_agent(self):

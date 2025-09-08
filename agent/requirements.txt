@@ -12,3 +12,5 @@ rich
 requests
 sentence-transformers
 mem0ai
+pymongo
+langgraph-checkpoint-mongodb

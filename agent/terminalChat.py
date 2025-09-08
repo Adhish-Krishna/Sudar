@@ -5,7 +5,7 @@ def chat():
     compiled_agent = agent.get_agent()
     config = {
         "configurable":{
-            "thread_id":"1"
+            "thread_id":"1" #should be actual chat_id
         }
     }
     while True:
