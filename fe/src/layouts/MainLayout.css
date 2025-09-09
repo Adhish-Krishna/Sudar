@@ -5,18 +5,17 @@
 }
 
 .main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  transition: margin-left 0.3s ease;
+  flex: 1 !important;
+  margin-left: 260px !important; /* Sidebar width */
+  padding-top: var(--header-height, 64px) !important; /* Header height */
+  transition: margin-left 0.3s ease !important;
+  min-height: 100vh !important;
+  width: calc(100% - 260px) !important;
 }
 
 .main-content.collapsed {
-  margin-left: 80px;
-}
-
-.main-content.expanded {
-  margin-left: 260px;
+  margin-left: 80px !important;
+  width: calc(100% - 80px) !important;
 }
 
 .page-content {
@@ -37,4 +36,19 @@
   .page-content {
     margin-top: 70px;
   }
+}
+
+/* Layout fixes for full-width header */
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Fix any conflicting z-index issues */
+.sidebar {
+  z-index: 999 !important;
+}
+
+.header {
+  z-index: 1000 !important;
 }

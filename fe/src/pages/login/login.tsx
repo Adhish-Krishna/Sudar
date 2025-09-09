@@ -4,45 +4,41 @@ import './login.css';
 import SudarLogo from '../../assets/Sudar.png';
 import loginTeacherImage from '../../assets/login_teacher.png';
 import Button from '../../components/Button';
+// import { useAuth } from '../../contexts/AuthContext';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  // const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setIsLoading(true);
     
-    // Placeholder for API call - to be implemented later
-    console.log('Login attempt with:', { email, password });
-    
-    // For now, simply navigate to home page after form submission
-    // TODO: Add proper authentication logic here
-    // Example:
-    // try {
-    //   const response = await fetch('/api/login', {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify({ email, password }),
-    //   });
-    //   const data = await response.json();
-    //   if (data.success) {
-    //     navigate('/');
-    //   }
-    // } catch (error) {
-    //   console.error('Login error:', error);
-    // }
-    
-    // Temporary: Navigate to home page immediately
-    navigate('/home');
+    try {
+      // await login(email, password);
+      console.log('Login attempt:', { email, password });
+      // Simulate API call delay
+      setTimeout(() => {
+        setIsLoading(false);
+        navigate('/home');
+      }, 1500);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Login failed');
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
-    // Placeholder for forgot password functionality
-    console.log('Forgot password clicked');
-    // TODO: Implement forgot password logic
+    navigate('/forgot-password');
+  };
+
+  const handleSignUp = () => {
+    navigate('/signup');
   };
 
   return (
@@ -61,6 +57,8 @@ const Login: React.FC = () => {
             <h1 className="login-title">Login to Your Account</h1>
             
             <form onSubmit={handleLogin} className="login-form">
+              {error && <div className="error-message">{error}</div>}
+              
               <div className="input-group">
                 <label htmlFor="email" className="input-label">Email</label>
                 <input
@@ -87,10 +85,10 @@ const Login: React.FC = () => {
                 />
               </div>
               
-              {/* Example using the Button component with CSS variables */}
               <Button
                 type="submit"
                 variant="primary"
+                disabled={isLoading}
                 style={{
                   width: '100%',
                   marginTop: '8px',
@@ -98,7 +96,7 @@ const Login: React.FC = () => {
                   fontSize: '16px',
                 }}
               >
-                Login
+                {isLoading ? 'Signing In...' : 'Login'}
               </Button>
             </form>
             
@@ -117,7 +115,22 @@ const Login: React.FC = () => {
               Forgot Password?
             </button>
             
-            {/* Example of a secondary button with CSS variables */}
+            <div className="login-footer">
+              <p>Don't have an account?</p>
+              <button 
+                onClick={handleSignUp}
+                className="forgot-password-link"
+                style={{
+                  color: 'var(--primary-color)',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                Sign Up
+              </button>
+            </div>
             </div>
         </div>
       </div>
