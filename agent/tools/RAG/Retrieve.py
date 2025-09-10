@@ -11,14 +11,14 @@ console = Console()
 load_dotenv()
 
 class RetrieveChunks:
-  def __init__(self, filepath: str, query: str, user_id: str = "teacher001", chat_id: str = "1"):
+  def __init__(self, object_key: str, query: str, user_id: str = "teacher001", chat_id: str = "1"):
     try:
       self.query = query
       self.user_id = user_id
       self.chat_id = chat_id
       self.client = QdrantClient(url=os.getenv("QDRANT_URL"))
-      self.filepath: str = filepath
-      self.filename: str = extract_filename(filepath)
+      self.object_key: str = object_key
+      self.filename: str = extract_filename(object_key)
       self.current_dir = os.path.dirname(os.path.abspath(__file__))
     except Exception as e:
       console.print(f"Error during initialization: {str(e)}", style="red")

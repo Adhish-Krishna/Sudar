@@ -10,6 +10,8 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
 from dotenv import load_dotenv
 import uuid
+from minio import Minio
+import tempfile
 
 # Create console instance at class level
 console = Console()
@@ -17,23 +19,33 @@ console = Console()
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL")
+MINIO_URL = os.getenv("MINIO_URL", "http://localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "documents")
 
 class ChunkDocument:
 
-  def __init__(self, filepath: str, user_id: str = "teacher001", chat_id: str = "1"):
+  def __init__(self, object_key: str, user_id: str = "teacher001", chat_id: str = "1"):
     try:
       self.user_id = user_id
       self.chat_id = chat_id
       self.client = QdrantClient(url=QDRANT_URL)
+      self.minio_client = Minio(
+          endpoint=str(MINIO_URL).replace("http://", "").replace("https://", ""),
+          access_key=MINIO_ACCESS_KEY,
+          secret_key=MINIO_SECRET_KEY,
+          secure=False
+      )
       #creating a collection if it does not exits
       if(self.client.collection_exists(collection_name="sudar-ai")==False):
         self.client.create_collection(
           collection_name="sudar-ai",
           vectors_config=VectorParams(size=384, distance=Distance.COSINE),
         )
-      self.filepath: str = filepath
-      self.filename: str = extract_filename(filepath)
-      self.extension: str = extract_extension(filepath)
+      self.object_key: str = object_key
+      self.filename: str = extract_filename(object_key)
+      self.extension: str = extract_extension(object_key)
       self.current_dir = os.path.dirname(os.path.abspath(__file__))
     except Exception as e:
       console.print(f"Error during initialization: {str(e)}", style="red")
@@ -42,24 +54,34 @@ class ChunkDocument:
   def parseDocument(self):
     try:
       console.print("Initializing Vector DB...", style="blue")
-      if not os.path.exists(self.filepath):
-        console.print(f"Error: The document {self.filepath} does not exist!", style="red")
-        raise FileNotFoundError(f"The document {self.filepath} does not exist!")
-
+      
+      # Download file from MinIO to a temporary file
+      with tempfile.NamedTemporaryFile(delete=False, suffix=self.extension) as temp_file:
+          response = self.minio_client.get_object(MINIO_BUCKET_NAME, self.object_key)
+          temp_file.write(response.read())
+          temp_filepath = temp_file.name
+      
       console.print("Loading the document...", style="blue")
       st = datetime.now()
-      loader = DoclingLoader(file_path=self.filepath, export_type=ExportType.DOC_CHUNKS)
+      loader = DoclingLoader(file_path=temp_filepath, export_type=ExportType.DOC_CHUNKS)
       self.docs = loader.load()
       et = datetime.now()
       run_time = et - st
       console.print("Document Loaded", style="blue")
       console.print(f"Time Taken: {str(run_time)}", style="blue")
       console.print(f"Number of Chunks: {str(len(self.docs))}", style="blue")
+      
+      # Clean up the temporary file
+      os.remove(temp_filepath)
+
     except FileNotFoundError as e:
       console.print(f"File Error: {str(e)}", style="red")
       raise
     except Exception as e:
       console.print(f"Error during document parsing: {str(e)}", style="red")
+      # Clean up temp file in case of error
+      if 'temp_filepath' in locals() and os.path.exists(temp_filepath):
+          os.remove(temp_filepath)
       raise
 
   def initializeEmbeddings(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2")->None:
@@ -87,7 +109,7 @@ class ChunkDocument:
           id=str(uuid.uuid4()),
           vector=self.embeddings.embed_query(docs.page_content),
           payload={
-            "filepath":docs.metadata['source'],
+            "object_key": self.object_key,
             "content": docs.page_content,
             "user_id": self.user_id, #sample user_id
             "chat_id": self.chat_id, #sample chat_id
