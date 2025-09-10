@@ -1,120 +1,131 @@
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Home.css';
+import './home.css';
+// import { useAuth } from '../../contexts/AuthContext';
+// import { protectedAPI } from '../../api';
 
-interface HomeSection {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  gradient: string;
-  route: string;
-}
-
-const Home = () => {
+const Home: React.FC = () => {
+  // const { user, isAuthenticated, loading, logout } = useAuth();
   const navigate = useNavigate();
   
-  const homeSections: HomeSection[] = [
-    { 
-      id: 'students', 
-      name: 'Manage Students', 
-      description: 'Add, edit and manage student information',
-      icon: 'users',
-      gradient: 'from-blue-500 to-cyan-600',
-      route: '/students'
-    },
-    { 
-      id: 'doubt-clearance', 
-      name: 'Doubt Clearance', 
-      description: 'Help students with their questions and doubts',
-      icon: 'help',
-      gradient: 'from-green-500 to-emerald-600',
-      route: '/doubt-clearance'
-    },
-    { 
-      id: 'ai-character', 
-      name: 'AI Character', 
-      description: 'Interactive AI assistant for enhanced learning',
-      icon: 'robot',
-      gradient: 'from-purple-500 to-violet-600',
-      route: '/ai-character'
-    },
-    { 
-      id: 'classes', 
-      name: 'List of Subjects', 
-      description: 'View and manage all your class subjects',
-      icon: 'classes',
-      gradient: 'from-orange-500 to-red-600',
-      route: '/classes'
-    }
-  ];
-
-  const handleSectionClick = (section: HomeSection) => {
-    if (section.id === 'classes') {
-      // Navigate to classes page which will show subjects
-      navigate('/classes');
-    } else {
-      navigate(section.route);
-    }
+  // Temporary: Mock authentication state for frontend development
+  const isAuthenticated = true; // Set to false to test unauthenticated view
+  const loading = false;
+  const user = {
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john.doe@example.com',
+    schoolName: 'Springfield Elementary',
+    subject: 'Mathematics',
+    experience: '5-10 years'
   };
 
-  const renderIcon = (iconType: string) => {
-    switch (iconType) {
-      case 'users':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="section-icon">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        );
-      case 'help':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="section-icon">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      case 'robot':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="section-icon">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-        );
-      case 'classes':
-        return (
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="section-icon">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-          </svg>
-        );
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="home-container">
-      <div className="home-header">
-        <h1 className="home-title">Welcome to Sudar Educational Platform</h1>
+  if (loading) {
+    return (
+      <div className="home-container">
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+          <p>Loading...</p>
+        </div>
       </div>
-      
-      <div className="sections-grid">
-        {homeSections.map((section) => (
-          <div
-            key={section.id}
-            className={`section-card ${section.gradient}`}
-            onClick={() => handleSectionClick(section)}
-          >
-            <div className="section-icon-container">
-              {renderIcon(section.icon)}
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="home-container">
+        <div className="hero-section">
+          <h1 className="hero-title">Welcome to Sudar</h1>
+          <p className="hero-subtitle">
+            Empowering educators with intelligent content creation and worksheet generation tools.
+          </p>
+          <div className="hero-features">
+            <div className="feature-item">
+              <h3>Smart Content Creation</h3>
+              <p>Generate educational content tailored to your curriculum and students' needs.</p>
             </div>
-            <div className="section-content">
-              <h3 className="section-name">{section.name}</h3>
-              <p className="section-description">{section.description}</p>
+            <div className="feature-item">
+              <h3>Automated Worksheets</h3>
+              <p>Create custom worksheets with various question types and difficulty levels.</p>
             </div>
-            <div className="section-arrow">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="arrow-icon">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+            <div className="feature-item">
+              <h3>Subject Management</h3>
+              <p>Organize your teaching materials by subjects and grade levels.</p>
             </div>
           </div>
-        ))}
+          <div className="hero-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/signup')}
+            >
+              Get Started
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate('/login')}
+            >
+              Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Authenticated user dashboard
+  return (
+    <div className="home-container">
+      <div className="dashboard-header">
+        <h1>Welcome back, {user?.firstName}!</h1>
+        <p>Ready to create amazing educational content?</p>
+      </div>
+
+      <div className="dashboard-actions">
+        <div className="action-grid">
+          <div className="action-card">
+            <h3>Manage Students</h3>
+            <p>View and manage your students' information and progress</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/students')}
+            >
+              Manage Students
+            </button>
+          </div>
+
+          <div className="action-card">
+            <h3>Doubt Clearance</h3>
+            <p>Address student questions and provide explanations</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/doubt-clearance')}
+            >
+              Clear Doubts
+            </button>
+          </div>
+
+          <div className="action-card">
+            <h3>AI Character</h3>
+            <p>Interact with AI teaching assistant for help and guidance</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/ai-character')}
+            >
+              Chat with AI
+            </button>
+          </div>
+
+          <div className="action-card">
+            <h3>List of Classes</h3>
+            <p>View all your classes and their schedules</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/classes')}
+            >
+              View Classes
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

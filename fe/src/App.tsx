@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './pages/login/login';
-import Home from './pages/home/Home';
+import ForgotPassword from './pages/login/ForgotPassword';
+import SignUp from './pages/login/SignUp';
+import Home from './pages/home/home';
 import Classes from './pages/classes/Classes';
 import SubjectPage from './pages/subject/SubjectPage';
 import MainLayout from './layouts/MainLayout';
@@ -13,6 +15,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route 
             path="/home" 
