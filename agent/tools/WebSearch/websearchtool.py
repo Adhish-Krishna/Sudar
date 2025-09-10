@@ -1,17 +1,14 @@
 from tavily import TavilyClient
-from dotenv import load_dotenv
-import os
 from rich import print as rprint
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
+from envconfig import TAVILY_API_KEY
 
-# Load environment variables
-load_dotenv()
 
 def web_search(query: str) -> str:
   rprint("[green]Searching the Web...[green]")
   # Initialize client inside the function to ensure env vars are loaded
-  tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+  tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
   context = tavily_client.get_search_context(query=query,max_tokens=1000,max_results=3)
   return context
 

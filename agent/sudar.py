@@ -1,25 +1,13 @@
 from langchain_ollama import ChatOllama
 from langgraph_supervisor import create_supervisor
-import os
-from dotenv import load_dotenv
 from .tools import DocumentRetrieverTool, WebSearchTool, WebScraperTool, SaveContentTool
-from langgraph.checkpoint.memory import InMemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
 from .subagents import ReActSubAgent
 from .prompts import contentResearcherPrompt, worksheetGeneratorPrompt, supervisorPrompt
 from langchain_groq import ChatGroq
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from pymongo import MongoClient
-
-# Load the environment variables
-load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GOOGLE_MODEL_NAME = os.getenv("GOOGLE_MODEL_NAME")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
-MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME")
-MONGO_DB_URI = os.getenv("MONGO_DB_URI")
+from envconfig import GOOGLE_API_KEY, GOOGLE_MODEL_NAME, OLLAMA_MODEL, MODEL_PROVIDER, GROQ_API_KEY, GROQ_MODEL_NAME, MONGO_DB_URI
 
 class SUDARAgent:
     def __init__(self):

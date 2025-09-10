@@ -3,12 +3,10 @@ import os
 from datetime import datetime
 from ...utils.util import extract_filename
 from rich.console import Console
-from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-
+from envconfig import QDRANT_URL
 console = Console()
-load_dotenv()
 
 class RetrieveChunks:
   def __init__(self, object_key: str, query: str, user_id: str = "teacher001", chat_id: str = "1"):
@@ -16,7 +14,7 @@ class RetrieveChunks:
       self.query = query
       self.user_id = user_id
       self.chat_id = chat_id
-      self.client = QdrantClient(url=os.getenv("QDRANT_URL"))
+      self.client = QdrantClient(url= QDRANT_URL)
       self.object_key: str = object_key
       self.filename: str = extract_filename(object_key)
       self.current_dir = os.path.dirname(os.path.abspath(__file__))

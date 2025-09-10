@@ -3,15 +3,13 @@ from dotenv import load_dotenv
 import os
 from datetime import datetime
 from typing import List, Dict, Optional
-
-load_dotenv()
-
+from envconfig import MONGO_DB_URI
 
 class ChatService:
     def __init__(self, db_name: str, collection_name: str):
         self.db_name = db_name
         self.collection_name = collection_name
-        self.client = MongoClient(os.getenv("MONGO_DB_URI"))
+        self.client = MongoClient(MONGO_DB_URI)
         self.db = self.client[self.db_name]
         if self.collection_name not in self.db.list_collection_names():
             self.collection = self.db.create_collection(self.collection_name)

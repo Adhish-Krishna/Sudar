@@ -12,17 +12,10 @@ from dotenv import load_dotenv
 import uuid
 from minio import Minio
 import tempfile
+from envconfig import QDRANT_URL, MINIO_URL, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET_NAME
 
 # Create console instance at class level
 console = Console()
-
-load_dotenv()
-
-QDRANT_URL = os.getenv("QDRANT_URL")
-MINIO_URL = os.getenv("MINIO_URL", "http://localhost:9000")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "documents")
 
 class ChunkDocument:
 

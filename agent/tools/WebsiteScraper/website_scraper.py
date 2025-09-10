@@ -1,14 +1,11 @@
 from tavily import TavilyClient
-from dotenv import load_dotenv
-import os
 from rich import print as rprint
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
-
-load_dotenv()
+from envconfig import TAVILY_API_KEY
 
 def scrapWebsite(url: str | list, query: str):
-  tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+  tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
   rprint("[green]Scrapping the website...[green]")
   context = ""
   urls = [url] if isinstance(url,str) else url

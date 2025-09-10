@@ -4,7 +4,6 @@ from rich import print as rprint
 from typing import Union
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
-import os
 
 def RAG(object_key: str, query: str, user_id: str = "teacher001", chat_id: str = "1") -> Union[str, None]:
   '''
