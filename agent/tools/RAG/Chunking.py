@@ -13,16 +13,15 @@ import uuid
 from minio import Minio
 import tempfile
 from envconfig import QDRANT_URL, MINIO_URL, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET_NAME
-
+from ...utils import getUserIdChatId
 # Create console instance at class level
 console = Console()
 
 class ChunkDocument:
 
-  def __init__(self, object_key: str, user_id: str = "teacher001", chat_id: str = "1"):
+  def __init__(self, object_key: str):
     try:
-      self.user_id = user_id
-      self.chat_id = chat_id
+      self.user_id, self.chat_id = getUserIdChatId()
       self.client = QdrantClient(url=QDRANT_URL)
       self.minio_client = Minio(
           endpoint=str(MINIO_URL).replace("http://", "").replace("https://", ""),

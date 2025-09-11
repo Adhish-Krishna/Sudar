@@ -5,7 +5,7 @@ from typing import Union
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
 
-def RAG(object_key: str, query: str, user_id: str = "teacher001", chat_id: str = "1") -> Union[str, None]:
+def RAG(object_key: str, query: str) -> Union[str, None]:
   '''
   Retrieves context from the vector database based on the given query
   Arguments:
@@ -20,7 +20,7 @@ def RAG(object_key: str, query: str, user_id: str = "teacher001", chat_id: str =
   try:
     context = ""
     # Parse and chunk the document
-    chunking = ChunkDocument(object_key, user_id, chat_id)
+    chunking = ChunkDocument(object_key)
 
     # This part seems to be for checking if chunks are already in the DB.
     # With MinIO, we might always want to parse, or have a more robust check.
@@ -37,7 +37,7 @@ def RAG(object_key: str, query: str, user_id: str = "teacher001", chat_id: str =
 
     # Retrieve context based on the query
     try:
-      retrieve = RetrieveChunks(object_key, query, user_id, chat_id)
+      retrieve = RetrieveChunks(object_key, query)
       chunks: list = retrieve.retrieveChunks()
     except Exception as e:
       rprint(f"[red]Error during chunk retrieval: {str(e)}[/red]")

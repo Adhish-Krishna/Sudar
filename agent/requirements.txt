@@ -14,5 +14,4 @@ sentence-transformers
 mem0ai
 pymongo
 langgraph-checkpoint-mongodb
-boto3
 minio

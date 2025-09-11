@@ -1,13 +1,10 @@
 from .sudar import SUDARAgent
 from dotenv import load_dotenv
 from .services import ChatService
-import os
-
-load_dotenv()
+from .utils import getUserIdChatId
 
 def chat():
-    user_id = "teacher001"
-    chat_id = "1"
+    user_id, chat_id = getUserIdChatId()
     thread_id = f"{user_id}_{chat_id}"
 
     service = ChatService(db_name="SUDAR", collection_name="chat_history")

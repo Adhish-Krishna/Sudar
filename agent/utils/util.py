@@ -52,3 +52,8 @@ def extract_extension(filepath: str) -> str:
         str: File extension including the dot (e.g. '.pdf')
     """
     return os.path.splitext(filepath)[1]
+
+def getUserIdChatId():
+    user_id = "teacher001"
+    chat_id = "2"
+    return user_id, chat_id

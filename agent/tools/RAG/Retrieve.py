@@ -6,14 +6,14 @@ from rich.console import Console
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 from envconfig import QDRANT_URL
+from ...utils import getUserIdChatId
 console = Console()
 
 class RetrieveChunks:
-  def __init__(self, object_key: str, query: str, user_id: str = "teacher001", chat_id: str = "1"):
+  def __init__(self, object_key: str, query: str):
     try:
       self.query = query
-      self.user_id = user_id
-      self.chat_id = chat_id
+      self.user_id , self.chat_id = getUserIdChatId()
       self.client = QdrantClient(url= QDRANT_URL)
       self.object_key: str = object_key
       self.filename: str = extract_filename(object_key)

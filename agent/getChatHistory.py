@@ -1,9 +1,9 @@
 from .services import ChatService
+from .utils import getUserIdChatId
 
 service = ChatService(db_name="SUDAR", collection_name="chat_history")
 
-user_id = "teacher001"
-chat_id = "1"
+user_id, chat_id = getUserIdChatId()
 
 print("Get all user chats")
 print(service.getUserChatList(user_id))
