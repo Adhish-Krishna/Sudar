@@ -17,3 +17,6 @@ MINIO_URL=os.getenv("MINIO_URL")
 MINIO_ACCESS_KEY=os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY=os.getenv("MINIO_SECRET_KEY")
 MINIO_BUCKET_NAME=os.getenv("MINIO_BUCKET_NAME")
+#env only for testing
+USER_ID = os.getenv("USER_ID")
+CHAT_ID = os.getenv("CHAT_ID")

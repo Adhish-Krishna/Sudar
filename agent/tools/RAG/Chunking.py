@@ -8,7 +8,6 @@ from rich.console import Console
 import os
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
-from dotenv import load_dotenv
 import uuid
 from minio import Minio
 import tempfile

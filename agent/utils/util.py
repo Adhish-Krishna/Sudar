@@ -1,4 +1,5 @@
 import os
+from envconfig import USER_ID, CHAT_ID
 
 def sanitize_collection_name(name: str) -> str:
     """
@@ -54,6 +55,6 @@ def extract_extension(filepath: str) -> str:
     return os.path.splitext(filepath)[1]
 
 def getUserIdChatId():
-    user_id = "teacher001"
-    chat_id = "2"
+    user_id = USER_ID
+    chat_id = CHAT_ID
     return user_id, chat_id

@@ -15,3 +15,4 @@ mem0ai
 pymongo
 langgraph-checkpoint-mongodb
 minio
+Spire.Doc
