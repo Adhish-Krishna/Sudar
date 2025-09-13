@@ -97,7 +97,7 @@ def saveContent(content: str, title: str)->str:
     tags["type"] = "GenerateContent"
     client.fput_object(
         bucket_name=MINIO_BUCKET_NAME,
-        object_name=pdf_filename,
+        object_name=object_name,
         file_path=pdf_filename,
         tags=tags,
         content_type="application/pdf"
