@@ -5,6 +5,8 @@ import ForgotPassword from './pages/login/ForgotPassword';
 import SignUp from './pages/login/SignUp';
 import Home from './pages/home/home';
 import Classes from './pages/classes/Classes';
+// Add this import at the top with other component imports
+import ClassSubjects from './pages/classSubjects/ClassSubjects';
 import SubjectPage from './pages/subject/SubjectPage';
 import MainLayout from './layouts/MainLayout';
 import './App.css';
@@ -31,6 +33,14 @@ function App() {
             element={
               <MainLayout>
                 <Classes />
+              </MainLayout>
+            } 
+          />
+          <Route 
+            path="/classes/:classId/subjects" 
+            element={
+              <MainLayout>
+                <ClassSubjects />
               </MainLayout>
             } 
           />
