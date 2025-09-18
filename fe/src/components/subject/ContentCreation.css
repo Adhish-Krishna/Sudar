@@ -1,106 +1,176 @@
 .content-creation {
-  padding: 1rem;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
 }
 
 .content-creation-container {
+  width: 100%;
   max-width: 800px;
   background-color: var(--surface-color);
   border-radius: var(--border-radius-lg);
   padding: 2rem;
   box-shadow: var(--shadow-sm);
+  margin: 0 auto;
 }
 
-.page-title {
+.greeting-section {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.greeting-title {
   font-size: 2rem;
   font-weight: 600;
-  margin: 0 0 2rem 0;
+  margin: 0;
   color: var(--text-color);
 }
 
-.form-section {
+.educator-highlight {
+  color: var(--primary-color);
+  font-weight: 700;
+}
+
+.input-section {
   margin-bottom: 2rem;
 }
 
-.input-group {
-  margin-bottom: 1.5rem;
+.title-input-container {
+  margin-bottom: 1rem;
+  background-color: var(--background-color);
+  border-radius: var(--border-radius-lg);
+  border: 2px solid var(--border-color);
+  padding: 1rem;
+  transition: border-color 0.2s ease;
 }
 
-.input-label {
-  display: block;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-color);
-  margin-bottom: 0.5rem;
+.title-input-container:focus-within {
+  border-color: var(--primary-color);
 }
 
 .title-input {
   width: 100%;
-  padding: 0.75rem 1rem;
-  border: 2px solid var(--border-color);
-  border-radius: var(--border-radius);
+  background: none;
+  border: none;
+  outline: none;
   font-size: 1rem;
-  background-color: var(--surface-color);
+  font-family: inherit;
   color: var(--text-color);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 0.5rem 0;
   box-sizing: border-box;
 }
 
-.title-input:focus {
-  outline: none;
+.title-input::placeholder {
+  color: var(--text-muted);
+}
+
+.content-input-container {
+  position: relative;
+  background-color: var(--background-color);
+  border-radius: var(--border-radius-lg);
+  border: 2px solid var(--border-color);
+  padding: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.content-input-container:focus-within {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
 }
 
 .content-textarea {
   width: 100%;
-  padding: 1rem;
-  border: 2px solid var(--border-color);
-  border-radius: var(--border-radius);
+  background: none;
+  border: none;
+  outline: none;
   font-size: 1rem;
   font-family: inherit;
-  background-color: var(--surface-color);
   color: var(--text-color);
-  resize: vertical;
+  resize: none;
   min-height: 200px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 1rem;
   box-sizing: border-box;
 }
 
-.content-textarea:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+.content-textarea::placeholder {
+  color: var(--text-muted);
 }
 
-.form-actions {
+.input-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 1rem;
 }
 
-.save-button {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
+.attach-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 0.5rem 1rem;
   border-radius: var(--border-radius);
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
-  font-weight: 500;
   cursor: pointer;
+  font-size: 0.875rem;
   transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
+}
+
+.attach-button:hover {
+  background-color: var(--background-secondary);
+  color: var(--text-color);
+  border-color: var(--primary-color);
+}
+
+.attach-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.save-button {
+  width: 40px;
+  height: 40px;
+  background-color: var(--primary-color);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .save-button:hover:not(:disabled) {
   background-color: var(--primary-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: scale(1.1);
 }
 
 .save-button:disabled {
   background-color: var(--text-muted);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.save-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .info-section {
