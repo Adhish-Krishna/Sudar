@@ -43,11 +43,16 @@ def saveContent(content: str, title: str)->str:
       secure=False
     )
     
+    # Check if bucket exists, if not create it
+    if not client.bucket_exists(MINIO_BUCKET_NAME):
+        rprint(f"[yellow]Bucket {MINIO_BUCKET_NAME} does not exist. Creating it...[yellow]")
+        client.make_bucket(MINIO_BUCKET_NAME)
+        rprint(f"[green]Bucket {MINIO_BUCKET_NAME} created successfully[green]")
+    
     tags = Tags(for_object=True)
     tags["user_id"] = user_id
     tags["chat_id"] = chat_id
     tags["type"] = "GeneratedPDFContent"
-    
     client.fput_object(
         bucket_name=MINIO_BUCKET_NAME,
         object_name=object_name,

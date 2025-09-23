@@ -1,0 +1,49 @@
+version: '3'
+services:
+  mongodb-server:
+    image: mongo:latest
+    container_name: mongodb-server
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio-server
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server --console-address ":9001" /data
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant-server
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: unless-stopped
+
+  md-to-pdf:
+    build: 
+      context: ./services/md-to-pdf
+    container_name: md-to-pdf-service
+    environment:
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  minio-data:
+  qdrant-data:

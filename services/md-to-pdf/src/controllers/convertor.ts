@@ -8,7 +8,14 @@ const convertor = async (req: Request, res: Response) => {
     }
 
     try {
-        const pdf = await mdToPdf({ content: file.buffer.toString() });
+        const pdf = await mdToPdf(
+            { content: file.buffer.toString() },
+            {
+                launch_options: {
+                    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                },
+            },
+        );
         res.status(200);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${file.originalname.replace(/\.md$/, '.pdf')}"`);
