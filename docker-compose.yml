@@ -43,7 +43,28 @@ services:
       - "3000:3000"
     restart: unless-stopped
 
+  manim-renderer:
+    build:
+      context: ./services/manim-renderer
+    container_name: manim-renderer-service
+    environment:
+      - PORT=8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - manim-temp:/app/temp
+      - manim-output:/app/output
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   mongo-data:
   minio-data:
   qdrant-data:
+  manim-temp:
+  manim-output:
