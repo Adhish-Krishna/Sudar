@@ -13,10 +13,16 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import threading
 import time
-import json
 import re
+import logging
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+import redis
+from redis.exceptions import RedisError
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -41,6 +47,43 @@ output_dir = parent_dir / "output"
 # Global variables to track running processes
 running_processes: Dict[str, Dict[str, Any]] = {}
 process_lock = threading.Lock()
+
+logger = logging.getLogger(__name__)
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+JOB_STATUS_TTL_SECONDS = int(os.getenv("JOB_STATUS_TTL_SECONDS", "3600"))
+redis_client: Optional[redis.Redis] = None
+
+
+def set_job_status(job_id: str, status: str) -> None:
+    """Persist job status in Redis when available."""
+    if not redis_client:
+        return
+    try:
+        redis_client.set(job_id, status, ex=JOB_STATUS_TTL_SECONDS)
+    except RedisError as exc:
+        logger.warning("Failed to set status for job %s: %s", job_id, exc)
+
+
+async def get_job_status(job_id: str) -> Optional[str]:
+    """Fetch job status from Redis asynchronously."""
+    if not redis_client:
+        return None
+    try:
+        return await asyncio.to_thread(redis_client.get, job_id)
+    except RedisError as exc:
+        logger.error("Failed to read status for job %s: %s", job_id, exc)
+        return None
+
+
+def delete_job_status(job_id: str) -> None:
+    """Remove job status from Redis."""
+    if not redis_client:
+        return
+    try:
+        redis_client.delete(job_id)
+    except RedisError as exc:
+        logger.warning("Failed to delete status for job %s: %s", job_id, exc)
 
 class ManimRequest(BaseModel):
     code: str
@@ -165,7 +208,7 @@ def extract_scene_names(code: str) -> list[str]:
     matches = re.findall(pattern, code)
     return matches
 
-async def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, format: str, timeout: int):
+def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, format: str, timeout: int):
     """Run Manim rendering process"""
     job_temp_dir = temp_dir / job_id
     try:
@@ -267,6 +310,7 @@ async def run_manim_process(job_id: str, code: str, scene_name: str, quality: st
                             job_info["message"] = "Rendering completed successfully"
                             job_info["progress"] = 100
                             job_info["output_file"] = str(final_output)
+                    set_job_status(job_id, "completed")
                 else:
                     # Debug: List all files created for troubleshooting
                     all_files = list(output_dir.glob("**/*")) + list(job_temp_dir.glob("**/*"))
@@ -278,6 +322,7 @@ async def run_manim_process(job_id: str, code: str, scene_name: str, quality: st
                             job_info["status"] = "error"
                             job_info["message"] = "Output file not found"
                             job_info["error_details"] = f"stdout: {stdout}\nstderr: {stderr}\nFiles created: {file_list}"
+                    set_job_status(job_id, "completed")
             else:
                 with process_lock:
                     job_info = running_processes.get(job_id)
@@ -285,6 +330,7 @@ async def run_manim_process(job_id: str, code: str, scene_name: str, quality: st
                         job_info["status"] = "error"
                         job_info["message"] = "Manim execution failed"
                         job_info["error_details"] = f"Return code: {process.returncode}\nstdout: {stdout}\nstderr: {stderr}"
+                set_job_status(job_id, "completed")
                     
         except subprocess.TimeoutExpired:
             # Kill the process group
@@ -300,6 +346,7 @@ async def run_manim_process(job_id: str, code: str, scene_name: str, quality: st
                     job_info["status"] = "timeout"
                     job_info["message"] = f"Process timed out after {timeout} seconds"
                     job_info["error_details"] = "Execution exceeded maximum allowed time"
+            set_job_status(job_id, "completed")
     
     except Exception as e:
         with process_lock:
@@ -308,6 +355,7 @@ async def run_manim_process(job_id: str, code: str, scene_name: str, quality: st
                 job_info["status"] = "error"
                 job_info["message"] = "Internal error occurred"
                 job_info["error_details"] = str(e) + "\n" + traceback.format_exc()
+        set_job_status(job_id, "completed")
     
     finally:
         # Cleanup job-specific temp directory
@@ -328,7 +376,7 @@ async def run_manim_process(job_id: str, code: str, scene_name: str, quality: st
         threading.Thread(target=cleanup_metadata, daemon=True).start()
 
 @app.post("/render")
-async def render_manim(request: ManimRequest, background_tasks: BackgroundTasks):
+async def render_manim(request: ManimRequest):
     """Submit Manim code for rendering"""
     
     # Validate code
@@ -354,61 +402,58 @@ async def render_manim(request: ManimRequest, background_tasks: BackgroundTasks)
             "progress": 0,
             "created_at": time.time()
         }
+
+    set_job_status(job_id, "ongoing")
     
-    # Start background task
-    background_tasks.add_task(
-        run_manim_process,
-        job_id,
-        request.code,
-        request.scene_name,
-        request.quality,
-        request.format,
-        request.timeout
+    # Schedule rendering without waiting for completion
+    asyncio.create_task(
+        asyncio.to_thread(
+            run_manim_process,
+            job_id,
+            request.code,
+            request.scene_name,
+            request.quality,
+            request.format,
+            request.timeout,
+        )
     )
     
-    return {"job_id": job_id, "message": "Rendering job submitted successfully"}
+    return {"job_id": job_id, "message": "Rendering job queued"}
 
-@app.get("/status/{job_id}")
-async def get_status(job_id: str):
-    """Get the status of a rendering job"""
-    with process_lock:
-        if job_id not in running_processes:
-            raise HTTPException(status_code=404, detail="Job not found")
-        
-        job_info = running_processes[job_id].copy()
-        # Remove process reference from response
-        if "process" in job_info:
-            del job_info["process"]
-        
-        return ProcessStatus(job_id=job_id, **job_info)
+@app.get("/status")
+async def get_status(job_id: str = Query(..., description="Rendering job identifier")):
+    """Get the status of a rendering job using Redis."""
+    if not redis_client:
+        raise HTTPException(status_code=503, detail="Status store unavailable")
+
+    status = await get_job_status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return {"job_id": job_id, "status": status}
 
 @app.get("/status/{job_id}/stream")
 async def stream_status(job_id: str):
     """Stream job status updates via SSE"""
-    
     async def generate():
-        last_status = None
+        if not redis_client:
+            yield "data: {\"error\": \"Status store unavailable\"}\n\n"
+            return
+
         while True:
-            with process_lock:
-                if job_id not in running_processes:
-                    yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
-                    break
-                
-                current_status = running_processes[job_id].copy()
-                if "process" in current_status:
-                    del current_status["process"]
-            
-            # Only send update if status changed
-            if current_status != last_status:
-                yield f"data: {json.dumps(current_status)}\n\n"
-                last_status = current_status.copy()
-            
-            # Stop streaming if job is completed, error, or timeout
-            if current_status["status"] in ["completed", "error", "timeout"]:
+            status = await get_job_status(job_id)
+            if status is None:
+                yield "data: {\"error\": \"Job not found\"}\n\n"
                 break
-            
+
+            if status == "completed":
+                yield "data: job completed\n\n"
+                break
+
+            # Send a keep-alive comment to prevent connection timeout
+            yield ": waiting\n\n"
             await asyncio.sleep(1)
-    
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
@@ -455,6 +500,11 @@ async def cancel_job(job_id: str):
                 job_info["message"] = "Job cancelled by user"
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to cancel job: {str(e)}")
+        else:
+            job_info["status"] = "cancelled"
+            job_info["message"] = "Job cancelled by user"
+
+        set_job_status(job_id, "completed")
         
         # Clean up job info after a delay
         def cleanup_later():
@@ -462,6 +512,7 @@ async def cancel_job(job_id: str):
             with process_lock:
                 if job_id in running_processes:
                     del running_processes[job_id]
+            delete_job_status(job_id)
         
         threading.Thread(target=cleanup_later, daemon=True).start()
     
@@ -475,10 +526,26 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Create necessary folders in the startup"""
+    global redis_client
+
     create_necessary_folders()
 
     """Cleanup old files on startup"""
     cleanup_old_files()
+
+    try:
+        redis_client = redis.Redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            socket_timeout=5,
+            health_check_interval=30,
+        )
+        # Validate connection during startup
+        await asyncio.to_thread(redis_client.ping)
+        logger.info("Connected to Redis for job status tracking")
+    except RedisError as exc:
+        redis_client = None
+        logger.error("Failed to connect to Redis: %s", exc)
     
     # Start periodic cleanup
     def periodic_cleanup():

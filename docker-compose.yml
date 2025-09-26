@@ -33,6 +33,15 @@ services:
       - qdrant-data:/qdrant/storage
     restart: unless-stopped
 
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-server
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
   md-to-pdf:
     build: 
       context: ./services/md-to-pdf
@@ -49,11 +58,15 @@ services:
     container_name: manim-renderer-service
     environment:
       - PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - JOB_STATUS_TTL_SECONDS=3600
     ports:
       - "8000:8000"
     volumes:
       - manim-temp:/app/temp
       - manim-output:/app/output
+    depends_on:
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -68,3 +81,4 @@ volumes:
   qdrant-data:
   manim-temp:
   manim-output:
+  redis-data:

@@ -35,6 +35,12 @@ RUN chown -R manimuser:manimuser /app
 # Switch to non-root user
 USER manimuser
 
+ARG REDIS_URL
+ARG JOB_STATUS_TTL_SECONDS
+
+ENV REDIS_URL=${REDIS_URL}
+ENV JOB_STATUS_TTL_SECONDS=${JOB_STATUS_TTL_SECONDS}
+
 # Expose port
 EXPOSE 8000
 
