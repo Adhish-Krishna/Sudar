@@ -32,6 +32,7 @@ Before you begin, ensure you have the following installed:
 
 -   [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
 -   [Python](https://www.python.org/downloads/) (version 3.10 or higher)
+-   [UV Package Manager](https://docs.astral.sh/uv/) (recommended) or pip
 
 ## Setup Instructions
 
@@ -62,51 +63,23 @@ This command will start all the services defined in the `docker-compose.yml` fil
 
 ### 3. Set Up the Python Environment
 
-Now, set up the Python environment for the agent.
+#### **Using UV (Recommended - 10x Faster)**
 
-1.  Navigate to the `agent` directory:
+1.  **Install UV** (one-time setup):
 
-    ```bash
-    cd agent
+    **Windows (PowerShell):**
+    ```powershell
+    pip install uv
     ```
 
-2.  Create a new virtual environment:
+2.  **Create virtual environment and install dependencies:**
 
     ```bash
-    python -m venv venv
+    # Install all dependencies
+    uv sync
     ```
 
-3.  Activate the virtual environment:
-
-    -   **On Windows:**
-        ```bash
-        .\venv\Scripts\activate
-        ```
-    -   **On macOS/Linux:**
-        ```bash
-        source venv/bin/activate
-        ```
-
-4.  Install the required Python packages from `requirements.txt`:
-
+3.  **Run the termial app** (no activation needed):
     ```bash
-    pip install -r requirements.txt
+    uv run python -m agent.terminalChat
     ```
-
-### 4. Run the Terminal Chat App
-
-Finally, you can run the terminal-based chat application.
-
-1.  Navigate back to the root directory of the project:
-
-    ```bash
-    cd ..
-    ```
-
-2.  Run the terminal chat application:
-
-    ```bash
-    python -m agent.terminalChat
-    ```
-
-You should now be able to interact with the Sudar AI Agent directly in your terminal.

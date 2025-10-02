@@ -6,7 +6,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - mongodb-data:/data/db
     restart: unless-stopped
 
   minio:
@@ -76,7 +76,7 @@ services:
       start_period: 40s
 
 volumes:
-  mongo-data:
+  mongodb-data:
   minio-data:
   qdrant-data:
   manim-temp:

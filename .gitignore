@@ -10,3 +10,18 @@ venv/
 .coverage
 output/
 **/db/
+
+# UV specific
+uv.lock
+.python-version
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
