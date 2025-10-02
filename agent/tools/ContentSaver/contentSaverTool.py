@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field
-from langchain_core.tools import StructuredTool
 from minio import Minio
 from envconfig import MINIO_ACCESS_KEY, MINIO_BUCKET_NAME, MINIO_SECRET_KEY, MINIO_URL, MD_TO_PDF_URL
 import requests
@@ -8,6 +7,8 @@ from minio.commonconfig import Tags
 import os
 from rich import print as rprint
 import tempfile
+from crewai.tools import BaseTool
+from typing import Type
 
 def saveContent(content: str, title: str)->str:
   user_id, chat_id = getUserIdChatId()
@@ -81,14 +82,31 @@ def saveContent(content: str, title: str)->str:
     rprint(f"[green]{pdf_filename} Saved to the bucket[green]")
     return f"Content saved to Minio bucket {MINIO_BUCKET_NAME} with object name {object_name}"
 
-class SaveContentInput(BaseModel):
-  content: str = Field(..., description="content to be saved in a file")
-  title: str = Field(..., description="title of the content")
-
-SaveContentTool = StructuredTool(
-  func=saveContent,
-  name="SaveContent",
-  description="""Use this tool to save generated content in a file in pdf format
-  INPUT format: {{"content":"content in string format", 'title": "title of the content in string format"}}""",
-  args_schema=SaveContentInput
-)
+class ContentSaverInput(BaseModel):
+    """Input schema for Content Saver Tool"""
+    content: str = Field(
+        ..., 
+        description="The markdown-formatted content to save as PDF"
+    )
+    title: str = Field(
+        ..., 
+        description="The title for the PDF file (will be used as filename)"
+    )
+    
+class ContentSaverTool(BaseTool):
+    name: str = "Content Saver"
+    description: str = (
+        "Convert markdown content to PDF and save it to MinIO storage. "
+        "Use this tool ONLY when you need to save generated worksheets, assignments, or educational materials. "
+        "The content should be in markdown format with proper formatting. "
+        "This tool will automatically convert it to PDF and store it with user context."
+    )
+    args_schema: Type[BaseModel] = ContentSaverInput
+    
+    def _run(self, content: str, title: str) -> str:
+        """Execute content saving"""
+        try:
+            result = saveContent(content=content, title=title)
+            return result if result else "Content saved successfully."
+        except Exception as e:
+            return f"Error saving content: {str(e)}"

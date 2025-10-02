@@ -1,9 +1,9 @@
 from tavily import TavilyClient
 from rich import print as rprint
 from pydantic import BaseModel, Field
-from langchain_core.tools import StructuredTool
+from crewai.tools import BaseTool
 from envconfig import TAVILY_API_KEY
-
+from typing import Type
 
 def web_search(query: str) -> str:
   rprint("[green]Searching the Web...[green]")
@@ -13,13 +13,27 @@ def web_search(query: str) -> str:
   return context
 
 class WebSearchInput(BaseModel):
-    query: str = Field(..., description="The query to search on the web.")
+    """Input schema for Web Search Tool"""
+    query: str = Field(
+        ..., 
+        description="The search query describing what information you need from the web"
+    )
 
-WebSearchTool = StructuredTool.from_function(
-                func=web_search,
-                name="WebSearch",
-                description="""Use for queries that require up-to-date or external data from the internet.
-                Input format: {{"query": "your question"}}""",
-                args_schema=WebSearchInput
-            )
+
+class WebSearchTool(BaseTool):
+    name: str = "Web Search"
+    description: str = (
+        "Search the internet for educational content and up-to-date information. "
+        "Use this tool when you need to find current information, educational resources, "
+        "or supplementary content from the web that is not available in uploaded documents."
+    )
+    args_schema: Type[BaseModel] = WebSearchInput
+    
+    def _run(self, query: str) -> str:
+        """Execute web search"""
+        try:
+            result = web_search(query=query)
+            return result if result else "No search results found."
+        except Exception as e:
+            return f"Error performing web search: {str(e)}"
 

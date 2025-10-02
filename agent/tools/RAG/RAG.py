@@ -3,7 +3,8 @@ from .Retrieve import RetrieveChunks
 from rich import print as rprint
 from typing import Union
 from pydantic import BaseModel, Field
-from langchain_core.tools import StructuredTool
+from crewai.tools import BaseTool
+from typing import Type
 
 def RAG(object_key: str, query: str) -> Union[str, None]:
   '''
@@ -59,15 +60,31 @@ def _rag_wrapper(object_key: str, query: str) -> str:
         except Exception as e:
             return f"Document processing error: {str(e)}"
 
-class DocumentQueryInput(BaseModel):
-    object_key: str = Field(..., description="The object key of the document in MinIO")
-    query: str = Field(..., description="Specific question or task for the document")
+class DocumentRetrievalInput(BaseModel):
+    """Input schema for Document Retrieval Tool"""
+    object_key: str = Field(
+        ..., 
+        description="The unique identifier/path of the document in MinIO storage (e.g., 'user123/chat456/document.pdf')"
+    )
+    query: str = Field(
+        ..., 
+        description="The specific question or information you want to extract from the document"
+    )
 
-DocumentRetrieverTool = StructuredTool.from_function(
-                func=_rag_wrapper,
-                name="DocumentRetrieval",
-                description="""ONLY use for questions about SPECIFIC DOCUMENTS stored in the object store.
-                Requires both object_key and query.
-                Input format: {{"object_key": "key-of-object", "query": "your question"}}""",
-                args_schema=DocumentQueryInput
-            )
+class DocumentRetrievalTool(BaseTool):
+    name: str = "Document Retrieval"
+    description: str = (
+        "Retrieve and query information from documents stored in MinIO. "
+        "Use this tool ONLY when you need to extract information from specific documents "
+        "that have been uploaded to the system. "
+        "Requires both object_key (document identifier) and query (what to extract)."
+    )
+    args_schema: Type[BaseModel] = DocumentRetrievalInput
+    
+    def _run(self, object_key: str, query: str) -> str:
+        """Execute document retrieval"""
+        try:
+            result = RAG(object_key=object_key, query=query)
+            return result if result else "No relevant content found in the document."
+        except Exception as e:
+            return f"Error retrieving document: {str(e)}"

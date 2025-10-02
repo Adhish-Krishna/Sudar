@@ -2,7 +2,9 @@
 Sub-Agents Package
 Contains specialized AI agents for different tasks
 """
+from .SubAgents import ContentResearcherSubAgent, WorksheetGeneratorSubAgent
 
-from .ReActSubAgent import ReActSubAgent
-
-__all__ = ['ReActSubAgent']
+__all__ = [
+    'ContentResearcherSubAgent',
+    'WorksheetGeneratorSubAgent'
+]

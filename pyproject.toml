@@ -5,12 +5,13 @@ description = "AI-powered Educational Assistant for Multi-grade Classrooms"
 requires-python = ">=3.10"
 
 dependencies = [
+    "crewai>=0.80.0",
+    "crewai-tools>=0.12.0",
     "langchain-docling",
     "langchain-huggingface",
     "langchain-community",
     "langchain-ollama",
     "qdrant-client[fastembed]",
-    "langgraph-supervisor",
     "langchain-google-genai",
     "langchain-groq",
     "tavily-python",
@@ -19,7 +20,6 @@ dependencies = [
     "requests",
     "sentence-transformers",
     "pymongo",
-    "langgraph-checkpoint-mongodb",
     "minio",
 ]
 

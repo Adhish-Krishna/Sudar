@@ -9,10 +9,10 @@ from . import WebSearch
 from . import WebsiteScraper
 
 # Import specific tools for direct access
-from .ContentSaver.contentSaverTool import SaveContentTool, saveContent
+from .ContentSaver.contentSaverTool import ContentSaverTool, saveContent
 from .RAG.Chunking import ChunkDocument
 from .RAG.Retrieve import RetrieveChunks
-from .RAG.RAG import RAG, DocumentRetrieverTool
+from .RAG.RAG import RAG, DocumentRetrievalTool
 from .WebSearch.websearchtool import WebSearchTool
 from .WebsiteScraper.website_scraper import WebScraperTool
 
@@ -24,12 +24,12 @@ __all__ = [
     'WebsiteScraper',
     
     # Individual Tools
-    'SaveContentTool',
+    'ContentSaverTool',
     'saveContent',
     'ChunkDocument',
     'RetrieveChunks',
     'RAG',
-    'DocumentRetrieverTool',
+    'DocumentRetrievalTool',
     'WebSearchTool',
     'WebScraperTool'
 ]
