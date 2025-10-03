@@ -9,11 +9,7 @@ dependencies = [
     "crewai-tools>=0.12.0",
     "langchain-docling",
     "langchain-huggingface",
-    "langchain-community",
-    "langchain-ollama",
     "qdrant-client[fastembed]",
-    "langchain-google-genai",
-    "langchain-groq",
     "tavily-python",
     "python-dotenv",
     "rich",
@@ -21,6 +17,8 @@ dependencies = [
     "sentence-transformers",
     "pymongo",
     "minio",
+    "mem0ai>=0.1.118",
+    "ollama>=0.6.0",
 ]
 
 [project.optional-dependencies]

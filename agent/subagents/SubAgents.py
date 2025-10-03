@@ -3,7 +3,6 @@ Generalized Sub-Agent Implementation for CrewAI
 Each sub-agent is a specialized worker with specific tools and expertise
 """
 from crewai import Agent
-from typing import List
 from ..tools import (
     DocumentRetrievalTool,
     WebSearchTool,
@@ -41,10 +40,10 @@ class ContentResearcherSubAgent:
             backstory=prompt,
             tools=[doc_tool, web_tool, scraper_tool],
             llm=llm,
-            verbose=False,
+            verbose=True,
             allow_delegation=False,
             max_iter=5,
-            memory=True
+            respect_context_window=True
         )
 
 
@@ -75,8 +74,8 @@ class WorksheetGeneratorSubAgent:
             backstory=prompt,
             tools=[saver_tool],
             llm=llm,
-            verbose=False,
+            verbose=True,
             allow_delegation=False,
             max_iter=5,
-            memory=True
+            respect_context_window=True
         )

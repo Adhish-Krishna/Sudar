@@ -1,37 +1,26 @@
 """
 CrewAI-based SUDAR Agent Implementation - Supervisor Architecture
 Features:
-- Supervisor (Orchestrator) agent that plans and delegates
+- Manager agent that plans and delegates
 - Specialized sub-agents (Content Researcher, Worksheet Generator)
-- Memory enabled with Ollama embeddings
+- Custom Mem0 memory service for conversation context
 - Intelligent task planning and execution by the Orchestrator
 """
-import os
-from crewai import Agent, Task, Crew, Process, LLM
-from crewai.memory import ShortTermMemory, EntityMemory
+from crewai import Task, Crew, Process, LLM
 from .subagents import ContentResearcherSubAgent, WorksheetGeneratorSubAgent
 from .prompts.prompt import (
-    supervisorPrompt,
     contentResearcherPrompt,
     worksheetGeneratorPrompt
 )
+from .services import AgentMemoryService
 from envconfig import (
     GOOGLE_API_KEY, 
     GOOGLE_MODEL_NAME, 
     OLLAMA_MODEL, 
     MODEL_PROVIDER, 
     GROQ_API_KEY, 
-    GROQ_MODEL_NAME,
-    EMBEDDINGS_OLLAMA_MODEL_NAME
+    GROQ_MODEL_NAME
 )
-
-# Ensure API keys are set in environment for CrewAI's memory system
-# This is critical for long-term memory LLM operations
-if GOOGLE_API_KEY:
-    os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
-    os.environ["GEMINI_API_KEY"] = GOOGLE_API_KEY  # Some versions use this
-if GROQ_API_KEY:
-    os.environ["GROQ_API_KEY"] = GROQ_API_KEY
 
 
 class SUDARCrew:
@@ -39,9 +28,9 @@ class SUDARCrew:
     SUDAR Educational Assistant Crew - Supervisor Architecture
     
     Architecture:
-    - Orchestrator Agent (Supervisor): Plans, delegates, consolidates
     - Content Researcher Sub-Agent: Research with tools (RAG, Web Search, Scraper)
     - Worksheet Generator Sub-Agent: Creates and saves worksheets
+    - Custom Memory Service: Mem0 OSS for conversation memory
     """
     
     def __init__(self, user_id: str = None, chat_id: str = None):
@@ -55,8 +44,16 @@ class SUDARCrew:
         self.user_id = user_id
         self.chat_id = chat_id
         self.llm = self._get_llm()
+
+        # Initialize custom memory service with Qdrant + Ollama
+        self.memory_service = AgentMemoryService(
+            user_id=user_id,
+            embedding_model="embeddinggemma:300m",  # Ollama embedding model
+            embedding_dimension=768,                 # Dimension for embeddinggemma:300m
+            qdrant_host="localhost",
+            qdrant_port=6333
+        )
         
-        self.orchestrator = self._create_orchestrator()
         self.content_researcher = ContentResearcherSubAgent.create(
             llm=self.llm,
             prompt=contentResearcherPrompt
@@ -89,94 +86,82 @@ class SUDARCrew:
                 stream=True
             )
     
-    def _create_orchestrator(self) -> Agent:
+    def create_manager_task(self, query: str) -> Task:
         """
-        Create the Orchestrator Agent (Supervisor)
-        This agent plans the workflow and delegates to sub-agents
+        Create manager task with memory context injected
         """
-        return Agent(
-            role='Orchestrator - Master Coordinator',
-            goal='Analyze user requests, devise execution plans, and coordinate specialized agents to deliver educational content',
-            backstory=supervisorPrompt,
-            tools=[],
-            llm=self.llm,
-            verbose=False,
-            allow_delegation=True, 
-            memory=True
+        # Retrieve relevant context from memory using semantic search
+        relevant_memories = self.memory_service.get_relevant_context(
+            query, 
+            limit=5,
+            collection="short_term",
+            score_threshold=0.5
         )
-    
-    def create_orchestrator_task(self, query: str) -> Task:
-        """
-        Create orchestrator task - supervisor plans and delegates
-        """
+        
+        # # Also get recent messages for temporal context
+        # recent_messages = self.memory_service.get_recent_messages(
+        #     limit=5,
+        #     collection="short_term"
+        # )
+        
+        # Format context for prompt
+        context = self.memory_service.format_context_for_prompt(relevant_memories)
+        
         return Task(
-            description=f"""Analyze this user request and coordinate the appropriate agents to fulfill it:
-            
-            User Request: {query}
-            
-            Your responsibilities:
-            1. Deeply understand what the user wants (worksheet, research, greeting, complex request, etc.)
-            2. Create an optimal execution plan
-            3. Delegate tasks to the appropriate specialized agents:
-               - Content Researcher Agent: For gathering educational content from documents, web, URLs
-               - Worksheet Generator Agent: For creating and saving worksheets
-            4. Consolidate outputs from sub-agents into a cohesive final response
-            5. Deliver the response in the format the user expects
-            
-            Available Agents and Their Capabilities:
-            - Content Researcher: Has DocumentRetrieval, WebSearch, WebScraper tools
-            - Worksheet Generator: Has ContentSaver tool (MUST save worksheets)
-            
-            Decision Guidelines (YOU decide the workflow):
-            - If user greets you → Respond warmly and ask how you can help
-            - If user asks for research → Delegate to Content Researcher
-            - If user asks for worksheet → Delegate to Content Researcher first (for content), then Worksheet Generator
-            - If user provides content and asks for worksheet → Delegate directly to Worksheet Generator
-            - If user asks complex multi-step request → Plan and delegate step by step
-            
-            Ensure all content is educationally sound and age-appropriate.
-            Consolidate all agent outputs into a final, cohesive response.
+            description=f"""User Request: {query}
+
+            {context}
+
+            Responsibilities:
+            1. Use the conversation context above to personalize responses
+            2. Understand what user wants (worksheet/research/greeting/complex request)
+            3. Delegate to specialized agents as needed:
+            - Content Researcher: DocumentRetrieval, WebSearch, WebScraper
+            - Worksheet Generator: ContentSaver (saves worksheets)
+            4. Consolidate outputs into final response
+
+            Guidelines:
+            - Greeting/intro → Respond warmly, acknowledge name from context, ask how to help
+            - Personal questions → Use context to answer (name, previous topics, etc.)
+            - Research request → Delegate to Content Researcher
+            - Worksheet request → Delegate to Content Researcher then Worksheet Generator
+            - User provides content for worksheet → Delegate to Worksheet Generator
+            - Complex request → Plan and delegate step by step
+
+            All content must be educational and age-appropriate.
             """,
-            expected_output="A complete response to the user's request with all required educational content",
-            agent=self.orchestrator
+            expected_output="Complete response using conversation context when relevant",
         )
     
     def kickoff(self, inputs: dict):
         """
-        Execute the crew with supervisor architecture
-        Let the Orchestrator agent decide everything!
+        Execute the crew with supervisor architecture and memory management
         
         Args:
             inputs: Dictionary containing 'query' and optional parameters
             
         Returns:
-            Crew execution result
+            Crew execution result with memory saved
         """
         query = inputs.get('query', '')
         
-        task = self.create_orchestrator_task(query)
-        
-        # Configure Ollama embedder - ChromaDB OllamaEmbeddingFunction uses 'model_name' not 'model'
-        embedder_config = {
-            "provider": "ollama",
-            "config": {
-                "model_name": EMBEDDINGS_OLLAMA_MODEL_NAME,  # Changed from 'model' to 'model_name'
-                "url": "http://localhost:11434"  # Base URL without /api/embeddings
-            }
-        }
-        
-        short_term_memory = ShortTermMemory(embedder_config=embedder_config)
-        entity_memory = EntityMemory(embedder_config=embedder_config)
+        task = self.create_manager_task(query)
         
         crew = Crew(
-            agents=[self.orchestrator, self.content_researcher, self.worksheet_generator],
+            agents=[self.content_researcher, self.worksheet_generator],
             tasks=[task],
             process=Process.hierarchical, 
             manager_llm=self.llm,  
-            memory=True,  
-            short_term_memory=short_term_memory,  
-            entity_memory=entity_memory,  
-            verbose=False
+            memory=False,
+            verbose=True,
         )
         
+        # Execute crew
         return crew.kickoff()
+    
+
+
+
+
+
+
