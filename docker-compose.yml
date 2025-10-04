@@ -99,12 +99,17 @@ services:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
       - QDRANT_COLLECTION_NAME=rag_documents
+      - MINIO_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=rag-documents
       - HOST=0.0.0.0
       - PORT=3001
     ports:
       - "3001:3001"
     depends_on:
       - qdrant
+      - minio
     networks:
       - sudar-network
     restart: unless-stopped

@@ -12,6 +12,7 @@ from src.DocumentParser import DocumentParser
 from src.Chunker import Chunker
 from src.Embedder import Embedder
 from src.Retriever import Retriever
+from src.MinIOStorage import MinIOStorage
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +30,24 @@ chunker = Chunker()
 embedder = Embedder()
 retriever = Retriever()
 
+# Initialize MinIO storage
+MINIO_URL = os.getenv("MINIO_URL", "http://localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "rag-documents")
+
+# Parse MinIO endpoint (remove http:// or https://)
+minio_endpoint = MINIO_URL.replace("http://", "").replace("https://", "")
+minio_secure = MINIO_URL.startswith("https://")
+
+minio_storage = MinIOStorage(
+    endpoint=minio_endpoint,
+    access_key=MINIO_ACCESS_KEY,
+    secret_key=MINIO_SECRET_KEY,
+    bucket_name=MINIO_BUCKET_NAME,
+    secure=minio_secure
+)
+
 
 # Pydantic models for request/response
 class IngestResponse(BaseModel):
@@ -38,6 +57,7 @@ class IngestResponse(BaseModel):
     user_id: str
     chat_id: str
     filename: str
+    minio_upload: Optional[dict] = None
 
 
 class RetrievalRequest(BaseModel):
@@ -101,6 +121,18 @@ async def ingest_document(
         file_content = await file.read()
         filename = file.filename
         
+        # Upload file to MinIO
+        minio_result = minio_storage.upload_file(
+            file_content=file_content,
+            filename=filename,
+            user_id=user_id,
+            chat_id=chat_id,
+            content_type=file.content_type
+        )
+        
+        if not minio_result.get("success"):
+            print(f"Warning: MinIO upload failed - {minio_result.get('error')}")
+        
         # Step 1: Parse document to markdown
         try:
             markdown_content = document_parser.parse(file_content, filename)
@@ -147,7 +179,8 @@ async def ingest_document(
             inserted_count=result["inserted_count"],
             user_id=user_id,
             chat_id=chat_id,
-            filename=filename
+            filename=filename,
+            minio_upload=minio_result if minio_result.get("success") else None
         )
     
     except HTTPException:
