@@ -38,4 +38,5 @@ packages = ["agent"]
 [tool.uv.workspace]
 members = [
     "services/rag-service",
+    "services/sudar-tools-mcp-server",
 ]
