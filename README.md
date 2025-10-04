@@ -42,14 +42,9 @@ Follow these steps to get the project up and running:
 
 First, you need to set up your environment variables.
 
-1.  In the root directory of the project, make a copy of the `.env.template` file and rename it to `.env`.
+1.  In the root directory of the project, make a copy of the `.env.example` file and rename it to `.env`.
 
-2.  Open the new `.env` file and add your Google API key to the `GOOGLE_API_KEY` variable and tavily api key to `TAVILY_API_KEY` variable:
-
-    ```
-    GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
-    TAVILY_API_KEY="YOUR TAVILY_API_KEY"
-    ```
+2.  Open the new `.env` file and fill all the api keys
 
 ### 2. Run Necessary Services
 
@@ -60,26 +55,3 @@ docker-compose up -d
 ```
 
 This command will start all the services defined in the `docker-compose.yml` file.
-
-### 3. Set Up the Python Environment
-
-#### **Using UV (Recommended - 10x Faster)**
-
-1.  **Install UV** (one-time setup):
-
-    **Windows (PowerShell):**
-    ```powershell
-    pip install uv
-    ```
-
-2.  **Create virtual environment and install dependencies:**
-
-    ```bash
-    # Install all dependencies
-    uv sync
-    ```
-
-3.  **Run the termial app** (no activation needed):
-    ```bash
-    uv run python -m agent.terminalChat
-    ```
