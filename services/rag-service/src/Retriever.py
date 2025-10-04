@@ -1,11 +1,11 @@
 """
 Retriever.py - Handles context retrieval from Qdrant with reranking
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
-from qdrant_client.models import Filter, FieldCondition, MatchValue
+from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
 import ollama
 
 # Load environment variables
@@ -90,7 +90,8 @@ class Retriever:
         query: str, 
         user_id: str, 
         chat_id: str, 
-        top_k: int = 5
+        top_k: int = 5,
+        filenames: List[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieve and rerank relevant chunks from Qdrant.
@@ -100,12 +101,25 @@ class Retriever:
             user_id: The user ID to filter by
             chat_id: The chat ID to filter by
             top_k: Number of top results to return after reranking
+            filenames: Optional list of filenames to filter by (OR condition)
         
         Returns:
             List[Dict]: List of retrieved chunks with metadata and scores
         """
         # Generate query embedding
         query_embedding = self._generate_embedding(query)
+        
+        # Build filter conditions
+        must_conditions = [
+            FieldCondition(key="user_id", match=MatchValue(value=user_id)),
+            FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
+        ]
+        
+        # Add filename filter if provided (OR condition)
+        if filenames and len(filenames) > 0:
+            must_conditions.append(
+                FieldCondition(key="filename", match=MatchAny(any=filenames))
+            )
         
         # Search in Qdrant with filters
         # Retrieve more results initially for reranking
@@ -114,12 +128,7 @@ class Retriever:
         search_results = self.qdrant_client.search(
             collection_name=self.collection_name,
             query_vector=query_embedding,
-            query_filter=Filter(
-                must=[
-                    FieldCondition(key="user_id", match=MatchValue(value=user_id)),
-                    FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
-                ]
-            ),
+            query_filter=Filter(must=must_conditions),
             limit=initial_top_k
         )
         
@@ -148,7 +157,8 @@ class Retriever:
                     'user_id': result.payload.get('user_id'),
                     'chat_id': result.payload.get('chat_id'),
                     'chunk_index': result.payload.get('chunk_index'),
-                    'type': result.payload.get('type')
+                    'type': result.payload.get('type'),
+                    'filename': result.payload.get('filename')
                 }
             })
         

@@ -1,6 +1,7 @@
 """Tools for web search and website scraping."""
 
 import os
+import re
 import tempfile
 from typing import List, Dict, Any, Optional
 import requests
@@ -313,4 +314,131 @@ class ContentSaverTool:
                     os.remove(temp_pdf_file.name)
                 except Exception as cleanup_err:
                     print(f"Error removing temporary PDF file: {cleanup_err}")
+
+
+class ContentRetrieverTool:
+    """Content retriever tool to fetch relevant content from RAG service."""
+    
+    def __init__(self, rag_service_url: str):
+        """Initialize the content retriever tool.
+        
+        Args:
+            rag_service_url: Base URL of the RAG service
+        """
+        self.rag_service_url = rag_service_url.rstrip('/')
+        self.retrieve_endpoint = f"{self.rag_service_url}/retrieve"
+    
+    @staticmethod
+    def extract_filenames(query: str) -> List[str]:
+        """Extract filenames from query that match @filename.ext pattern.
+        
+        Args:
+            query: The user query that may contain @filename.ext patterns
+            
+        Returns:
+            List of extracted filenames
+        """
+        # Pattern to match @filename.extension
+        pattern = r'@([\w\-]+\.[\w]+)'
+        matches = re.findall(pattern, query)
+        return matches
+    
+    def retrieve(
+        self,
+        query: str,
+        user_id: str,
+        chat_id: str,
+        filenames: Optional[List[str]] = None,
+        top_k: int = 5
+    ) -> Dict[str, Any]:
+        """Retrieve relevant content from RAG service.
+        
+        Args:
+            query: The search query
+            user_id: User identifier
+            chat_id: Chat session identifier
+            filenames: Optional list of filenames to filter by
+            top_k: Number of top results to return
+            
+        Returns:
+            Dict containing retrieved content and metadata
+        """
+        try:
+            # If filenames not provided, try to extract from query
+            if filenames is None:
+                filenames = self.extract_filenames(query)
+            
+            payload = {
+                "query": query,
+                "user_id": user_id,
+                "chat_id": chat_id,
+                "top_k": top_k
+            }
+            
+            # Add filenames if present
+            if filenames and len(filenames) > 0:
+                payload["filenames"] = filenames
+            
+            response = requests.post(
+                self.retrieve_endpoint,
+                json=payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Format the response
+            results = data.get("results", [])
+            formatted_context = self._format_context(results)
+            
+            return {
+                "success": True,
+                "query": query,
+                "user_id": user_id,
+                "chat_id": chat_id,
+                "filenames": filenames,
+                "context": formatted_context,
+                "results": results,
+                "count": len(results)
+            }
+            
+        except requests.exceptions.RequestException as e:
+            return {
+                "success": False,
+                "error": f"RAG service request failed: {str(e)}",
+                "query": query
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "query": query
+            }
+    
+    def _format_context(self, results: List[Dict[str, Any]]) -> str:
+        """Format retrieved results into a readable context string.
+        
+        Args:
+            results: List of retrieved chunks with metadata
+            
+        Returns:
+            Formatted context string
+        """
+        if not results:
+            return "No relevant content found in the documents."
+        
+        context_parts = ["Retrieved Context from Documents:\n"]
+        
+        for i, result in enumerate(results, 1):
+            text = result.get("text", "")
+            metadata = result.get("metadata", {})
+            filename = metadata.get("filename", "unknown")
+            score = result.get("score", 0.0)
+            
+            context_parts.append(
+                f"\n[{i}] From: {filename} (relevance: {score:.2f})\n{text}\n"
+            )
+        
+        return "\n".join(context_parts)
 

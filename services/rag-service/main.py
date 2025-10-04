@@ -65,6 +65,7 @@ class RetrievalRequest(BaseModel):
     user_id: str
     chat_id: str
     top_k: int = 5
+    filenames: Optional[List[str]] = None  # Optional list of filenames to filter by
 
 
 class RetrievalResponse(BaseModel):
@@ -198,7 +199,7 @@ async def retrieve_context(request: RetrievalRequest):
     Retrieve relevant context chunks based on a query.
     
     Args:
-        request: RetrievalRequest with query, user_id, chat_id, and top_k
+        request: RetrievalRequest with query, user_id, chat_id, top_k, and optional filenames
     
     Returns:
         RetrievalResponse with retrieved chunks
@@ -209,7 +210,8 @@ async def retrieve_context(request: RetrievalRequest):
             query=request.query,
             user_id=request.user_id,
             chat_id=request.chat_id,
-            top_k=request.top_k
+            top_k=request.top_k,
+            filenames=request.filenames
         )
         
         return RetrievalResponse(
