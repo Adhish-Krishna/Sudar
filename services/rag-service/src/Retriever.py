@@ -40,7 +40,10 @@ class Retriever:
         Returns:
             List[float]: The embedding vector
         """
-        response = ollama.embeddings(
+
+        ollama_client = ollama.Client(host=self.ollama_base_url)
+
+        response = ollama_client.embeddings(
             model=self.embedding_model,
             prompt=text
         )

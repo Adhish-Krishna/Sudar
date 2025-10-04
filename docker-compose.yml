@@ -1,4 +1,5 @@
 version: '3'
+
 services:
   mongodb-server:
     image: mongo:latest
@@ -7,6 +8,8 @@ services:
       - "27017:27017"
     volumes:
       - mongodb-data:/data/db
+    networks:
+      - sudar-network
     restart: unless-stopped
 
   minio:
@@ -21,6 +24,8 @@ services:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
     command: server --console-address ":9001" /data
+    networks:
+      - sudar-network
     restart: unless-stopped
 
   qdrant:
@@ -31,6 +36,8 @@ services:
       - "6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
+    networks:
+      - sudar-network
     restart: unless-stopped
 
   redis:
@@ -40,6 +47,8 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    networks:
+      - sudar-network
     restart: unless-stopped
 
   md-to-pdf:
@@ -50,6 +59,8 @@ services:
       - PORT=3000
     ports:
       - "3000:3000"
+    networks:
+      - sudar-network
     restart: unless-stopped
 
   manim-renderer:
@@ -67,12 +78,41 @@ services:
       - manim-output:/app/output
     depends_on:
       - redis
+    networks:
+      - sudar-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+
+  rag-service:
+    build:
+      context: ./services/rag-service
+    container_name: rag-service
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - EMBEDDING_MODEL_NAME=embeddinggemma:300m
+      - EMBEDDING_DIMENSION=768
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION_NAME=rag_documents
+      - HOST=0.0.0.0
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      - qdrant
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
       start_period: 40s
 
 volumes:
@@ -82,3 +122,7 @@ volumes:
   manim-temp:
   manim-output:
   redis-data:
+
+networks:
+  sudar-network:
+    driver: bridge

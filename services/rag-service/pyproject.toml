@@ -12,4 +12,18 @@ dependencies = [
     "python-multipart>=0.0.6",
     "qdrant-client>=1.7.0",
     "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+# CPU-only installation (for Docker and servers without GPU)
+cpu = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+]
+
+# GPU installation (for systems with CUDA)
+gpu = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
 ]
