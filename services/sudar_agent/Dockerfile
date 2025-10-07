@@ -5,21 +5,33 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN pip install --no-cache-dir uv
+# Install UV
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Copy project files
 COPY pyproject.toml ./
 COPY src ./src
 COPY .env ./.env
+
+# Install dependencies
+RUN uv pip install --system -e .
+
+# Create non-root user
+RUN useradd -m -u 1000 sudaruser && chown -R sudaruser:sudaruser /app
+
+# Switch to non-root
+USER sudaruser
 
 ARG MODEL_PROVIDER
 ARG GOOGLE_MODEL
@@ -57,16 +69,13 @@ ENV MONGODB_DATABASE=${MONGODB_DATABASE}
 ENV MONGODB_COLLECTION=${MONGODB_COLLECTION}
 ENV QDRANT_HOST=${QDRANT_HOST}
 ENV QDRANT_PORT=${QDRANT_PORT}
-ENV QDRANT_COLLECTION_SHORT_TERM=${QDRANT_COLLECTION_LONG_TERM}
+ENV QDRANT_COLLECTION_SHORT_TERM=${QDRANT_COLLECTION_SHORT_TERM}
 ENV QDRANT_COLLECTION_LONG_TERM=${QDRANT_COLLECTION_LONG_TERM}
 ENV OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
 ENV EMBEDDING_MODEL=${EMBEDDING_MODEL}
 ENV EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION}
 ENV HOST=${HOST}
 ENV PORT=${PORT}
-
-# Install dependencies using uv
-RUN uv pip install --system -e .
 
 # Expose port
 EXPOSE ${PORT}
