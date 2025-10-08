@@ -39,3 +39,4 @@ knowledge/
 venv/
 ENV/
 env/
+.env
