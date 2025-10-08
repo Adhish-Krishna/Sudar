@@ -42,6 +42,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
+
+    // Ensure theme attribute is set on document root for CSS selectors
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.className = theme;
+    document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
   return (

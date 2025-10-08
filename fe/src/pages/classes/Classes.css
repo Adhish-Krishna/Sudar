@@ -10,126 +10,154 @@
 }
 
 .classes-header h1 {
-  color: var(--text-color);
   font-size: 2.5rem;
-  margin-bottom: 0.5rem;
   font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
 }
 
 .classes-header p {
-  color: var(--text-color-secondary);
   font-size: 1.1rem;
+  color: var(--text-secondary);
 }
 
-.subjects-grid {
+/* Classes page specific styles only */
+
+/* Class Grid Styles */
+.classes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 2rem;
-  padding: 1rem 0;
+  margin-top: 2rem;
 }
 
-.subject-card {
-  position: relative;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+.class-card {
+  background: linear-gradient(135deg, var(--class-color) 0%, var(--class-color-dark) 100%);
+  border-radius: 16px;
   padding: 2rem;
-  text-align: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  position: relative;
   overflow: hidden;
-  min-height: 180px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 200px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.subject-card::before {
+.class-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: var(--subject-color);
-  transition: all 0.2s ease;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
 }
 
-.subject-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-color: var(--subject-color);
+.class-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
 
-.subject-card:hover::before {
-  height: 4px;
+.class-card:hover::before {
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.2) 0%, transparent 50%);
 }
 
-.subject-icon {
-  width: 48px;
-  height: 48px;
+.class-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.class-content h3 {
+  color: white;
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.class-description {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
   margin-bottom: 1rem;
-  transition: all 0.2s ease;
-  color: var(--subject-color);
+  flex-grow: 1;
+  line-height: 1.5;
 }
 
-.subject-card:hover .subject-icon {
-  transform: scale(1.05);
+.class-stats {
+  margin-top: auto;
 }
 
-.subject-card h3 {
-  color: var(--text-color);
-  font-size: 1.5rem;
+.student-count {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
   font-weight: 600;
-  margin: 0;
-  transition: color 0.2s ease;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  display: inline-block;
 }
 
-.subject-card:hover h3 {
-  color: var(--subject-color);
-}
-
-.subject-overlay {
+.class-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--subject-color);
+  background: rgba(0, 0, 0, 0.3);
   color: white;
-  padding: 0.75rem;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  font-weight: 500;
+  padding: 1rem;
+  text-align: center;
+  font-weight: 600;
   font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0;
+  transform: translateY(100%);
+  transition: all 0.3s ease;
 }
 
-.subject-card:hover .subject-overlay {
+.class-card:hover .class-overlay {
   opacity: 1;
+  transform: translateY(0);
 }
 
-/* Responsive Design */
+/* Subject styles moved to ClassSubjects.css */
+
+/* Responsive design */
 @media (max-width: 768px) {
   .classes-container {
-    padding: 1rem;
+    padding: 1.5rem;
+  }
+  
+  .classes-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .class-card {
+    padding: 2rem 1.5rem;
+    min-height: 150px;
   }
   
   .classes-header h1 {
     font-size: 2rem;
   }
+}
+
+@media (max-width: 480px) {
+  .classes-container {
+    padding: 1rem;
+  }
   
-  .subjects-grid {
+  .classes-grid {
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+    gap: 1rem;
   }
   
-  .subject-card {
-    min-height: 150px;
-    padding: 1.5rem;
-  }
-  
-  .subject-icon {
-    font-size: 2.5rem;
+  .class-card {
+    padding: 1.5rem 1rem;
   }
 }

@@ -21,3 +21,37 @@ The teachers can use this AI agent for instant doubt clearing sessions in both t
 
 ## **Block Diagram**
 <img src='./assets/block-diagram.png'>
+
+## **Sudar AI Agent Setup**
+
+This guide will walk you through the setup process for the Sudar AI Agent project.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+-   [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
+-   [Python](https://www.python.org/downloads/) (version 3.10 or higher)
+-   [UV Package Manager](https://docs.astral.sh/uv/) (recommended) or pip
+
+## Setup Instructions
+
+Follow these steps to get the project up and running:
+
+### 1. Configure Environment Variables
+
+First, you need to set up your environment variables.
+
+1.  In the root directory of the project, make a copy of the `.env.example` file and rename it to `.env`.
+
+2.  Open the new `.env` file and fill all the api keys
+
+### 2. Run Necessary Services
+
+Next, use Docker Compose to build and run the required services in the background.
+
+```bash
+docker-compose up -d
+```
+
+This command will start all the services defined in the `docker-compose.yml` file.

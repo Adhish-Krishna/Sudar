@@ -18,11 +18,11 @@
 }
 
 .sidebar.expanded {
-  width: 260px;
+  width: 210px;
 }
 
 .sidebar-header {
-  padding: 1.25rem;
+  padding: 0.6rem;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: center;

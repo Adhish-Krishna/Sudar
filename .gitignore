@@ -1,0 +1,27 @@
+**/__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+env/
+venv/
+*.log
+.pytest_cache/
+.coverage
+output/
+**/db/
+
+# UV specific
+uv.lock
+.python-version
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

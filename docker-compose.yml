@@ -1,0 +1,200 @@
+services:
+  mongodb-server:
+    image: mongo:latest
+    container_name: mongodb-server
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - sudar-network
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio-server
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server --console-address ":9001" /data
+    networks:
+      - sudar-network
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant-server
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - sudar-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-server
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - sudar-network
+    restart: unless-stopped
+
+  md-to-pdf:
+    build: 
+      context: ./services/md-to-pdf
+    container_name: md-to-pdf-service
+    environment:
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    networks:
+      - sudar-network
+    restart: unless-stopped
+
+  manim-renderer:
+    build:
+      context: ./services/manim-renderer
+    container_name: manim-renderer-service
+    environment:
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - JOB_STATUS_TTL_SECONDS=3600
+    ports:
+      - "8000:8000"
+    volumes:
+      - manim-temp:/app/temp
+      - manim-output:/app/output
+    depends_on:
+      - redis
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  rag-service:
+    build:
+      context: ./services/rag-service
+    container_name: rag-service
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - EMBEDDING_MODEL_NAME=embeddinggemma:300m
+      - EMBEDDING_DIMENSION=768
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION_NAME=rag_documents
+      - MINIO_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=rag-documents
+      - HOST=0.0.0.0
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      - qdrant
+      - minio
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  sudar-tools-mcp-server:
+    build:
+      context: ./services/sudar-tools-mcp-server
+      args:
+        - TAVILY_API_KEY=${TAVILY_API_KEY}
+    container_name: sudar-tools-mcp-server
+    environment:
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - MINIO_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=sudar-content
+      - MD_TO_PDF_URL=http://md-to-pdf:3000/convert
+      - RAG_SERVICE_URL=http://rag-service:3001
+      - HOST=0.0.0.0
+      - PORT=3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      - minio
+      - md-to-pdf
+      - rag-service
+    networks:
+      - sudar-network
+    restart: unless-stopped
+
+  sudar-agent:
+    build:
+      context: ./services/sudar_agent
+    container_name: sudar-agent
+    environment:
+      - MODEL_PROVIDER=${MODEL_PROVIDER}
+      - GOOGLE_MODEL=${GOOGLE_MODEL}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL}
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - RAG_SERVICE_URL=http://rag-service:3001
+      - MCP_TOOLS_URL=http://sudar-tools-mcp-server:3002
+      - MD_TO_PDF_URL=http://md-to-pdf:3000/convert
+      - MONGODB_URL=mongodb://mongodb-server:27017
+      - MONGODB_DATABASE=sudar_db
+      - MONGODB_COLLECTION=chats
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION_SHORT_TERM=sudar_agent_short_term_memory
+      - QDRANT_COLLECTION_LONG_TERM=sudar_agent_long_term_memory
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - EMBEDDING_MODEL=embeddinggemma:300m
+      - EMBEDDING_DIMENSION=768
+      - HOST=0.0.0.0
+      - PORT=3005
+    ports:
+      - "3005:3005"
+    depends_on:
+      - mongodb-server
+      - qdrant
+      - rag-service
+      - sudar-tools-mcp-server
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  mongodb-data:
+  minio-data:
+  qdrant-data:
+  manim-temp:
+  manim-output:
+  redis-data:
+
+networks:
+  sudar-network:
+    driver: bridge

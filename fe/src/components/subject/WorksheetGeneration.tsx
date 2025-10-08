@@ -84,9 +84,6 @@ const WorksheetGeneration = ({ subjectName }: WorksheetGenerationProps) => {
           <p className="info-text">
             <strong>Subject:</strong> {subjectName}
           </p>
-          <p className="info-text">
-            🔧 <em>Worksheet generation functionality will be implemented with AI integration.</em>
-          </p>
         </div>
       </div>
     </div>
