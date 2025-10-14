@@ -1,0 +1,13 @@
+fastapi[all]  
+loguru  
+pytest  
+python-dotenv  
+psycopg2-binary 
+werkzeug  
+bcrypt  
+sqlalchemy  
+python-jose[cryptography]>=3.3.0  
+numpy  
+scikit-learn  
+faiss-cpu  
+apscheduler  
