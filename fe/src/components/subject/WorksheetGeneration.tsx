@@ -7,17 +7,48 @@ interface WorksheetGenerationProps {
 
 type Mode = 'worksheet' | 'content';
 
+interface WorksheetHistory {
+  id: number;
+  title: string;
+  topics: string;
+  date: string;
+  type: 'worksheet' | 'content';
+}
+
 const WorksheetGeneration = ({ subjectName }: WorksheetGenerationProps) => {
   const [topics, setTopics] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [mode, setMode] = useState<Mode>('worksheet');
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Mock history data - Replace with API call
+  const [history] = useState<WorksheetHistory[]>([
+    {
+      id: 1,
+      title: 'Mathematics - Algebra Basics',
+      topics: 'Linear equations, quadratic equations, polynomials',
+      date: '2024-01-15',
+      type: 'worksheet'
+    },
+    {
+      id: 2,
+      title: 'Science - Photosynthesis',
+      topics: 'Plant biology, chemical reactions, energy conversion',
+      date: '2024-01-14',
+      type: 'worksheet'
+    },
+    {
+      id: 3,
+      title: 'English - Grammar Exercises',
+      topics: 'Tenses, articles, prepositions',
+      date: '2024-01-13',
+      type: 'worksheet'
+    }
+  ]);
 
   const handleViewHistory = () => {
-    // TODO: Implement history viewing functionality
     setShowHistory(!showHistory);
     console.log('View worksheet history clicked');
-    alert('Previous worksheet history feature coming soon!');
   };
 
   const handleGenerate = async () => {
@@ -152,6 +183,88 @@ const WorksheetGeneration = ({ subjectName }: WorksheetGenerationProps) => {
             </em>
           </p>
         </div>
+
+        {/* History Modal */}
+        {showHistory && (
+          <div className="history-overlay" onClick={handleViewHistory}>
+            <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="history-header">
+                <h3>Previously Generated Worksheets</h3>
+                <button 
+                  className="close-button"
+                  onClick={handleViewHistory}
+                  title="Close"
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="history-content">
+                {history.length === 0 ? (
+                  <div className="no-history">
+                    <svg className="no-history-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p>No worksheets generated yet</p>
+                  </div>
+                ) : (
+                  <div className="history-list">
+                    {history.map((item) => (
+                      <div key={item.id} className="history-item">
+                        <div className="history-item-header">
+                          <h4>{item.title}</h4>
+                          <span className="history-date">
+                            {new Date(item.date).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                        <p className="history-topics">{item.topics}</p>
+                        <div className="history-actions">
+                          <button 
+                            className="history-action-btn view-btn"
+                            onClick={() => console.log('View worksheet:', item.id)}
+                            title="View Worksheet"
+                          >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View
+                          </button>
+                          <button 
+                            className="history-action-btn download-btn"
+                            onClick={() => console.log('Download worksheet:', item.id)}
+                            title="Download Worksheet"
+                          >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download
+                          </button>
+                          <button 
+                            className="history-action-btn delete-btn"
+                            onClick={() => console.log('Delete worksheet:', item.id)}
+                            title="Delete Worksheet"
+                          >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

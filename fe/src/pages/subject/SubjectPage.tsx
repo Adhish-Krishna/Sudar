@@ -43,11 +43,11 @@ const SubjectPage = () => {
   return (
     <div className="subject-page">
       {/* Breadcrumb */}
-      <div className="breadcrumb">
+      {/* <div className="breadcrumb">
         <span className="breadcrumb-item">{subjectName}</span>
         <span className="breadcrumb-separator">&gt;</span>
         <span className="breadcrumb-current">{activeTab}</span>
-      </div>
+      </div> */}
 
       {/* Tab Navigation */}
       <div className="tab-navigation">
