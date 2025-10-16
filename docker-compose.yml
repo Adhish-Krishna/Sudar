@@ -1,4 +1,53 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-server
+    environment:
+      - POSTGRES_DB=sudar_db
+      - POSTGRES_USER=sudar_user
+      - POSTGRES_PASSWORD=sudar_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./be/sql:/docker-entrypoint-initdb.d
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sudar_user -d sudar_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./be
+    container_name: sudar-backend
+    environment:
+      - DATABASE_URL=postgresql://sudar_user:sudar_password@postgres:5432/sudar_db
+      - SECRET_KEY=${SECRET_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME}
+    ports:
+      - "3006:3006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:3006/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   mongodb-server:
     image: mongo:latest
     container_name: mongodb-server
@@ -188,6 +237,7 @@ services:
       start_period: 60s
 
 volumes:
+  postgres-data:
   mongodb-data:
   minio-data:
   qdrant-data:
