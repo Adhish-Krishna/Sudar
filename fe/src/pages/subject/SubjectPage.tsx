@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import SubjectDetail from '../../components/subject/SubjectDetail';
-import ContentCreation from '../../components/subject/ContentCreation';
 import WorksheetGeneration from '../../components/subject/WorksheetGeneration';
 import './SubjectPage.css';
 
-type TabType = 'Subject' | 'Create Content' | 'Generate Worksheet';
+type TabType = 'Subject' | 'AI Assistant';
 
 const SubjectPage = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
@@ -34,9 +33,7 @@ const SubjectPage = () => {
     switch (activeTab) {
       case 'Subject':
         return <SubjectDetail subjectName={subjectName} subjectId={subjectId || ''} />;
-      case 'Create Content':
-        return <ContentCreation subjectName={subjectName} />;
-      case 'Generate Worksheet':
+      case 'AI Assistant':
         return <WorksheetGeneration subjectName={subjectName} />;
       default:
         return <SubjectDetail subjectName={subjectName} subjectId={subjectId || ''} />;
@@ -54,7 +51,7 @@ const SubjectPage = () => {
 
       {/* Tab Navigation */}
       <div className="tab-navigation">
-        {(['Subject', 'Create Content', 'Generate Worksheet'] as TabType[]).map((tab) => (
+        {(['Subject', 'AI Assistant'] as TabType[]).map((tab) => (
           <button
             key={tab}
             className={`tab-button ${activeTab === tab ? 'active' : ''}`}
