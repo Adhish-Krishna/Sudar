@@ -99,6 +99,24 @@ services:
       - sudar-network
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama:/root/.ollama  
+      - ./ollama_entrypoint.sh:/ollama_entrypoint.sh 
+    ports:
+      - "11434:11434"
+    entrypoint: ["/bin/bash", "/ollama_entrypoint.sh"] 
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - sudar-network
+    restart: unless-stopped
+
   md-to-pdf:
     build: 
       context: ./services/md-to-pdf
@@ -141,7 +159,7 @@ services:
       context: ./services/rag-service
     container_name: rag-service
     environment:
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDING_MODEL_NAME=embeddinggemma:300m
       - EMBEDDING_DIMENSION=768
       - QDRANT_HOST=qdrant
@@ -156,8 +174,12 @@ services:
     ports:
       - "3001:3001"
     depends_on:
-      - qdrant
-      - minio
+      ollama:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
     networks:
       - sudar-network
     restart: unless-stopped
@@ -215,7 +237,7 @@ services:
       - QDRANT_PORT=6333
       - QDRANT_COLLECTION_SHORT_TERM=sudar_agent_short_term_memory
       - QDRANT_COLLECTION_LONG_TERM=sudar_agent_long_term_memory
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDING_MODEL=embeddinggemma:300m
       - EMBEDDING_DIMENSION=768
       - HOST=0.0.0.0
@@ -223,10 +245,16 @@ services:
     ports:
       - "3005:3005"
     depends_on:
-      - mongodb-server
-      - qdrant
-      - rag-service
-      - sudar-tools-mcp-server
+      ollama:
+        condition: service_started
+      mongodb-server:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      rag-service:
+        condition: service_started
+      sudar-tools-mcp-server:
+        condition: service_started
     networks:
       - sudar-network
     restart: unless-stopped
@@ -245,6 +273,7 @@ volumes:
   manim-temp:
   manim-output:
   redis-data:
+  ollama:
 
 networks:
   sudar-network:
