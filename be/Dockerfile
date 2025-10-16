@@ -19,6 +19,7 @@ COPY pyproject.toml ./
 # Copy application code (needed for package installation)
 COPY api/ ./api/
 COPY sql/ ./sql/
+COPY run.py ./
 
 # Install Python dependencies using uv
 RUN uv pip install --system .
@@ -27,13 +28,17 @@ RUN uv pip install --system .
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
+ARG PORT
+
+ENV PORT=${PORT}
+
 # Expose port
-EXPOSE 3006
+EXPOSE ${PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3006/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
 
 # Run the application
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "3006"]
+CMD ["python", "run.py"]
 

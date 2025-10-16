@@ -5,10 +5,13 @@ from .classroom import router as classroom_router
 from .students import router as students_router
 from .subjects import router as subjects_router
 from .performance import router as performance_router
-from .database import engine, Base
+import uvicorn
+from dotenv import load_dotenv
+import os
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+load_dotenv()
+
+PORT = os.getenv("PORT")
 
 app = FastAPI(
     title="Sudar API",
@@ -51,4 +54,11 @@ def health_check():
     Health check endpoint
     """
     return {"status": "healthy"}
+
+def main():
+    uvicorn.run("api.main:app", host="0.0.0.0", port=int(PORT), reload=True)
+
+if __name__ == "__main__":
+    main()
+
 

@@ -25,6 +25,7 @@ services:
       context: ./be
     container_name: sudar-backend
     environment:
+      - PORT=3006
       - DATABASE_URL=postgresql://sudar_user:sudar_password@postgres:5432/sudar_db
       - SECRET_KEY=${SECRET_KEY}
       - SMTP_HOST=${SMTP_HOST}

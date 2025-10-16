@@ -55,3 +55,16 @@ docker-compose up -d
 ```
 
 This command will start all the services defined in the `docker-compose.yml` file.
+
+## **Services and Ports**
+
+The following services are part of the Sudar platform:
+
+| Service | Default Port | URL | Server |
+|---------|--------------|-----| -----|
+| manim-renderer | 8000 | http://localhost:8000 | Fast API |
+| md-to-pdf | 3000 | http://localhost:3000 | NodeJS |
+| rag-service | 3001 | http://localhost:3001 | Fast API |
+| sudar-agent | 3005 | http://localhost:3005 | Fast API |
+| sudar-tools-mcp-server | 3002 | http://localhost:3002 | FastMCP |
+| be | 3006 | http://localhost:3006 | Fast API |
