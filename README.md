@@ -19,8 +19,8 @@ The teachers can use this AI agent for instant doubt clearing sessions in both t
 
 6) Equip teachers (especially in rural & semi-urban India) with an AI assistant that helps them teach age-appropriate, medically accurate,       culturally sensitive sex education without fear or discomfort.
 
-## **Block Diagram**
-<img src='./assets/block-diagram.png'>
+## **Sudar AI Architecture**
+<img src='./assets/SudarAIArchitecture.png'>
 
 ## **Sudar AI Agent Setup**
 
@@ -30,9 +30,14 @@ This guide will walk you through the setup process for the Sudar AI Agent projec
 
 Before you begin, ensure you have the following installed:
 
--   [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
--   [Python](https://www.python.org/downloads/) (version 3.10 or higher)
--   [UV Package Manager](https://docs.astral.sh/uv/) (recommended) or pip
+- For easy installation and deployment:
+
+    - [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
+
+- For development:
+
+    -   [Python](https://www.python.org/downloads/) (version 3.11 or higher)
+    -   [UV Package Manager](https://docs.astral.sh/uv/) (recommended) or pip
 
 ## Setup Instructions
 
