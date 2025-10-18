@@ -1,14 +1,95 @@
 """
-Startup script to check Ollama availability and start the service
+Startup script to check Ollama availability, initialize Docling models, and start the service
 """
 import os
 import sys
 import time
 import requests
+import logging
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(levelname)s] %(name)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+def initialize_docling_models():
+    """
+    Initialize Docling models on first startup.
+    
+    Models are downloaded and cached in the directory specified by DOCLING_ARTIFACTS_PATH.
+    This ensures models persist across container restarts via Docker volumes.
+    
+    Returns:
+        bool: True if initialization successful or already cached, False otherwise
+    """
+    try:
+        logger.info("Initializing Docling models...")
+        
+        from docling.datamodel.settings import settings
+        from docling.utils.model_downloader import download_models
+        
+        # Get artifacts path from environment or use default
+        artifacts_path = os.getenv('DOCLING_ARTIFACTS_PATH')
+        if artifacts_path:
+            artifacts_path = Path(artifacts_path)
+        else:
+            artifacts_path = settings.cache_dir / "models"
+        
+        logger.info(f"Models cache directory: {artifacts_path}")
+        
+        # Ensure directory exists
+        artifacts_path.mkdir(parents=True, exist_ok=True)
+        
+        # Check if models are already downloaded
+        # Look for layout model as an indicator that models exist
+        layout_marker = artifacts_path / "ds4sd--docling-layout-heron" / "layout_model.pt"
+        
+        if layout_marker.exists():
+            logger.info("✓ Docling models already cached, skipping download")
+            return True
+        
+        logger.info("Downloading Docling models (this may take a few minutes on first startup)...")
+        logger.info("  - Layout model (Heron)")
+        logger.info("  - TableFormer (table structure)")
+        logger.info("  - Code & Formula model")
+        logger.info("  - Picture Classifier")
+        logger.info("  - RapidOCR (detection & recognition)")
+        
+        # Download models
+        download_models(
+            output_dir=artifacts_path,
+            force=False,
+            progress=True,
+            with_layout=True,
+            with_tableformer=True,
+            with_code_formula=True,
+            with_picture_classifier=True,
+            with_rapidocr=True,
+            with_easyocr=False,
+            with_smolvlm=False,
+            with_granitedocling=False,
+            with_granitedocling_mlx=False,
+            with_smoldocling=False,
+            with_smoldocling_mlx=False,
+            with_granite_vision=False,
+        )
+        
+        logger.info(f"✓ Docling models successfully initialized in {artifacts_path}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Failed to initialize Docling models: {str(e)}", exc_info=True)
+        logger.warning("  Service will start but document parsing may fail!")
+        return False  # Don't fail startup, let service start
+
 
 def check_ollama_connection(max_retries=5, retry_delay=5):
     """
@@ -121,10 +202,23 @@ def main():
     print("RAG Microservice - Startup Check")
     print("=" * 60)
     
+    # Initialize Docling models on first startup
+    # This downloads models to the Docker volume if not already cached
+    print("\n" + "=" * 60)
+    print("Step 1: Initialize Docling Models")
+    print("=" * 60)
+    initialize_docling_models()
+    
     # Check Qdrant connection
+    print("\n" + "=" * 60)
+    print("Step 2: Check Qdrant Connection")
+    print("=" * 60)
     qdrant_ok = check_qdrant_connection()
     
     # Check Ollama connection
+    print("\n" + "=" * 60)
+    print("Step 3: Check Ollama Connection")
+    print("=" * 60)
     ollama_ok = check_ollama_connection()
     
     # Decide whether to start the service

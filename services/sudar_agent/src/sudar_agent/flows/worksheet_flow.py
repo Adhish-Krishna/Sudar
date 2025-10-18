@@ -12,15 +12,16 @@ from ..config.config import config
 class WorksheetGeneratorFlow(Flow):
     """Flow for generating worksheets with content research."""
     
-    def __init__(self, user_id: str, chat_id: str):
+    def __init__(self, user_id: str, chat_id: str, classroom_id: str):
         super().__init__()
         self.user_id = user_id
         self.chat_id = chat_id
+        self.classroom_id = classroom_id
         self.llm = self._get_llm()
         
         # Initialize tools with user/chat context
-        self.content_retriever = ContentRetrieverTool(user_id=user_id, chat_id=chat_id)
-        self.content_saver = ContentSaverTool(user_id=user_id, chat_id=chat_id)
+        self.content_retriever = ContentRetrieverTool(user_id=user_id, chat_id=chat_id, classroom_id=classroom_id)
+        self.content_saver = ContentSaverTool(user_id=user_id, chat_id=chat_id, classroom_id=classroom_id)
         self.web_search = WebSearchTool()
         self.web_scraper = WebsiteScraperTool()
     

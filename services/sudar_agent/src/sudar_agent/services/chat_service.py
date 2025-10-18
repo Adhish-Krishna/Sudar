@@ -29,6 +29,7 @@ class ChatService:
         chat_id: str,
         role: str,
         content: str,
+        classroom_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
@@ -39,6 +40,7 @@ class ChatService:
             chat_id: Chat session identifier
             role: Message role (user, agent, content_researcher, worksheet_generator, router)
             content: Message content
+            classroom_id: Optional classroom identifier for organizing by classroom
             metadata: Optional additional metadata
         
         Returns:
@@ -53,14 +55,19 @@ class ChatService:
             "metadata": metadata or {}
         }
         
+        # Add classroom_id if provided
+        if classroom_id:
+            document["classroom_id"] = classroom_id
+        
         result = self.collection.insert_one(document)
-        logger.debug(f"Saved {role} message for user {user_id}, chat {chat_id}")
+        logger.debug(f"Saved {role} message for user {user_id}, chat {chat_id}, classroom {classroom_id}")
         return str(result.inserted_id)
     
     def get_chat_history(
         self,
         user_id: str,
         chat_id: str,
+        classroom_id: Optional[str] = None,
         limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -69,12 +76,18 @@ class ChatService:
         Args:
             user_id: User identifier
             chat_id: Chat session identifier
+            classroom_id: Optional classroom identifier to filter by classroom
             limit: Optional limit on number of messages to retrieve
         
         Returns:
             List of chat messages sorted by timestamp
         """
         query = {"user_id": user_id, "chat_id": chat_id}
+        
+        # Add classroom_id filter if provided
+        if classroom_id:
+            query["classroom_id"] = classroom_id
+        
         cursor = self.collection.find(query).sort("timestamp", 1)
         
         if limit:
@@ -87,19 +100,26 @@ class ChatService:
         
         return messages
     
-    def delete_chat(self, user_id: str, chat_id: str) -> int:
+    def delete_chat(self, user_id: str, chat_id: str, classroom_id: Optional[str] = None) -> int:
         """
         Delete all messages for a specific chat
         
         Args:
             user_id: User identifier
             chat_id: Chat session identifier
+            classroom_id: Optional classroom identifier to filter by classroom
         
         Returns:
             Number of deleted messages
         """
-        result = self.collection.delete_many({"user_id": user_id, "chat_id": chat_id})
-        logger.info(f"Deleted {result.deleted_count} messages for chat {chat_id}")
+        query = {"user_id": user_id, "chat_id": chat_id}
+        
+        # Add classroom_id filter if provided
+        if classroom_id:
+            query["classroom_id"] = classroom_id
+        
+        result = self.collection.delete_many(query)
+        logger.info(f"Deleted {result.deleted_count} messages for chat {chat_id}, classroom {classroom_id}")
         return result.deleted_count
     
     def close(self):

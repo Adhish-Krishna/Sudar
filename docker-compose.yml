@@ -171,8 +171,11 @@ services:
       - MINIO_BUCKET_NAME=rag-documents
       - HOST=0.0.0.0
       - PORT=3001
+      - DOCLING_ARTIFACTS_PATH=/docling_models
     ports:
       - "3001:3001"
+    volumes:
+      - docling-models:/docling_models
     depends_on:
       ollama:
         condition: service_started
@@ -274,6 +277,7 @@ volumes:
   manim-output:
   redis-data:
   ollama:
+  docling-models:
 
 networks:
   sudar-network:

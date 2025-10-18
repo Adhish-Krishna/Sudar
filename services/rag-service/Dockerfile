@@ -6,15 +6,19 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_SYSTEM_PYTHON=1 \
     PYTORCH_ENABLE_MPS_FALLBACK=1 \
-    TORCH_DEVICE=cpu
+    TORCH_DEVICE=cpu \
+    DOCLING_ARTIFACTS_PATH=/docling_models
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies including curl for health checks
+# Install system dependencies including curl for health checks and OpenGL libraries for Docling
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv - the fast Python package installer
@@ -37,9 +41,15 @@ RUN uv pip install --system . --index-strategy unsafe-best-match
 # Copy application code
 COPY . .
 
+# Create docling models directory before switching to non-root user
+# This will be mounted as a volume for persistence
+RUN mkdir -p /docling_models && \
+    chmod 777 /docling_models
+
 # Create a non-root user for security
 RUN useradd -m -u 1000 raguser && \
-    chown -R raguser:raguser /app
+    chown -R raguser:raguser /app && \
+    chown -R raguser:raguser /docling_models
 
 # Switch to non-root user
 USER raguser
@@ -83,5 +93,5 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application with startup checks
+# Run the application with startup checks and model initialization
 CMD ["python", "startup.py"]

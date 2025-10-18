@@ -4,6 +4,7 @@ from .auth import router as auth_router
 from .classroom import router as classroom_router
 from .students import router as students_router
 from .subjects import router as subjects_router
+from .activity import router as activity_router
 from .performance import router as performance_router
 import uvicorn
 from dotenv import load_dotenv
@@ -33,6 +34,7 @@ app.include_router(auth_router)
 app.include_router(classroom_router)
 app.include_router(students_router)
 app.include_router(subjects_router)
+app.include_router(activity_router)
 app.include_router(performance_router)
 
 

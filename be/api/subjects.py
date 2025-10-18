@@ -166,7 +166,7 @@ def delete_subject(
     """
     Delete a subject from a classroom.
     Only the teacher who owns the classroom can delete subjects.
-    This will cascade delete all worksheets, content, and related data.
+    This will cascade delete all activities, files, and related data.
     """
     # Verify classroom ownership
     verify_classroom_ownership(classroom_id, current_teacher, db)

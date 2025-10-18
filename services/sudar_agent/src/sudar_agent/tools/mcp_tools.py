@@ -97,6 +97,7 @@ class ContentSaverTool(BaseTool):
     
     user_id: str = Field(default="")
     chat_id: str = Field(default="")
+    classroom_id: str = Field(default="")
     
     def _run(self, content: str, title: str) -> Dict[str, Any]:
         """Save content as PDF."""
@@ -110,7 +111,8 @@ class ContentSaverTool(BaseTool):
                             "content": content,
                             "title": title,
                             "user_id": self.user_id,
-                            "chat_id": self.chat_id
+                            "chat_id": self.chat_id,
+                            "classroom_id": self.classroom_id
                         }
                     }
                 )
@@ -141,6 +143,7 @@ class ContentRetrieverTool(BaseTool):
     
     user_id: str = Field(default="")
     chat_id: str = Field(default="")
+    classroom_id: str = Field(default="")
     
     def _run(self, query: str, filenames: Optional[List[str]] = None, top_k: int = 5) -> Dict[str, Any]:
         """Retrieve content from documents."""
@@ -154,6 +157,7 @@ class ContentRetrieverTool(BaseTool):
                             "query": query,
                             "user_id": self.user_id,
                             "chat_id": self.chat_id,
+                            "classroom_id": self.classroom_id,
                             "filenames": filenames,
                             "top_k": top_k
                         }

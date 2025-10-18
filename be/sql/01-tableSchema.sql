@@ -49,39 +49,36 @@ CREATE TABLE subjects (
         REFERENCES classrooms (classroom_id) ON DELETE CASCADE
 );
 
--- WORKSHEETS
-CREATE TABLE worksheets (
-    worksheet_id      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- ACTIVITY
+CREATE TABLE activity (
+    activity_id       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     subject_id        UUID NOT NULL,
-    chat_id           UUID NOT NULL UNIQUE, 
-    saved_worksheet   JSONB,
+    title             VARCHAR(255) NOT NULL,
+    type              VARCHAR(50) NOT NULL,
     created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_worksheet_subject FOREIGN KEY (subject_id)
+    CONSTRAINT fk_activity_subject FOREIGN KEY (subject_id)
         REFERENCES subjects (subject_id) ON DELETE CASCADE
 );
 
--- CONTENT
-CREATE TABLE content (
-    content_id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    subject_id        UUID NOT NULL,
-    chat_id           UUID NOT NULL UNIQUE,
-    title             VARCHAR(255) NOT NULL,
-    saved_content     JSONB,
-    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_content_subject FOREIGN KEY (subject_id)
-        REFERENCES subjects (subject_id) ON DELETE CASCADE
+-- FILES
+CREATE TABLE files (
+    file_id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    minio_path        TEXT NOT NULL,
+    activity_id       UUID NOT NULL,
+    CONSTRAINT fk_files_activity FOREIGN KEY (activity_id)
+        REFERENCES activity (activity_id) ON DELETE CASCADE
 );
 
 -- PERFORMANCE (Composite Primary Key)
 CREATE TABLE performance (
     student_rollno    VARCHAR(10) NOT NULL,
-    worksheet_id      UUID NOT NULL,
+    activity_id       UUID NOT NULL,
     teacher_feedback  TEXT,
     teacher_mark      INT NOT NULL,
-    PRIMARY KEY (student_rollno, worksheet_id),
+    PRIMARY KEY (student_rollno, activity_id),
     CONSTRAINT fk_performance_student FOREIGN KEY (student_rollno)
         REFERENCES students (rollno) ON DELETE CASCADE,
-    CONSTRAINT fk_performance_worksheet FOREIGN KEY (worksheet_id)
-        REFERENCES worksheets (worksheet_id) ON DELETE CASCADE
+    CONSTRAINT fk_performance_activity FOREIGN KEY (activity_id)
+        REFERENCES activity (activity_id) ON DELETE CASCADE
 );
 

@@ -56,6 +56,7 @@ class IngestResponse(BaseModel):
     inserted_count: int
     user_id: str
     chat_id: str
+    classroom_id: Optional[str] = None
     filename: str
     minio_upload: Optional[dict] = None
 
@@ -64,6 +65,7 @@ class RetrievalRequest(BaseModel):
     query: str
     user_id: str
     chat_id: str
+    classroom_id: Optional[str] = None
     top_k: int = 5
     filenames: Optional[List[str]] = None  # Optional list of filenames to filter by
 
@@ -73,6 +75,7 @@ class RetrievalResponse(BaseModel):
     query: str
     user_id: str
     chat_id: str
+    classroom_id: Optional[str] = None
     results: List[dict]
     count: int
 
@@ -104,7 +107,8 @@ async def health():
 async def ingest_document(
     file: UploadFile = File(...),
     user_id: str = Form(...),
-    chat_id: str = Form(...)
+    chat_id: str = Form(...),
+    classroom_id: Optional[str] = Form(None)
 ):
     """
     Ingest a document: parse, chunk, embed, and store in Qdrant.
@@ -113,6 +117,7 @@ async def ingest_document(
         file: Uploaded file (PDF, DOCX, PPTX, XLSX, MD, TXT)
         user_id: User identifier
         chat_id: Chat/conversation identifier
+        classroom_id: Optional classroom identifier
     
     Returns:
         IngestResponse with status and details
@@ -128,6 +133,7 @@ async def ingest_document(
             filename=filename,
             user_id=user_id,
             chat_id=chat_id,
+            classroom_id=classroom_id,
             content_type=file.content_type
         )
         
@@ -166,6 +172,7 @@ async def ingest_document(
                 chunks=chunks,
                 user_id=user_id,
                 chat_id=chat_id,
+                classroom_id=classroom_id,
                 metadata={"filename": filename}
             )
         except Exception as e:
@@ -180,6 +187,7 @@ async def ingest_document(
             inserted_count=result["inserted_count"],
             user_id=user_id,
             chat_id=chat_id,
+            classroom_id=classroom_id,
             filename=filename,
             minio_upload=minio_result if minio_result.get("success") else None
         )
@@ -210,6 +218,7 @@ async def retrieve_context(request: RetrievalRequest):
             query=request.query,
             user_id=request.user_id,
             chat_id=request.chat_id,
+            classroom_id=request.classroom_id,
             top_k=request.top_k,
             filenames=request.filenames
         )
@@ -219,6 +228,7 @@ async def retrieve_context(request: RetrievalRequest):
             query=request.query,
             user_id=request.user_id,
             chat_id=request.chat_id,
+            classroom_id=request.classroom_id,
             results=results,
             count=len(results)
         )
@@ -231,19 +241,20 @@ async def retrieve_context(request: RetrievalRequest):
 
 
 @app.delete("/delete/{user_id}/{chat_id}")
-async def delete_chat_data(user_id: str, chat_id: str):
+async def delete_chat_data(user_id: str, chat_id: str, classroom_id: Optional[str] = None):
     """
     Delete all data for a specific user and chat.
     
     Args:
         user_id: User identifier
         chat_id: Chat/conversation identifier
+        classroom_id: Optional classroom identifier for filtering
     
     Returns:
         Deletion status
     """
     try:
-        result = embedder.delete_by_chat(user_id, chat_id)
+        result = embedder.delete_by_chat(user_id, chat_id, classroom_id)
         return result
     except Exception as e:
         raise HTTPException(
@@ -253,24 +264,31 @@ async def delete_chat_data(user_id: str, chat_id: str):
 
 
 @app.get("/list/{user_id}/{chat_id}")
-async def list_chat_chunks(user_id: str, chat_id: str, limit: int = 100):
+async def list_chat_chunks(
+    user_id: str, 
+    chat_id: str, 
+    classroom_id: Optional[str] = None,
+    limit: int = 100
+):
     """
     List all chunks for a specific user and chat.
     
     Args:
         user_id: User identifier
         chat_id: Chat/conversation identifier
+        classroom_id: Optional classroom identifier for filtering
         limit: Maximum number of chunks to return
     
     Returns:
         List of chunks with metadata
     """
     try:
-        chunks = retriever.retrieve_all_for_chat(user_id, chat_id, limit)
+        chunks = retriever.retrieve_all_for_chat(user_id, chat_id, classroom_id, limit)
         return {
             "status": "success",
             "user_id": user_id,
             "chat_id": chat_id,
+            "classroom_id": classroom_id,
             "chunks": chunks,
             "count": len(chunks)
         }

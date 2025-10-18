@@ -56,6 +56,7 @@ class MinIOStorage:
         filename: str,
         user_id: str,
         chat_id: str,
+        classroom_id: Optional[str] = None,
         content_type: Optional[str] = None
     ) -> dict:
         """Upload a file to MinIO.
@@ -65,19 +66,25 @@ class MinIOStorage:
             filename: Original filename
             user_id: User identifier
             chat_id: Chat identifier
+            classroom_id: Optional classroom identifier
             content_type: MIME type of the file
             
         Returns:
             Dict with upload details
         """
         try:
-            # Create object name with user/chat structure
-            object_name = f"{user_id}/{chat_id}/{filename}"
+            # Create object name with user/classroom/chat structure
+            if classroom_id:
+                object_name = f"{user_id}/{classroom_id}/{chat_id}/{filename}"
+            else:
+                object_name = f"{user_id}/{chat_id}/{filename}"
             
             # Prepare tags
             tags = Tags(for_object=True)
             tags["user_id"] = user_id
             tags["chat_id"] = chat_id
+            if classroom_id:
+                tags["classroom_id"] = classroom_id
             tags["type"] = "uploaded_document"
             tags["filename"] = filename
             

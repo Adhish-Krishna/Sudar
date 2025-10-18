@@ -1,9 +1,16 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Date, Text, CHAR
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Date, Text, CHAR, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 from .database import Base
+import enum
+
+
+class ActivityType(enum.Enum):
+    """Enum for activity types"""
+    WORKSHEET = "Worksheet"
+    CONTENT = "Content"
 
 
 class Teacher(Base):
@@ -66,46 +73,43 @@ class Subject(Base):
     
     # Relationships
     classroom = relationship("Classroom", back_populates="subjects")
-    worksheets = relationship("Worksheet", back_populates="subject", cascade="all, delete-orphan")
-    contents = relationship("Content", back_populates="subject", cascade="all, delete-orphan")
+    activities = relationship("Activity", back_populates="subject", cascade="all, delete-orphan")
 
 
-class Worksheet(Base):
-    __tablename__ = "worksheets"
+class Activity(Base):
+    __tablename__ = "activity"
     
-    worksheet_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    activity_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
-    chat_id = Column(UUID(as_uuid=True), unique=True, nullable=False)
-    saved_worksheet = Column(JSONB, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    subject = relationship("Subject", back_populates="worksheets")
-    performances = relationship("Performance", back_populates="worksheet", cascade="all, delete-orphan")
-
-
-class Content(Base):
-    __tablename__ = "content"
-    
-    content_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
-    chat_id = Column(UUID(as_uuid=True), unique=True, nullable=False)
     title = Column(String(255), nullable=False)
-    saved_content = Column(JSONB, nullable=True)
+    type = Column(SQLEnum(ActivityType), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    subject = relationship("Subject", back_populates="contents")
+    subject = relationship("Subject", back_populates="activities")
+    files = relationship("File", back_populates="activity", cascade="all, delete-orphan")
+    performances = relationship("Performance", back_populates="activity", cascade="all, delete-orphan")
+
+
+class File(Base):
+    __tablename__ = "files"
+    
+    file_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    minio_path = Column(Text, nullable=False)
+    activity_id = Column(UUID(as_uuid=True), ForeignKey("activity.activity_id", ondelete="CASCADE"), nullable=False)
+    
+    # Relationships
+    activity = relationship("Activity", back_populates="files")
 
 
 class Performance(Base):
     __tablename__ = "performance"
     
     student_rollno = Column(String(10), ForeignKey("students.rollno", ondelete="CASCADE"), primary_key=True)
-    worksheet_id = Column(UUID(as_uuid=True), ForeignKey("worksheets.worksheet_id", ondelete="CASCADE"), primary_key=True)
+    activity_id = Column(UUID(as_uuid=True), ForeignKey("activity.activity_id", ondelete="CASCADE"), primary_key=True)
     teacher_feedback = Column(Text, nullable=True)
     teacher_mark = Column(Integer, nullable=False)
     
     # Relationships
     student = relationship("Student", back_populates="performances")
-    worksheet = relationship("Worksheet", back_populates="performances")
+    activity = relationship("Activity", back_populates="performances")

@@ -6,9 +6,10 @@ from .models import (
     Classroom, 
     Student, 
     Subject, 
-    Worksheet, 
-    Content, 
-    Performance
+    Activity,
+    File,
+    Performance,
+    ActivityType
 )
 from .schemas import (
     TeacherSignUp,
@@ -17,7 +18,11 @@ from .schemas import (
     ClassroomCreate,
     StudentCreate,
     SubjectCreate,
-    PerformanceCreate
+    ActivityCreate,
+    ActivityUpdate,
+    FileCreate,
+    PerformanceCreate,
+    ActivityTypeEnum
 )
 from .authUtils import (
     check_user_password, 

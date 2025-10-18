@@ -29,16 +29,18 @@ class AgentMemoryService:
     - Direct Qdrant storage
     """
     
-    def __init__(self, user_id: str, chat_id: str):
+    def __init__(self, user_id: str, chat_id: str, classroom_id: Optional[str] = None):
         """
         Initialize memory service for a specific user and chat
         
         Args:
             user_id: Unique identifier for the user
             chat_id: Unique identifier for the chat session
+            classroom_id: Optional unique identifier for the classroom
         """
         self.user_id = user_id
         self.chat_id = chat_id
+        self.classroom_id = classroom_id
         self.embedding_model = config.EMBEDDING_MODEL
         self.embedding_dimension = config.EMBEDDING_DIMENSION
         
@@ -52,7 +54,7 @@ class AgentMemoryService:
         # Ensure collections exist
         self._ensure_collections()
         
-        logger.info(f"AgentMemoryService initialized for user: {user_id}, chat: {chat_id}")
+        logger.info(f"AgentMemoryService initialized for user: {user_id}, chat: {chat_id}, classroom: {classroom_id}")
     
     def _ensure_collections(self) -> None:
         """Ensure both short_term and long_term collections exist with correct dimensions."""
@@ -131,6 +133,10 @@ class AgentMemoryService:
             **(metadata or {})
         }
         
+        # Add classroom_id if available
+        if self.classroom_id:
+            payload["classroom_id"] = self.classroom_id
+        
         # Generate unique ID
         point_id = str(uuid.uuid4())
         
@@ -176,16 +182,23 @@ class AgentMemoryService:
         # Generate query embedding
         query_embedding = self._generate_embedding(query)
         
+        # Build filter conditions
+        must_conditions = [
+            FieldCondition(key="user_id", match=MatchValue(value=self.user_id)),
+            FieldCondition(key="chat_id", match=MatchValue(value=self.chat_id))
+        ]
+        
+        # Add classroom_id filter if available
+        if self.classroom_id:
+            must_conditions.append(
+                FieldCondition(key="classroom_id", match=MatchValue(value=self.classroom_id))
+            )
+        
         # Search in Qdrant
         results = self.qdrant_client.search(
             collection_name=collection_name,
             query_vector=query_embedding,
-            query_filter=Filter(
-                must=[
-                    FieldCondition(key="user_id", match=MatchValue(value=self.user_id)),
-                    FieldCondition(key="chat_id", match=MatchValue(value=self.chat_id))
-                ]
-            ),
+            query_filter=Filter(must=must_conditions),
             limit=limit,
             score_threshold=score_threshold
         )

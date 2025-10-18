@@ -25,12 +25,14 @@ logger = logging.getLogger(__name__)
 class ChatRequest(BaseModel):
     user_id: str
     chat_id: str
+    classroom_id: Optional[str] = None
     query: str
 
 
 class ChatResponse(BaseModel):
     user_id: str
     chat_id: str
+    classroom_id: Optional[str] = None
     response: str
 
 
@@ -132,12 +134,13 @@ async def chat(request: ChatRequest):
     Streams the agent's response using Server-Sent Events.
     """
     try:
-        logger.info(f"Received chat request from user: {request.user_id}, chat: {request.chat_id}")
+        logger.info(f"Received chat request from user: {request.user_id}, chat: {request.chat_id}, classroom: {request.classroom_id}")
         
         # Create orchestrator
         orchestrator = SudarAgentOrchestrator(
             user_id=request.user_id,
-            chat_id=request.chat_id
+            chat_id=request.chat_id,
+            classroom_id=request.classroom_id
         )
         
         # Return SSE stream
@@ -164,12 +167,13 @@ async def chat_sync(request: ChatRequest):
     Returns the complete response at once.
     """
     try:
-        logger.info(f"Received sync chat request from user: {request.user_id}, chat: {request.chat_id}")
+        logger.info(f"Received sync chat request from user: {request.user_id}, chat: {request.chat_id}, classroom: {request.classroom_id}")
         
         # Create orchestrator
         orchestrator = SudarAgentOrchestrator(
             user_id=request.user_id,
-            chat_id=request.chat_id
+            chat_id=request.chat_id,
+            classroom_id=request.classroom_id
         )
         
         # Process query
@@ -179,6 +183,7 @@ async def chat_sync(request: ChatRequest):
         return ChatResponse(
             user_id=request.user_id,
             chat_id=request.chat_id,
+            classroom_id=request.classroom_id,
             response=result
         )
         

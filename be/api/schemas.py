@@ -1,7 +1,15 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Any
+from typing import Optional, List
 from datetime import datetime, date
 from uuid import UUID
+from enum import Enum
+
+
+# ============= Enums =============
+class ActivityTypeEnum(str, Enum):
+    """Enum for activity types"""
+    WORKSHEET = "Worksheet"
+    CONTENT = "Content"
 
 
 # ============= Authentication Schemas =============
@@ -110,46 +118,37 @@ class SubjectResponse(BaseModel):
         from_attributes = True
 
 
-# ============= Worksheet Schemas =============
-class WorksheetCreate(BaseModel):
-    chat_id: UUID
-    saved_worksheet: Optional[Any] = None
+# ============= Activity Schemas =============
+class FileCreate(BaseModel):
+    minio_path: str = Field(..., min_length=1)
 
 
-class WorksheetUpdate(BaseModel):
-    saved_worksheet: Optional[Any] = None
-
-
-class WorksheetResponse(BaseModel):
-    worksheet_id: UUID
-    subject_id: UUID
-    chat_id: UUID
-    saved_worksheet: Optional[Any]
-    created_at: datetime
+class FileResponse(BaseModel):
+    file_id: UUID
+    minio_path: str
+    activity_id: UUID
     
     class Config:
         from_attributes = True
 
 
-# ============= Content Schemas =============
-class ContentCreate(BaseModel):
-    chat_id: UUID
+class ActivityCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
-    saved_content: Optional[Any] = None
+    type: ActivityTypeEnum
+    files: Optional[List[FileCreate]] = []
 
 
-class ContentUpdate(BaseModel):
+class ActivityUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
-    saved_content: Optional[Any] = None
 
 
-class ContentResponse(BaseModel):
-    content_id: UUID
+class ActivityResponse(BaseModel):
+    activity_id: UUID
     subject_id: UUID
-    chat_id: UUID
     title: str
-    saved_content: Optional[Any]
+    type: ActivityTypeEnum
     created_at: datetime
+    files: List[FileResponse] = []
     
     class Config:
         from_attributes = True
@@ -158,7 +157,7 @@ class ContentResponse(BaseModel):
 # ============= Performance Schemas =============
 class PerformanceCreate(BaseModel):
     student_rollno: str = Field(..., min_length=1, max_length=10)
-    worksheet_id: UUID
+    activity_id: UUID
     teacher_feedback: Optional[str] = None
     teacher_mark: int = Field(..., ge=0, le=100)
 
@@ -170,7 +169,7 @@ class PerformanceUpdate(BaseModel):
 
 class PerformanceResponse(BaseModel):
     student_rollno: str
-    worksheet_id: UUID
+    activity_id: UUID
     teacher_feedback: Optional[str]
     teacher_mark: int
     

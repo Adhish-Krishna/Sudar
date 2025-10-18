@@ -3,37 +3,37 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from .database import get_db
-from .models import Performance, Worksheet, Student, Subject, Classroom, Teacher
+from .models import Performance, Activity, Student, Subject, Classroom, Teacher
 from .schemas import PerformanceCreate, PerformanceUpdate, PerformanceResponse
 from .authUtils import get_current_teacher
 
 router = APIRouter(prefix="/performance", tags=["Performance"])
 
 
-def verify_worksheet_ownership(
-    worksheet_id: UUID,
+def verify_activity_ownership(
+    activity_id: UUID,
     current_teacher: Teacher,
     db: Session
-) -> Worksheet:
+) -> Activity:
     """
-    Verify that the worksheet exists and belongs to a classroom owned by the current teacher.
+    Verify that the activity exists and belongs to a classroom owned by the current teacher.
     """
-    worksheet = db.query(Worksheet).join(
-        Subject, Worksheet.subject_id == Subject.subject_id
+    activity = db.query(Activity).join(
+        Subject, Activity.subject_id == Subject.subject_id
     ).join(
         Classroom, Subject.classroom_id == Classroom.classroom_id
     ).filter(
-        Worksheet.worksheet_id == worksheet_id,
+        Activity.activity_id == activity_id,
         Classroom.teacher_id == current_teacher.teacher_id
     ).first()
     
-    if not worksheet:
+    if not activity:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Worksheet not found or unauthorized"
+            detail="Activity not found or unauthorized"
         )
     
-    return worksheet
+    return activity
 
 
 @router.post("", response_model=PerformanceResponse, status_code=status.HTTP_201_CREATED)
@@ -43,20 +43,20 @@ def create_performance(
     current_teacher: Teacher = Depends(get_current_teacher)
 ):
     """
-    Create a new performance record (feedback) for a student on a worksheet.
+    Create a new performance record (feedback) for a student on an activity.
     Only the teacher who owns the classroom can create performance records.
     """
-    # Verify worksheet ownership
-    worksheet = verify_worksheet_ownership(data.worksheet_id, current_teacher, db)
+    # Verify activity ownership
+    activity = verify_activity_ownership(data.activity_id, current_teacher, db)
     
-    # Verify student exists and belongs to the same classroom as the worksheet's subject
+    # Verify student exists and belongs to the same classroom as the activity's subject
     student = db.query(Student).join(
         Classroom, Student.classroom_id == Classroom.classroom_id
     ).join(
         Subject, Classroom.classroom_id == Subject.classroom_id
     ).filter(
         Student.rollno == data.student_rollno,
-        Subject.subject_id == worksheet.subject_id
+        Subject.subject_id == activity.subject_id
     ).first()
     
     if not student:
@@ -68,19 +68,19 @@ def create_performance(
     # Check if performance record already exists
     existing_performance = db.query(Performance).filter(
         Performance.student_rollno == data.student_rollno,
-        Performance.worksheet_id == data.worksheet_id
+        Performance.activity_id == data.activity_id
     ).first()
     
     if existing_performance:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Performance record already exists for this student and worksheet"
+            detail="Performance record already exists for this student and activity"
         )
     
     # Create new performance record
     performance = Performance(
         student_rollno=data.student_rollno,
-        worksheet_id=data.worksheet_id,
+        activity_id=data.activity_id,
         teacher_feedback=data.teacher_feedback,
         teacher_mark=data.teacher_mark
     )
@@ -99,21 +99,21 @@ def create_performance(
     return performance
 
 
-@router.get("/worksheet/{worksheet_id}", response_model=List[PerformanceResponse])
-def get_performances_by_worksheet(
-    worksheet_id: UUID,
+@router.get("/activity/{activity_id}", response_model=List[PerformanceResponse])
+def get_performances_by_activity(
+    activity_id: UUID,
     db: Session = Depends(get_db),
     current_teacher: Teacher = Depends(get_current_teacher)
 ):
     """
-    Get all performance records for a specific worksheet.
+    Get all performance records for a specific activity.
     Only the teacher who owns the classroom can view performance records.
     """
-    # Verify worksheet ownership
-    verify_worksheet_ownership(worksheet_id, current_teacher, db)
+    # Verify activity ownership
+    verify_activity_ownership(activity_id, current_teacher, db)
     
     performances = db.query(Performance).filter(
-        Performance.worksheet_id == worksheet_id
+        Performance.activity_id == activity_id
     ).all()
     
     return performances
@@ -150,23 +150,23 @@ def get_performances_by_student(
     return performances
 
 
-@router.get("/{student_rollno}/{worksheet_id}", response_model=PerformanceResponse)
+@router.get("/{student_rollno}/{activity_id}", response_model=PerformanceResponse)
 def get_performance(
     student_rollno: str,
-    worksheet_id: UUID,
+    activity_id: UUID,
     db: Session = Depends(get_db),
     current_teacher: Teacher = Depends(get_current_teacher)
 ):
     """
-    Get a specific performance record by student and worksheet.
+    Get a specific performance record by student and activity.
     Only the teacher who owns the classroom can view the performance record.
     """
-    # Verify worksheet ownership
-    verify_worksheet_ownership(worksheet_id, current_teacher, db)
+    # Verify activity ownership
+    verify_activity_ownership(activity_id, current_teacher, db)
     
     performance = db.query(Performance).filter(
         Performance.student_rollno == student_rollno,
-        Performance.worksheet_id == worksheet_id
+        Performance.activity_id == activity_id
     ).first()
     
     if not performance:
@@ -178,10 +178,10 @@ def get_performance(
     return performance
 
 
-@router.put("/{student_rollno}/{worksheet_id}", response_model=PerformanceResponse)
+@router.put("/{student_rollno}/{activity_id}", response_model=PerformanceResponse)
 def update_performance(
     student_rollno: str,
-    worksheet_id: UUID,
+    activity_id: UUID,
     data: PerformanceUpdate,
     db: Session = Depends(get_db),
     current_teacher: Teacher = Depends(get_current_teacher)
@@ -190,12 +190,12 @@ def update_performance(
     Update a performance record (feedback).
     Only the teacher who owns the classroom can update performance records.
     """
-    # Verify worksheet ownership
-    verify_worksheet_ownership(worksheet_id, current_teacher, db)
+    # Verify activity ownership
+    verify_activity_ownership(activity_id, current_teacher, db)
     
     performance = db.query(Performance).filter(
         Performance.student_rollno == student_rollno,
-        Performance.worksheet_id == worksheet_id
+        Performance.activity_id == activity_id
     ).first()
     
     if not performance:
@@ -223,10 +223,10 @@ def update_performance(
     return performance
 
 
-@router.delete("/{student_rollno}/{worksheet_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{student_rollno}/{activity_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_performance(
     student_rollno: str,
-    worksheet_id: UUID,
+    activity_id: UUID,
     db: Session = Depends(get_db),
     current_teacher: Teacher = Depends(get_current_teacher)
 ):
@@ -234,12 +234,12 @@ def delete_performance(
     Delete a performance record.
     Only the teacher who owns the classroom can delete performance records.
     """
-    # Verify worksheet ownership
-    verify_worksheet_ownership(worksheet_id, current_teacher, db)
+    # Verify activity ownership
+    verify_activity_ownership(activity_id, current_teacher, db)
     
     performance = db.query(Performance).filter(
         Performance.student_rollno == student_rollno,
-        Performance.worksheet_id == worksheet_id
+        Performance.activity_id == activity_id
     ).first()
     
     if not performance:

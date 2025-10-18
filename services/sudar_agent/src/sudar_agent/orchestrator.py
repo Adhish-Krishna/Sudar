@@ -13,25 +13,31 @@ logger = logging.getLogger(__name__)
 class SudarAgentOrchestrator:
     """Main orchestrator that coordinates the agent system."""
     
-    def __init__(self, user_id: str, chat_id: str):
+    def __init__(self, user_id: str, chat_id: str, classroom_id: str = None):
         """
         Initialize the orchestrator.
         
         Args:
             user_id: User identifier
             chat_id: Chat session identifier
+            classroom_id: Optional classroom identifier
         """
         self.user_id = user_id
         self.chat_id = chat_id
+        self.classroom_id = classroom_id
         
         # Initialize services
-        self.memory_service = AgentMemoryService(user_id=user_id, chat_id=chat_id)
+        self.memory_service = AgentMemoryService(
+            user_id=user_id, 
+            chat_id=chat_id,
+            classroom_id=classroom_id
+        )
         self.chat_service = ChatService()
         
         # Initialize router
         self.router = RouterCrew()
         
-        logger.info(f"SudarAgentOrchestrator initialized for user: {user_id}, chat: {chat_id}")
+        logger.info(f"SudarAgentOrchestrator initialized for user: {user_id}, chat: {chat_id}, classroom: {classroom_id}")
     
     def process_query(self, query: str) -> str:
         """
@@ -49,7 +55,8 @@ class SudarAgentOrchestrator:
                 user_id=self.user_id,
                 chat_id=self.chat_id,
                 role="user",
-                content=query
+                content=query,
+                classroom_id=self.classroom_id
             )
             
             # Save user message to memory
@@ -79,12 +86,13 @@ class SudarAgentOrchestrator:
                 chat_id=self.chat_id,
                 role="router",
                 content=f"Routed to: {flow_type}",
+                classroom_id=self.classroom_id,
                 metadata={"flow_type": flow_type}
             )
             
             # Execute the appropriate flow
             if flow_type == "WORKSHEET_FLOW":
-                flow = WorksheetGeneratorFlow(user_id=self.user_id, chat_id=self.chat_id)
+                flow = WorksheetGeneratorFlow(user_id=self.user_id, chat_id=self.chat_id, classroom_id=self.classroom_id)
                 
                 # Kick off the flow with initial state
                 flow.kickoff(inputs={
@@ -102,7 +110,8 @@ class SudarAgentOrchestrator:
                         user_id=self.user_id,
                         chat_id=self.chat_id,
                         role="content_researcher",
-                        content=research_findings
+                        content=research_findings,
+                        classroom_id=self.classroom_id
                     )
                 
                 # Save final result
@@ -110,11 +119,12 @@ class SudarAgentOrchestrator:
                     user_id=self.user_id,
                     chat_id=self.chat_id,
                     role="worksheet_generator",
-                    content=result
+                    content=result,
+                    classroom_id=self.classroom_id
                 )
                 
             else:  # DOUBT_FLOW
-                flow = DoubtClearanceFlow(user_id=self.user_id, chat_id=self.chat_id)
+                flow = DoubtClearanceFlow(user_id=self.user_id, chat_id=self.chat_id, classroom_id=self.classroom_id)
                 
                 # Kick off the flow with initial state
                 flow.kickoff(inputs={
@@ -130,7 +140,8 @@ class SudarAgentOrchestrator:
                     user_id=self.user_id,
                     chat_id=self.chat_id,
                     role="doubt_solver",
-                    content=result
+                    content=result,
+                    classroom_id=self.classroom_id
                 )
             
             # Save agent response to memory
@@ -145,7 +156,8 @@ class SudarAgentOrchestrator:
                 user_id=self.user_id,
                 chat_id=self.chat_id,
                 role="agent",
-                content=result
+                content=result,
+                classroom_id=self.classroom_id
             )
             
             return result
@@ -160,6 +172,7 @@ class SudarAgentOrchestrator:
                 chat_id=self.chat_id,
                 role="agent",
                 content=error_message,
+                classroom_id=self.classroom_id,
                 metadata={"error": True}
             )
             

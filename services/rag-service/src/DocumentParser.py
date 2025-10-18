@@ -1,5 +1,8 @@
 """
 DocumentParser.py - Handles document parsing using Docling
+
+Uses cached models stored in DOCLING_ARTIFACTS_PATH (Docker volume) to avoid
+re-downloading models on every container restart.
 """
 import tempfile
 import os
@@ -11,10 +14,23 @@ class DocumentParser:
     """
     A class responsible for parsing various document formats into markdown.
     Supports: PDF, DOCX, PPTX, XLSX, Markdown, TXT
+    
+    Models are loaded from DOCLING_ARTIFACTS_PATH if set, otherwise from default cache.
+    The DOCLING_ARTIFACTS_PATH environment variable is automatically used by Docling
+    to locate cached models.
     """
     
     def __init__(self):
-        """Initialize the DocumentConverter from Docling."""
+        """
+        Initialize the DocumentConverter from Docling with cached models.
+        
+        Uses DOCLING_ARTIFACTS_PATH environment variable (if set) to load pre-downloaded models.
+        This avoids downloading models on every container startup.
+        
+        Note: DocumentConverter automatically respects the DOCLING_ARTIFACTS_PATH 
+        environment variable set in the container.
+        """
+        # Initialize converter - it will automatically use DOCLING_ARTIFACTS_PATH env var
         self.converter = DocumentConverter()
     
     def parse(self, file_content: bytes, filename: str) -> str:

@@ -91,6 +91,7 @@ class Embedder:
         chunks: List[str], 
         user_id: str, 
         chat_id: str,
+        classroom_id: str = None,
         metadata: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
@@ -100,6 +101,7 @@ class Embedder:
             chunks: List of text chunks to embed
             user_id: The user ID
             chat_id: The chat ID
+            classroom_id: Optional classroom ID for organizing by classroom
             metadata: Additional metadata to store with chunks
         
         Returns:
@@ -130,6 +132,10 @@ class Embedder:
                 "chunk_index": idx
             }
             
+            # Add classroom_id if provided
+            if classroom_id:
+                payload["classroom_id"] = classroom_id
+            
             # Add additional metadata if provided
             if metadata:
                 payload.update(metadata)
@@ -157,28 +163,35 @@ class Embedder:
             "chat_id": chat_id
         }
     
-    def delete_by_chat(self, user_id: str, chat_id: str) -> Dict[str, Any]:
+    def delete_by_chat(self, user_id: str, chat_id: str, classroom_id: str = None) -> Dict[str, Any]:
         """
         Delete all chunks for a specific user and chat.
         
         Args:
             user_id: The user ID
             chat_id: The chat ID
+            classroom_id: Optional classroom ID to filter by classroom
         
         Returns:
             Dict containing deletion status
         """
+        must_conditions = [
+            FieldCondition(key="user_id", match=MatchValue(value=user_id)),
+            FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
+        ]
+        
+        # Add classroom_id filter if provided
+        if classroom_id:
+            must_conditions.append(
+                FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
+            )
+        
         self.qdrant_client.delete(
             collection_name=self.collection_name,
-            points_selector=Filter(
-                must=[
-                    FieldCondition(key="user_id", match=MatchValue(value=user_id)),
-                    FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
-                ]
-            )
+            points_selector=Filter(must=must_conditions)
         )
         
         return {
             "status": "success",
-            "message": f"Deleted all chunks for user_id={user_id}, chat_id={chat_id}"
+            "message": f"Deleted all chunks for user_id={user_id}, chat_id={chat_id}, classroom_id={classroom_id}"
         }

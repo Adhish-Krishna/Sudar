@@ -84,18 +84,20 @@ def save_content(
     content: str,
     title: str,
     user_id: Optional[str] = None,
-    chat_id: Optional[str] = None
+    chat_id: Optional[str] = None,
+    classroom_id: Optional[str] = None
 ) -> dict:
     """Convert markdown content to PDF and save it to MinIO storage.
     
     This tool takes markdown-formatted content, converts it to PDF using the md-to-pdf service,
-    and stores it in MinIO object storage with optional user and chat context.
+    and stores it in MinIO object storage with optional user, chat, and classroom context.
     
     Args:
         content: The markdown-formatted content to save as PDF
         title: The title for the PDF file (will be used as filename)
         user_id: Optional user ID for organizing content in MinIO (creates folder structure)
         chat_id: Optional chat ID for organizing content in MinIO (creates folder structure)
+        classroom_id: Optional classroom ID for organizing content in MinIO (creates folder structure)
     
     Returns:
         A dictionary containing:
@@ -112,14 +114,16 @@ def save_content(
             content="# My Document\\n\\nThis is the content.",
             title="My Assignment",
             user_id="user123",
-            chat_id="chat456"
+            chat_id="chat456",
+            classroom_id="classroom789"
         )
     """
     return content_saver_tool.save_content(
         content=content,
         title=title,
         user_id=user_id,
-        chat_id=chat_id
+        chat_id=chat_id,
+        classroom_id=classroom_id
     )
 
 
@@ -128,6 +132,7 @@ def retrieve_content(
     query: str,
     user_id: str,
     chat_id: str,
+    classroom_id: Optional[str] = None,
     filenames: Optional[List[str]] = None,
     top_k: int = 5
 ) -> dict:
@@ -136,12 +141,13 @@ def retrieve_content(
     This tool searches through documents that have been previously ingested into the RAG system
     and retrieves the most relevant content chunks based on the query. It can optionally filter
     results by specific filenames mentioned in the query (using @filename.ext syntax) or provided
-    explicitly in the filenames parameter.
+    explicitly in the filenames parameter, and by classroom context.
     
     Args:
         query: The search query to find relevant content. Can include @filename.ext to reference specific files
         user_id: User identifier to filter documents by user context
         chat_id: Chat session identifier to filter documents by chat context
+        classroom_id: Optional classroom identifier to filter documents by classroom context
         filenames: Optional list of specific filenames to filter results by. If not provided,
                   will auto-extract from query using @filename.ext pattern
         top_k: Number of most relevant results to return (default: 5)
@@ -152,6 +158,7 @@ def retrieve_content(
         - query: The original search query
         - user_id: The user identifier
         - chat_id: The chat identifier
+        - classroom_id: The classroom identifier (if provided)
         - filenames: List of filenames used for filtering (if any)
         - context: Formatted context string combining all retrieved chunks
         - results: List of retrieved chunks with metadata and relevance scores
@@ -163,6 +170,7 @@ def retrieve_content(
             query="Explain photosynthesis from @biology.pdf",
             user_id="user123",
             chat_id="chat456",
+            classroom_id="classroom789",
             top_k=5
         )
     """
@@ -170,6 +178,7 @@ def retrieve_content(
         query=query,
         user_id=user_id,
         chat_id=chat_id,
+        classroom_id=classroom_id,
         filenames=filenames,
         top_k=top_k
     )
@@ -223,13 +232,15 @@ async def call_tool(request):
                 content=arguments.get("content"),
                 title=arguments.get("title"),
                 user_id=arguments.get("user_id"),
-                chat_id=arguments.get("chat_id")
+                chat_id=arguments.get("chat_id"),
+                classroom_id=arguments.get("classroom_id")
             )
         elif tool_name == "retrieve_content":
             result = content_retriever_tool.retrieve(
                 query=arguments.get("query"),
                 user_id=arguments.get("user_id"),
                 chat_id=arguments.get("chat_id"),
+                classroom_id=arguments.get("classroom_id"),
                 filenames=arguments.get("filenames"),
                 top_k=arguments.get("top_k", 5)
             )

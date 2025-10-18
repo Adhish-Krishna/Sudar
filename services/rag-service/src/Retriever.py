@@ -91,6 +91,7 @@ class Retriever:
         user_id: str, 
         chat_id: str, 
         top_k: int = 5,
+        classroom_id: str = None,
         filenames: List[str] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -101,6 +102,7 @@ class Retriever:
             user_id: The user ID to filter by
             chat_id: The chat ID to filter by
             top_k: Number of top results to return after reranking
+            classroom_id: Optional classroom ID to filter by classroom
             filenames: Optional list of filenames to filter by (OR condition)
         
         Returns:
@@ -114,6 +116,12 @@ class Retriever:
             FieldCondition(key="user_id", match=MatchValue(value=user_id)),
             FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
         ]
+        
+        # Add classroom_id filter if provided
+        if classroom_id:
+            must_conditions.append(
+                FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
+            )
         
         # Add filename filter if provided (OR condition)
         if filenames and len(filenames) > 0:
@@ -156,6 +164,7 @@ class Retriever:
                 'metadata': {
                     'user_id': result.payload.get('user_id'),
                     'chat_id': result.payload.get('chat_id'),
+                    'classroom_id': result.payload.get('classroom_id'),
                     'chunk_index': result.payload.get('chunk_index'),
                     'type': result.payload.get('type'),
                     'filename': result.payload.get('filename')
@@ -171,6 +180,7 @@ class Retriever:
         self, 
         user_id: str, 
         chat_id: str, 
+        classroom_id: str = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
@@ -179,20 +189,28 @@ class Retriever:
         Args:
             user_id: The user ID
             chat_id: The chat ID
+            classroom_id: Optional classroom ID to filter by classroom
             limit: Maximum number of results to return
         
         Returns:
             List[Dict]: List of all chunks for the chat
         """
+        # Build filter conditions
+        must_conditions = [
+            FieldCondition(key="user_id", match=MatchValue(value=user_id)),
+            FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
+        ]
+        
+        # Add classroom_id filter if provided
+        if classroom_id:
+            must_conditions.append(
+                FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
+            )
+        
         # Use scroll to get all points with filters
         results, _ = self.qdrant_client.scroll(
             collection_name=self.collection_name,
-            scroll_filter=Filter(
-                must=[
-                    FieldCondition(key="user_id", match=MatchValue(value=user_id)),
-                    FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
-                ]
-            ),
+            scroll_filter=Filter(must=must_conditions),
             limit=limit
         )
         
@@ -204,6 +222,7 @@ class Retriever:
                 'metadata': {
                     'user_id': result.payload.get('user_id'),
                     'chat_id': result.payload.get('chat_id'),
+                    'classroom_id': result.payload.get('classroom_id'),
                     'chunk_index': result.payload.get('chunk_index'),
                     'type': result.payload.get('type')
                 }
