@@ -22,6 +22,8 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
+    # Text chunking dependency
+    "langchain-text-splitters>=0.3.0",
 ]
 
 [project.optional-dependencies]

@@ -44,9 +44,12 @@ app.add_middleware(
 
 # Initialize components
 document_parser = DocumentParser()
-# Use smaller chunk size (800) to avoid embedding model context length issues
-# embedding models typically handle ~2000 tokens, which is roughly 6000-8000 chars
-chunker = Chunker(chunk_size=800, chunk_overlap=150)
+
+# Initialize recursive text splitter chunker
+# chunk_size=1000: target chunk size in characters
+# chunk_overlap=200: overlap between chunks for context preservation
+chunker = Chunker(chunk_size=1000, chunk_overlap=200)
+
 embedder = Embedder()
 retriever = Retriever()
 

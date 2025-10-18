@@ -49,7 +49,7 @@ class Embedder:
                 )
             )
     
-    def _generate_embedding(self, text: str, max_length: int = 4000) -> List[float]:
+    def _generate_embedding(self, text: str) -> List[float]:
         """
         Generate embedding for a text using Ollama.
         Truncates text if it exceeds max_length to prevent context length errors.
@@ -61,10 +61,6 @@ class Embedder:
         Returns:
             List[float]: The embedding vector
         """
-        # Truncate text if too long (embedding models have token limits)
-        if len(text) > max_length:
-            print(f"Warning: Truncated text from {len(text)} to {max_length} characters")
-            text = text[:max_length]
         
         ollama_client = ollama.Client(host=self.ollama_base_url)
 
@@ -75,11 +71,8 @@ class Embedder:
             )
             return response['embedding']
         except Exception as e:
-            # If still fails, try with even shorter text
-            if "context length" in str(e).lower() and len(text) > 2000:
-                print(f"Warning: Context length error, retrying with 2000 chars")
-                return self._generate_embedding(text[:2000], max_length=2000)
-            raise
+            raise RuntimeError(f"Failed to generate embedding: {e}")
+                
     
     def _generate_id(self, text: str, user_id: str, chat_id: str, index: int) -> str:
         """
