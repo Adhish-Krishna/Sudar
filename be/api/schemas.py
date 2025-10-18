@@ -13,10 +13,21 @@ class ActivityTypeEnum(str, Enum):
 
 
 # ============= Authentication Schemas =============
+class SendVerificationCodeRequest(BaseModel):
+    email: EmailStr
+    teacher_name: str = Field(..., min_length=1, max_length=100)
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+
+
 class TeacherSignUp(BaseModel):
     teacher_name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=6)
+    verification_code: str = Field(..., min_length=6, max_length=6)
 
 
 class TeacherLogin(BaseModel):
@@ -25,9 +36,10 @@ class TeacherLogin(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
+    message: str = "Authentication successful"
+    teacher_id: UUID
+    teacher_name: str
+    email: str
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -38,11 +50,6 @@ class ResetPasswordRequest(BaseModel):
     email: EmailStr
     code: str = Field(..., min_length=6, max_length=6)
     new_password: str = Field(..., min_length=6)
-
-
-class VerifyEmailRequest(BaseModel):
-    email: EmailStr
-    code: str = Field(..., min_length=6, max_length=6)
 
 
 # ============= Teacher Schemas =============

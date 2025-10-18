@@ -1,10 +1,12 @@
 """
 RAG Microservice - FastAPI application for document ingestion and retrieval
 """
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Depends
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
 
@@ -13,6 +15,12 @@ from src.Chunker import Chunker
 from src.Embedder import Embedder
 from src.Retriever import Retriever
 from src.MinIOStorage import MinIOStorage
+from src.database import get_db
+from src.auth_dependency import (
+    get_current_user,
+    verify_user_access,
+    verify_classroom_access
+)
 
 # Load environment variables
 load_dotenv()
@@ -21,12 +29,24 @@ load_dotenv()
 app = FastAPI(
     title="RAG Microservice",
     description="A microservice for document ingestion and context retrieval using RAG",
-    version="1.0.0"
+    version="1.0.0",
+    root_path='/rag'
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Add your frontend URLs
+    allow_credentials=True,  # Required for cookies
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize components
 document_parser = DocumentParser()
-chunker = Chunker()
+# Use smaller chunk size (800) to avoid embedding model context length issues
+# embedding models typically handle ~2000 tokens, which is roughly 6000-8000 chars
+chunker = Chunker(chunk_size=800, chunk_overlap=150)
 embedder = Embedder()
 retriever = Retriever()
 
@@ -108,21 +128,40 @@ async def ingest_document(
     file: UploadFile = File(...),
     user_id: str = Form(...),
     chat_id: str = Form(...),
-    classroom_id: Optional[str] = Form(None)
+    classroom_id: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Ingest a document: parse, chunk, embed, and store in Qdrant.
+    Requires authentication via cookie.
     
     Args:
         file: Uploaded file (PDF, DOCX, PPTX, XLSX, MD, TXT)
         user_id: User identifier
         chat_id: Chat/conversation identifier
         classroom_id: Optional classroom identifier
+        current_user: Authenticated user from cookie
+        db: Database session
     
     Returns:
         IngestResponse with status and details
     """
     try:
+        # Verify user has permission to access this data
+        verify_user_access(
+            request_user_id=user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        # Verify classroom access if classroom_id is provided
+        if classroom_id:
+            verify_classroom_access(
+                user_id=current_user["user_id"],
+                classroom_id=classroom_id,
+                db=db
+            )
+        
         # Read file content
         file_content = await file.read()
         filename = file.filename
@@ -202,17 +241,38 @@ async def ingest_document(
 
 
 @app.post("/retrieve", response_model=RetrievalResponse)
-async def retrieve_context(request: RetrievalRequest):
+async def retrieve_context(
+    request: RetrievalRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Retrieve relevant context chunks based on a query.
+    Requires authentication via cookie.
     
     Args:
         request: RetrievalRequest with query, user_id, chat_id, top_k, and optional filenames
+        current_user: Authenticated user from cookie
+        db: Database session
     
     Returns:
         RetrievalResponse with retrieved chunks
     """
     try:
+        # Verify user has permission to access this data
+        verify_user_access(
+            request_user_id=request.user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        # Verify classroom access if classroom_id is provided
+        if request.classroom_id:
+            verify_classroom_access(
+                user_id=current_user["user_id"],
+                classroom_id=request.classroom_id,
+                db=db
+            )
+        
         # Retrieve relevant chunks
         results = retriever.retrieve(
             query=request.query,
@@ -241,19 +301,42 @@ async def retrieve_context(request: RetrievalRequest):
 
 
 @app.delete("/delete/{user_id}/{chat_id}")
-async def delete_chat_data(user_id: str, chat_id: str, classroom_id: Optional[str] = None):
+async def delete_chat_data(
+    user_id: str,
+    chat_id: str,
+    classroom_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Delete all data for a specific user and chat.
+    Requires authentication via cookie.
     
     Args:
         user_id: User identifier
         chat_id: Chat/conversation identifier
         classroom_id: Optional classroom identifier for filtering
+        current_user: Authenticated user from cookie
+        db: Database session
     
     Returns:
         Deletion status
     """
     try:
+        # Verify user has permission to access this data
+        verify_user_access(
+            request_user_id=user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        # Verify classroom access if classroom_id is provided
+        if classroom_id:
+            verify_classroom_access(
+                user_id=current_user["user_id"],
+                classroom_id=classroom_id,
+                db=db
+            )
+        
         result = embedder.delete_by_chat(user_id, chat_id, classroom_id)
         return result
     except Exception as e:
@@ -268,21 +351,40 @@ async def list_chat_chunks(
     user_id: str, 
     chat_id: str, 
     classroom_id: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     List all chunks for a specific user and chat.
+    Requires authentication via cookie.
     
     Args:
         user_id: User identifier
         chat_id: Chat/conversation identifier
         classroom_id: Optional classroom identifier for filtering
         limit: Maximum number of chunks to return
+        current_user: Authenticated user from cookie
+        db: Database session
     
     Returns:
         List of chunks with metadata
     """
     try:
+        # Verify user has permission to access this data
+        verify_user_access(
+            request_user_id=user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        # Verify classroom access if classroom_id is provided
+        if classroom_id:
+            verify_classroom_access(
+                user_id=current_user["user_id"],
+                classroom_id=classroom_id,
+                db=db
+            )
+        
         chunks = retriever.retrieve_all_for_chat(user_id, chat_id, classroom_id, limit)
         return {
             "status": "success",

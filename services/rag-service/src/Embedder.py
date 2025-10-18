@@ -49,23 +49,37 @@ class Embedder:
                 )
             )
     
-    def _generate_embedding(self, text: str) -> List[float]:
+    def _generate_embedding(self, text: str, max_length: int = 4000) -> List[float]:
         """
         Generate embedding for a text using Ollama.
+        Truncates text if it exceeds max_length to prevent context length errors.
         
         Args:
             text: The text to embed
+            max_length: Maximum character length (default 8000, roughly 2000 tokens)
         
         Returns:
             List[float]: The embedding vector
         """
+        # Truncate text if too long (embedding models have token limits)
+        if len(text) > max_length:
+            print(f"Warning: Truncated text from {len(text)} to {max_length} characters")
+            text = text[:max_length]
+        
         ollama_client = ollama.Client(host=self.ollama_base_url)
 
-        response = ollama_client.embeddings(
-            model=self.embedding_model,
-            prompt=text
-        )
-        return response['embedding']
+        try:
+            response = ollama_client.embeddings(
+                model=self.embedding_model,
+                prompt=text
+            )
+            return response['embedding']
+        except Exception as e:
+            # If still fails, try with even shorter text
+            if "context length" in str(e).lower() and len(text) > 2000:
+                print(f"Warning: Context length error, retrying with 2000 chars")
+                return self._generate_embedding(text[:2000], max_length=2000)
+            raise
     
     def _generate_id(self, text: str, user_id: str, chat_id: str, index: int) -> str:
         """
@@ -115,53 +129,74 @@ class Embedder:
             }
         
         points = []
+        failed_chunks = []
         
         for idx, chunk in enumerate(chunks):
-            # Generate embedding
-            embedding = self._generate_embedding(chunk)
-            
-            # Generate unique UUID
-            point_id = self._generate_id(chunk, user_id, chat_id, idx)
-            
-            # Prepare payload
-            payload = {
-                "text": chunk,
-                "user_id": user_id,
-                "chat_id": chat_id,
-                "type": "InsertedData",
-                "chunk_index": idx
-            }
-            
-            # Add classroom_id if provided
-            if classroom_id:
-                payload["classroom_id"] = classroom_id
-            
-            # Add additional metadata if provided
-            if metadata:
-                payload.update(metadata)
-            
-            # Create point
-            point = PointStruct(
-                id=point_id,
-                vector=embedding,
-                payload=payload
+            try:
+                # Generate embedding
+                embedding = self._generate_embedding(chunk)
+                
+                # Generate unique UUID
+                point_id = self._generate_id(chunk, user_id, chat_id, idx)
+                
+                # Prepare payload
+                payload = {
+                    "text": chunk,
+                    "user_id": user_id,
+                    "chat_id": chat_id,
+                    "type": "InsertedData",
+                    "chunk_index": idx
+                }
+                
+                # Add classroom_id if provided
+                if classroom_id:
+                    payload["classroom_id"] = classroom_id
+                
+                # Add additional metadata if provided
+                if metadata:
+                    payload.update(metadata)
+                
+                # Create point
+                point = PointStruct(
+                    id=point_id,
+                    vector=embedding,
+                    payload=payload
+                )
+                
+                points.append(point)
+            except Exception as e:
+                print(f"Error processing chunk {idx}: {str(e)}")
+                print(f"Chunk length: {len(chunk)} characters")
+                print(f"Chunk preview: {chunk[:200]}...")
+                failed_chunks.append({
+                    "index": idx,
+                    "error": str(e),
+                    "length": len(chunk)
+                })
+        
+        # Upload points to Qdrant if any were successfully created
+        if points:
+            self.qdrant_client.upsert(
+                collection_name=self.collection_name,
+                points=points
             )
-            
-            points.append(point)
         
-        # Upload points to Qdrant
-        self.qdrant_client.upsert(
-            collection_name=self.collection_name,
-            points=points
-        )
-        
-        return {
-            "status": "success",
-            "message": f"Successfully embedded and stored {len(chunks)} chunks",
-            "inserted_count": len(chunks),
+        # Prepare response
+        response = {
+            "status": "success" if points else "error",
+            "message": f"Successfully embedded and stored {len(points)} out of {len(chunks)} chunks",
+            "inserted_count": len(points),
+            "total_chunks": len(chunks),
             "user_id": user_id,
             "chat_id": chat_id
         }
+        
+        # Add failed chunks info if any
+        if failed_chunks:
+            response["failed_chunks"] = len(failed_chunks)
+            response["warning"] = f"{len(failed_chunks)} chunks failed to embed"
+        
+        return response
     
     def delete_by_chat(self, user_id: str, chat_id: str, classroom_id: str = None) -> Dict[str, Any]:
         """

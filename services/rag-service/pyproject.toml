@@ -18,6 +18,10 @@ dependencies = [
     # OCR and document parsing dependencies
     "rapidocr>=1.4.0",
     "onnxruntime>=1.17.0",
+    # Authentication dependencies
+    "python-jose[cryptography]>=3.3.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
 ]
 
 [project.optional-dependencies]

@@ -6,7 +6,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jose import jwt, JWTError
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, Response, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -23,6 +23,11 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+# Cookie settings
+COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", None)  # None for same-origin
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "False").lower() == "true"  # Set to True in production with HTTPS
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")  # 'lax', 'strict', or 'none'
 
 # Email settings
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -114,15 +119,84 @@ def decode_token(token: str) -> dict:
         )
 
 
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """
+    Set authentication tokens as HTTP-only cookies.
+    
+    Args:
+        response: FastAPI Response object
+        access_token: JWT access token
+        refresh_token: JWT refresh token
+    """
+    # Set access token cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # Prevents JavaScript access (XSS protection)
+        secure=COOKIE_SECURE,  # Only send over HTTPS in production
+        samesite=COOKIE_SAMESITE,  # CSRF protection
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # in seconds
+        domain=COOKIE_DOMAIN,
+        path="/"
+    )
+    
+    # Set refresh token cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # in seconds
+        domain=COOKIE_DOMAIN,
+        path="/"
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """
+    Clear authentication cookies (for logout).
+    
+    Args:
+        response: FastAPI Response object
+    """
+    response.delete_cookie(
+        key="access_token",
+        domain=COOKIE_DOMAIN,
+        path="/"
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        domain=COOKIE_DOMAIN,
+        path="/"
+    )
+
+
 def get_current_teacher(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    access_token: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ) -> Teacher:
     """
-    Dependency to get the current authenticated teacher from the JWT token.
+    Dependency to get the current authenticated teacher from cookie token.
+    
+    Args:
+        access_token: JWT token from cookie
+        db: Database session
+        
+    Returns:
+        Teacher: Authenticated teacher object
+        
+    Raises:
+        HTTPException: If authentication fails
     """
-    token = credentials.credentials
-    payload = decode_token(token)
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    payload = decode_token(access_token)
     
     # Check if it's an access token
     if payload.get("type") != "access":

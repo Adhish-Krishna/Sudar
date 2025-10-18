@@ -17,7 +17,8 @@ PORT = os.getenv("PORT")
 app = FastAPI(
     title="Sudar API",
     description="Backend API for Sudar Educational Platform",
-    version="1.0.0"
+    version="1.0.0",
+    root_path="/api"
 )
 
 # Configure CORS

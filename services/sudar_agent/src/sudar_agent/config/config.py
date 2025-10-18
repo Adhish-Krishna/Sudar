@@ -11,6 +11,9 @@ load_dotenv()
 class Config:
     """Configuration class for Sudar Agent service."""
     
+    # Security Configuration
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    
     # LLM Configuration
     MODEL_PROVIDER: Literal["google", "groq", "ollama"] = os.getenv("MODEL_PROVIDER", "google")
     GOOGLE_MODEL: str = os.getenv("GOOGLE_MODEL", "gemini/gemini-2.5-flash-preview-04-17")

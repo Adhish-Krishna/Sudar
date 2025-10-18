@@ -5,13 +5,16 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from .orchestrator import SudarAgentOrchestrator
 from .config.config import config
+from .auth_dependency import get_current_user, verify_user_access, verify_classroom_access
+from .database import get_db
 
 # Configure logging
 logging.basicConfig(
@@ -54,7 +57,8 @@ app = FastAPI(
     title="Sudar Agent Service",
     description="AI Agent service for educational assistance using CrewAI",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    root_path='/agent'
 )
 
 # Add CORS middleware
@@ -127,14 +131,49 @@ async def generate_sse_stream(orchestrator: SudarAgentOrchestrator, query: str):
 
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
+async def chat(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Chat endpoint with SSE streaming.
     
     Streams the agent's response using Server-Sent Events.
+    Requires JWT authentication via Bearer token.
+    
+    Args:
+        request: Chat request containing user_id, chat_id, classroom_id, and query
+        current_user: Authenticated user information from JWT token
+        db: Database session for classroom verification
+        
+    Returns:
+        StreamingResponse: Server-Sent Events stream with agent responses
+        
+    Raises:
+        HTTPException 401: If authentication fails
+        HTTPException 403: If user_id doesn't match authenticated user or no classroom access
+        HTTPException 500: If processing fails
     """
     try:
-        logger.info(f"Received chat request from user: {request.user_id}, chat: {request.chat_id}, classroom: {request.classroom_id}")
+        # Verify user has permission to make this request
+        verify_user_access(
+            request_user_id=request.user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        # Verify classroom access if classroom_id is provided
+        if request.classroom_id:
+            verify_classroom_access(
+                user_id=current_user["user_id"],
+                classroom_id=request.classroom_id,
+                db=db
+            )
+        
+        logger.info(
+            f"Received chat request from user: {request.user_id}, "
+            f"chat: {request.chat_id}, classroom: {request.classroom_id}"
+        )
         
         # Create orchestrator
         orchestrator = SudarAgentOrchestrator(
@@ -160,14 +199,49 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/api/chat/sync", response_model=ChatResponse)
-async def chat_sync(request: ChatRequest):
+async def chat_sync(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Synchronous chat endpoint (non-streaming).
     
     Returns the complete response at once.
+    Requires JWT authentication via Bearer token.
+    
+    Args:
+        request: Chat request containing user_id, chat_id, classroom_id, and query
+        current_user: Authenticated user information from JWT token
+        db: Database session for classroom verification
+        
+    Returns:
+        ChatResponse: Complete agent response
+        
+    Raises:
+        HTTPException 401: If authentication fails
+        HTTPException 403: If user_id doesn't match authenticated user or no classroom access
+        HTTPException 500: If processing fails
     """
     try:
-        logger.info(f"Received sync chat request from user: {request.user_id}, chat: {request.chat_id}, classroom: {request.classroom_id}")
+        # Verify user has permission to make this request
+        verify_user_access(
+            request_user_id=request.user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        # Verify classroom access if classroom_id is provided
+        if request.classroom_id:
+            verify_classroom_access(
+                user_id=current_user["user_id"],
+                classroom_id=request.classroom_id,
+                db=db
+            )
+        
+        logger.info(
+            f"Received sync chat request from user: {request.user_id}, "
+            f"chat: {request.chat_id}, classroom: {request.classroom_id}"
+        )
         
         # Create orchestrator
         orchestrator = SudarAgentOrchestrator(
