@@ -24,6 +24,9 @@ dependencies = [
     "psycopg2-binary>=2.9.0",
     # Text chunking dependency
     "langchain-text-splitters>=0.3.0",
+    # Kafka and Redis
+    "kafka-python>=2.0.2",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

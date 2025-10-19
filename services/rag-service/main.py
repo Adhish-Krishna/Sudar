@@ -9,6 +9,10 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
+import uuid
+import json
+from kafka import KafkaProducer
+import redis
 
 from src.DocumentParser import DocumentParser
 from src.Chunker import Chunker
@@ -24,6 +28,18 @@ from src.auth_dependency import (
 
 # Load environment variables
 load_dotenv()
+
+# Initialize Kafka producer
+kafka_bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
+producer = KafkaProducer(
+    bootstrap_servers=[kafka_bootstrap_servers],
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+# Initialize Redis
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", 6379))
+redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -76,12 +92,11 @@ minio_storage = MinIOStorage(
 class IngestResponse(BaseModel):
     status: str
     message: str
-    inserted_count: int
+    job_id: str
     user_id: str
     chat_id: str
     classroom_id: Optional[str] = None
     filename: str
-    minio_upload: Optional[dict] = None
 
 
 class RetrievalRequest(BaseModel):
@@ -136,7 +151,7 @@ async def ingest_document(
     db: Session = Depends(get_db)
 ):
     """
-    Ingest a document: parse, chunk, embed, and store in Qdrant.
+    Ingest a document asynchronously: upload to MinIO, publish job to Kafka, and return job ID.
     Requires authentication via cookie.
     
     Args:
@@ -148,7 +163,7 @@ async def ingest_document(
         db: Database session
     
     Returns:
-        IngestResponse with status and details
+        IngestResponse with job_id and status
     """
     try:
         # Verify user has permission to access this data
@@ -169,6 +184,9 @@ async def ingest_document(
         file_content = await file.read()
         filename = file.filename
         
+        # Generate unique job ID
+        job_id = str(uuid.uuid4())
+        
         # Upload file to MinIO
         minio_result = minio_storage.upload_file(
             file_content=file_content,
@@ -182,56 +200,40 @@ async def ingest_document(
         if not minio_result.get("success"):
             print(f"Warning: MinIO upload failed - {minio_result.get('error')}")
         
-        # Step 1: Parse document to markdown
-        try:
-            markdown_content = document_parser.parse(file_content, filename)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Error parsing document: {str(e)}"
-            )
+        # Prepare job data
+        job_data = {
+            "job_id": job_id,
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "classroom_id": classroom_id,
+            "filename": filename,
+            "file_content": file_content.decode('latin-1'),  # Encode for JSON
+            "content_type": file.content_type,
+            "minio_result": minio_result
+        }
         
-        # Step 2: Chunk the markdown content
-        try:
-            chunks = chunker.chunk(markdown_content)
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Error chunking document: {str(e)}"
-            )
+        # Publish to Kafka
+        producer.send('ingest_jobs', value=job_data)
+        producer.flush()
         
-        if not chunks:
-            raise HTTPException(
-                status_code=400, 
-                detail="No content could be extracted from the document"
-            )
-        
-        # Step 3: Embed and store chunks
-        try:
-            result = embedder.embed_and_store(
-                chunks=chunks,
-                user_id=user_id,
-                chat_id=chat_id,
-                classroom_id=classroom_id,
-                metadata={"filename": filename}
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Error embedding and storing chunks: {str(e)}"
-            )
+        # Store job status in Redis
+        redis_client.setex(f"job:{job_id}", 3600, json.dumps({
+            "status": "queued",
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "classroom_id": classroom_id,
+            "filename": filename,
+            "created_at": str(os.times()[4])  # Simple timestamp
+        }))
         
         return IngestResponse(
-            status=result["status"],
-            message=result["message"],
-            inserted_count=result["inserted_count"],
+            status="queued",
+            message="Ingestion job queued successfully",
+            job_id=job_id,
             user_id=user_id,
             chat_id=chat_id,
             classroom_id=classroom_id,
-            filename=filename,
-            minio_upload=minio_result if minio_result.get("success") else None
+            filename=filename
         )
     
     except HTTPException:
@@ -240,6 +242,47 @@ async def ingest_document(
         raise HTTPException(
             status_code=500, 
             detail=f"Unexpected error: {str(e)}"
+        )
+
+
+@app.get("/job-status/{job_id}")
+async def get_job_status(
+    job_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get the status of an ingestion job.
+    Requires authentication via cookie.
+    
+    Args:
+        job_id: Job identifier
+        current_user: Authenticated user from cookie
+    
+    Returns:
+        Job status and details
+    """
+    try:
+        # Get job data from Redis
+        job_data = redis_client.get(f"job:{job_id}")
+        if not job_data:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        job = json.loads(job_data)
+        
+        # Verify user access
+        verify_user_access(
+            request_user_id=job["user_id"],
+            token_user_id=current_user["user_id"]
+        )
+        
+        return job
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error retrieving job status: {str(e)}"
         )
 
 

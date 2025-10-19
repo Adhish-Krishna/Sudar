@@ -117,6 +117,29 @@ services:
       - sudar-network
     restart: unless-stopped
 
+  broker:
+    image: apache/kafka:latest
+    container_name: broker
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    restart: unless-stopped
+    networks:
+      - sudar-network
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
@@ -189,6 +212,9 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET_NAME=rag-documents
+      - KAFKA_BOOTSTRAP_SERVERS=broker:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - HOST=0.0.0.0
       - PORT=3001
       - DOCLING_ARTIFACTS_PATH=/docling_models
@@ -205,6 +231,10 @@ services:
         condition: service_started
       minio:
         condition: service_started
+      broker:
+        condition: service_started
+      redis:
+        condition: service_started
     networks:
       - sudar-network
     restart: unless-stopped
@@ -214,6 +244,43 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+
+  rag-worker:
+    build:
+      context: ./services/rag-service
+    container_name: rag-worker
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL_NAME=embeddinggemma:300m
+      - EMBEDDING_DIMENSION=768
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION_NAME=rag_documents
+      - MINIO_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=rag-documents
+      - KAFKA_BOOTSTRAP_SERVERS=broker:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DOCLING_ARTIFACTS_PATH=/docling_models
+    volumes:
+      - docling-models:/docling_models
+    depends_on:
+      ollama:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
+      broker:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    command: ["python", "worker.py"]
 
   sudar-tools-mcp-server:
     build:
