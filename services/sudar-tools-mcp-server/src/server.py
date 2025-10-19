@@ -150,7 +150,7 @@ def retrieve_content(
         classroom_id: Optional classroom identifier to filter documents by classroom context
         filenames: Optional list of specific filenames to filter results by. If not provided,
                   will auto-extract from query using @filename.ext pattern
-        top_k: Number of most relevant results to return (default: 5)
+        top_k: Number of most relevant results to return
     
     Returns:
         A dictionary containing:

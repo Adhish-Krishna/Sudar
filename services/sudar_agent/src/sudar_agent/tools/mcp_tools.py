@@ -1,11 +1,40 @@
 """MCP Tools - Wrappers for connecting to Sudar MCP Tools Server."""
 
 import httpx
-from typing import List, Optional, Dict, Any
+import json
+from typing import List, Optional, Dict, Any, Type
 from crewai.tools import BaseTool
-from pydantic import Field
+from pydantic import Field, BaseModel
 
 from ..config.config import config
+
+
+# Schema for ContentRetrieverTool arguments
+class ContentRetrieverToolSchema(BaseModel):
+    """Schema for content retriever tool arguments."""
+    query: str = Field(..., description="The search query to find relevant content")
+    filenames: Optional[List[str]] = Field(default=None, description="Optional list of filenames to filter by")
+    top_k: int = Field(default=5, description="Number of top results to return (defaults to 5)")
+
+
+# Schema for WebSearchTool arguments
+class WebSearchToolSchema(BaseModel):
+    """Schema for web search tool arguments."""
+    query: str = Field(..., description="The search query to execute")
+    max_results: int = Field(default=5, description="Maximum number of search results to return")
+
+
+# Schema for WebsiteScraperTool arguments
+class WebsiteScraperToolSchema(BaseModel):
+    """Schema for website scraper tool arguments."""
+    urls: List[str] = Field(..., description="List of URLs to scrape content from")
+
+
+# Schema for ContentSaverTool arguments
+class ContentSaverToolSchema(BaseModel):
+    """Schema for content saver tool arguments."""
+    content: str = Field(..., description="The markdown-formatted content to save as PDF")
+    title: str = Field(..., description="The title for the PDF file")
 
 
 class WebSearchTool(BaseTool):
@@ -17,6 +46,7 @@ class WebSearchTool(BaseTool):
         "Use this tool to find up-to-date information, educational resources, "
         "scientific facts, and learning materials from the internet."
     )
+    args_schema: Type[BaseModel] = WebSearchToolSchema
     
     def _run(self, query: str, max_results: int = 5) -> Dict[str, Any]:
         """Execute web search."""
@@ -41,7 +71,6 @@ class WebSearchTool(BaseTool):
                 
                 # Parse the result
                 content = result.get("content", [{}])[0].get("text", "{}")
-                import json
                 return json.loads(content) if isinstance(content, str) else content
                 
         except Exception as e:
@@ -57,6 +86,7 @@ class WebsiteScraperTool(BaseTool):
         "Use this tool when you have URLs that contain valuable educational content "
         "that needs to be extracted and analyzed."
     )
+    args_schema: Type[BaseModel] = WebsiteScraperToolSchema
     
     def _run(self, urls: List[str]) -> List[Dict[str, Any]]:
         """Execute website scraping."""
@@ -78,7 +108,6 @@ class WebsiteScraperTool(BaseTool):
                     return [{"success": False, "error": result.get("content", [{}])[0].get("text", "Unknown error")}]
                 
                 content = result.get("content", [{}])[0].get("text", "[]")
-                import json
                 return json.loads(content) if isinstance(content, str) else content
                 
         except Exception as e:
@@ -94,6 +123,7 @@ class ContentSaverTool(BaseTool):
         "Use this tool to save generated worksheets, assignments, or educational content. "
         "ALWAYS use this tool to save every worksheet you generate."
     )
+    args_schema: Type[BaseModel] = ContentSaverToolSchema
     
     user_id: str = Field(default="")
     chat_id: str = Field(default="")
@@ -123,7 +153,6 @@ class ContentSaverTool(BaseTool):
                     return {"success": False, "error": result.get("content", [{}])[0].get("text", "Unknown error")}
                 
                 content_result = result.get("content", [{}])[0].get("text", "{}")
-                import json
                 return json.loads(content_result) if isinstance(content_result, str) else content_result
                 
         except Exception as e:
@@ -141,12 +170,13 @@ class ContentRetrieverTool(BaseTool):
         "This tool searches through user's documents and returns the most relevant chunks. "
         "Parameters: query (required), filenames (optional), top_k (optional, defaults to 5)"
     )
+    args_schema: Type[BaseModel] = ContentRetrieverToolSchema
     
     user_id: str = Field(default="")
     chat_id: str = Field(default="")
     classroom_id: str = Field(default="")
     
-    def _run(self, query: str, filenames: Optional[List[str]] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
+    def _run(self, query: str, filenames: Optional[List[str]] = None, top_k: int = 5) -> Dict[str, Any]:
         """Retrieve content from documents."""
         # Ensure top_k has a default value if not provided by LLM
         if top_k is None:
@@ -175,7 +205,6 @@ class ContentRetrieverTool(BaseTool):
                     return {"success": False, "error": result.get("content", [{}])[0].get("text", "Unknown error")}
                 
                 content = result.get("content", [{}])[0].get("text", "{}")
-                import json
                 return json.loads(content) if isinstance(content, str) else content
                 
         except Exception as e:
