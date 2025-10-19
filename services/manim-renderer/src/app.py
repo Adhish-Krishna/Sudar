@@ -22,13 +22,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+PORT = os.getenv("PORT", 3004)
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
-app = FastAPI(title="Manim Renderer Service", version="1.0.0")
+app = FastAPI(title="Manim Renderer Service", version="1.0.0", root_path="/manim")
 
 # Add CORS middleware
 app.add_middleware(
@@ -556,4 +558,4 @@ async def startup_event():
     threading.Thread(target=periodic_cleanup, daemon=True).start()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(PORT))

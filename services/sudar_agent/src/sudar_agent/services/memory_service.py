@@ -12,6 +12,7 @@ import uuid
 import ollama
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from ..config.config import config
 
@@ -43,6 +44,19 @@ class AgentMemoryService:
         self.classroom_id = classroom_id
         self.embedding_model = config.EMBEDDING_MODEL
         self.embedding_dimension = config.EMBEDDING_DIMENSION
+        
+        # Initialize text chunker
+        self.chunker = RecursiveCharacterTextSplitter(
+            chunk_size=1000,  # Adjust based on model's context length (2k tokens ≈ 1000 chars)
+            chunk_overlap=200,
+            separators=[
+                "\n\n",      # Paragraph
+                "\n",        # Line break
+                ". ",        # Sentence
+                " ",         # Word
+                ""           # Character
+            ]
+        )
         
         # Initialize Qdrant client
         self.qdrant_client = QdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
@@ -102,9 +116,9 @@ class AgentMemoryService:
         content: str,
         metadata: Optional[Dict[str, Any]] = None,
         collection: str = "short_term"
-    ) -> str:
+    ) -> List[str]:
         """
-        Add a message to memory
+        Add a message to memory, chunking if necessary
         
         Args:
             role: Role of the message sender (user, agent, etc.)
@@ -113,47 +127,64 @@ class AgentMemoryService:
             collection: Collection to store in ('short_term' or 'long_term')
         
         Returns:
-            ID of the stored message
+            List of IDs of the stored message chunks
         """
         collection_name = (
             self.short_term_collection if collection == "short_term" 
             else self.long_term_collection
         )
         
-        # Generate embedding
-        embedding = self._generate_embedding(content)
+        # Chunk the content if it's long
+        if not content or not content.strip():
+            return []
         
-        # Create payload
-        payload = {
-            "user_id": self.user_id,
-            "chat_id": self.chat_id,
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat(),
-            **(metadata or {})
-        }
+        chunks = self.chunker.split_text(content)
+        if not chunks:
+            chunks = [content]  # Fallback if chunking fails
         
-        # Add classroom_id if available
-        if self.classroom_id:
-            payload["classroom_id"] = self.classroom_id
+        # Store each chunk
+        point_ids = []
+        base_timestamp = datetime.now().isoformat()
         
-        # Generate unique ID
-        point_id = str(uuid.uuid4())
+        for i, chunk in enumerate(chunks):
+            # Generate embedding for this chunk
+            embedding = self._generate_embedding(chunk)
+            
+            # Create payload
+            payload = {
+                "user_id": self.user_id,
+                "chat_id": self.chat_id,
+                "role": role,
+                "content": chunk.strip(),
+                "chunk_index": i,
+                "total_chunks": len(chunks),
+                "original_content": content if len(chunks) == 1 else None,  # Store original only if single chunk
+                "timestamp": base_timestamp,
+                **(metadata or {})
+            }
+            
+            # Add classroom_id if available
+            if self.classroom_id:
+                payload["classroom_id"] = self.classroom_id
+            
+            # Generate unique ID
+            point_id = str(uuid.uuid4())
+            point_ids.append(point_id)
+            
+            # Store in Qdrant
+            self.qdrant_client.upsert(
+                collection_name=collection_name,
+                points=[
+                    PointStruct(
+                        id=point_id,
+                        vector=embedding,
+                        payload=payload
+                    )
+                ]
+            )
         
-        # Store in Qdrant
-        self.qdrant_client.upsert(
-            collection_name=collection_name,
-            points=[
-                PointStruct(
-                    id=point_id,
-                    vector=embedding,
-                    payload=payload
-                )
-            ]
-        )
-        
-        logger.debug(f"Added {role} message to {collection} memory: {content[:50]}...")
-        return point_id
+        logger.debug(f"Added {role} message ({len(chunks)} chunks) to {collection} memory")
+        return point_ids
     
     def get_relevant_context(
         self,
@@ -213,14 +244,24 @@ class AgentMemoryService:
         ]
     
     def format_context_for_prompt(self, memories: List[Dict[str, Any]]) -> str:
-        """Format memory entries for inclusion in a prompt."""
+        """Format memory entries for inclusion in a prompt, grouping chunks from same message."""
         if not memories:
             return ""
         
-        context_parts = ["Previous Conversation Context:"]
+        # Group chunks by timestamp and role (assuming same message)
+        grouped_memories = {}
         for memory in memories:
-            role = memory.get("role", "unknown")
-            content = memory.get("content", "")
-            context_parts.append(f"{role.capitalize()}: {content}")
+            key = (memory.get("timestamp"), memory.get("role"))
+            if key not in grouped_memories:
+                grouped_memories[key] = []
+            grouped_memories[key].append(memory)
+        
+        context_parts = ["Previous Conversation Context:"]
+        for (timestamp, role), chunks in grouped_memories.items():
+            # Sort chunks by index
+            chunks.sort(key=lambda x: x.get("chunk_index", 0))
+            # Combine chunk contents
+            full_content = " ".join(chunk.get("content", "") for chunk in chunks)
+            context_parts.append(f"{role.capitalize()}: {full_content}")
         
         return "\n".join(context_parts)

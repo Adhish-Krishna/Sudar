@@ -67,9 +67,10 @@ The following services are part of the Sudar platform:
 
 | Service | Default Port | URL | Server |
 |---------|--------------|-----| -----|
-| manim-renderer | 8000 | http://localhost:8000 | Fast API |
 | md-to-pdf | 3000 | http://localhost:3000 | NodeJS |
-| rag-service | 3001 | http://localhost:3001 | Fast API |
-| sudar-agent | 3005 | http://localhost:3005 | Fast API |
 | sudar-tools-mcp-server | 3002 | http://localhost:3002 | FastMCP |
-| be | 3006 | http://localhost:3006 | Fast API |
+| manim-renderer | 3004 | http://localhost:3004 | Fast API |
+| nginx proxy server | 8000 | http://localhost:8000 | Nginx | 
+| sudar-agent | Not exposed to host machine | http://localhost:8000/agent | Fast API |
+| backend | Not exposed to host machine | http://localhost:8000/api | Fast API |
+| rag-service | Not exposed to host machine | http://localhost:8000/rag | Fast API |

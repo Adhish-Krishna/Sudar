@@ -138,15 +138,20 @@ class ContentRetrieverTool(BaseTool):
         "Retrieve relevant content from previously ingested documents. "
         "Use this tool when the user's query contains @filename.ext references "
         "or when you need to fetch context from uploaded documents. "
-        "This tool searches through user's documents and returns the most relevant chunks."
+        "This tool searches through user's documents and returns the most relevant chunks. "
+        "Parameters: query (required), filenames (optional), top_k (optional, defaults to 5)"
     )
     
     user_id: str = Field(default="")
     chat_id: str = Field(default="")
     classroom_id: str = Field(default="")
     
-    def _run(self, query: str, filenames: Optional[List[str]] = None, top_k: int = 5) -> Dict[str, Any]:
+    def _run(self, query: str, filenames: Optional[List[str]] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
         """Retrieve content from documents."""
+        # Ensure top_k has a default value if not provided by LLM
+        if top_k is None:
+            top_k = 5
+            
         try:
             with httpx.Client(timeout=30.0) as client:
                 response = client.post(

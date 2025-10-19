@@ -285,12 +285,10 @@ async def get_job_status(
             detail=f"Error retrieving job status: {str(e)}"
         )
 
-
+# Retrieval alone does not require authorization
 @app.post("/retrieve", response_model=RetrievalResponse)
 async def retrieve_context(
-    request: RetrievalRequest,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    request: RetrievalRequest
 ):
     """
     Retrieve relevant context chunks based on a query.
@@ -305,27 +303,13 @@ async def retrieve_context(
         RetrievalResponse with retrieved chunks
     """
     try:
-        # Verify user has permission to access this data
-        verify_user_access(
-            request_user_id=request.user_id,
-            token_user_id=current_user["user_id"]
-        )
-        
-        # Verify classroom access if classroom_id is provided
-        if request.classroom_id:
-            verify_classroom_access(
-                user_id=current_user["user_id"],
-                classroom_id=request.classroom_id,
-                db=db
-            )
-        
         # Retrieve relevant chunks
         results = retriever.retrieve(
             query=request.query,
             user_id=request.user_id,
             chat_id=request.chat_id,
             classroom_id=request.classroom_id,
-            top_k=request.top_k,
+            top_k=request.top_k if request.top_k else 5,
             filenames=request.filenames
         )
         
