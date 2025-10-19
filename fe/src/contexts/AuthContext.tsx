@@ -1,18 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { authAPI, setTokenGetter, createEnhancedProtectedAPI } from '../api';
-import type { User, SignUpData } from '../api';
+import { authAPI } from '../api';
+import type { Login, SignUp, EmailVerification, ForgotPassword, ResetPassword, Teacher } from '../api';
 
 interface AuthContextType {
-  user: User | null;
+  user: Teacher | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (userData: SignUpData) => Promise<void>;
-  logout: () => void;
-  setAccessToken: (token: string) => void;
-  getAccessToken: () => string | null;
-  enhancedAPI: ReturnType<typeof createEnhancedProtectedAPI> | null;
+  login: (loginData: Login) => Promise<void>;
+  verifyEmail: (verifyData: EmailVerification) => Promise<void>;
+  signup: (signupData: SignUp) => Promise<void>;
+  forgotPassword: (forgotData: ForgotPassword) => Promise<void>;
+  resetPassword: (resetData: ResetPassword) => Promise<void>;
+  logout: () => Promise<void>;
+  getStatus: () => Promise<Teacher | null>;
+  setUser: (user: Teacher | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,93 +24,157 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [accessToken, setAccessTokenState] = useState<string | null>(null);
-  const [enhancedAPI, setEnhancedAPI] = useState<ReturnType<typeof createEnhancedProtectedAPI> | null>(null);
+  const [user, setUser] = useState<Teacher | null>(null);
+  const [loading, setLoading] = useState(true); // Start with true to prevent premature redirects
 
-  const isAuthenticated = !!user && !!accessToken;
+  const isAuthenticated = !!user;
 
-  const setAccessToken = (token: string) => {
-    setAccessTokenState(token);
-  };
-
-  const getAccessToken = () => {
-    return accessToken;
-  };
-
-  const refreshToken = async (): Promise<boolean> => {
+  const login = async (loginData: Login): Promise<void> => {
+    setLoading(true);
     try {
-      const data = await authAPI.refreshToken();
-      setAccessTokenState(data.accessToken);
-      setUser(data.user);
-      return true;
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      setAccessTokenState(null);
-      setUser(null);
-      return false;
-    }
-  };
-
-  // Set up the token getter and enhanced API
-  useEffect(() => {
-    setTokenGetter(() => accessToken);
-    const api = createEnhancedProtectedAPI(refreshToken);
-    setEnhancedAPI(api);
-  }, [accessToken]);
-
-  const login = async (email: string, password: string): Promise<void> => {
-    try {
-      const data = await authAPI.login(email, password);
-      
-      // Set access token and user data
-      setAccessTokenState(data.accessToken);
-      setUser(data.user);
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  };
-
-  const signup = async (userData: SignUpData): Promise<void> => {
-    try {
-      const data = await authAPI.signup(userData);
-      
-      // Set access token and user data
-      setAccessTokenState(data.accessToken);
-      setUser(data.user);
-    } catch (error) {
-      console.error('Signup error:', error);
-      throw error;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      // Call logout endpoint to clear refresh token cookie
-      await authAPI.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
+      const result = await authAPI.login(loginData);
+      if (result.status && result.status !== 200) {
+        throw new Error(result.message || 'Login failed');
+      }
+      // Set user from response
+      if (result.teacher_id) {
+        const userData: Teacher = {
+          teacher_id: result.teacher_id,
+          teacher_name: result.teacher_name,
+          email: result.email,
+        };
+        setUser(userData);
+      } else {
+        throw new Error('No user data in login response');
+      }
     } finally {
-      // Clear local state regardless of API call result
-      setAccessTokenState(null);
-      setUser(null);
+      setLoading(false);
     }
   };
 
-  // Check for existing authentication on app start
-  useEffect(() => {
-    const initializeAuth = async () => {
-      setLoading(true);
-      
-      // Try to refresh token to get initial auth state
-      await refreshToken();
-      
+  const verifyEmail = async (verifyData: EmailVerification): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await authAPI.verifyEmail(verifyData);
+      if (result.status && result.status !== 200) {
+        throw new Error(result.message || 'Email verification failed');
+      }
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const signup = async (signupData: SignUp): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await authAPI.signUp(signupData);
+      if (result.status && result.status !== 201) {
+        throw new Error(result.message || 'Signup failed');
+      }
+      // Assuming the API returns user data in the response
+      if (result.teacher_id) {
+        setUser({
+          teacher_id: result.teacher_id,
+          teacher_name: result.teacher_name,
+          email: result.email,
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const forgotPassword = async (forgotData: ForgotPassword): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await authAPI.forgotPassword(forgotData);
+      if (result.status && result.status !== 200) {
+        throw new Error(result.message || 'Failed to send reset email');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (resetData: ResetPassword): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await authAPI.resetPassword(resetData);
+      if (result.status && result.status !== 200) {
+        throw new Error(result.message || 'Password reset failed');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await authAPI.logout();
+      if (result.status && result.status !== 200) {
+        throw new Error(result.message || 'Logout failed');
+      }
+    } finally {
+      setUser(null);
+      setLoading(false);
+    }
+  };
+
+  const getStatus = async (): Promise<Teacher | null> => {
+    setLoading(true);
+    try {
+      const result = await authAPI.getStatus();
+      if (result.status && result.status !== 200) {
+        return null;
+      }
+      setUser(result);
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check authentication status on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkAuthStatus = async () => {
+      try {
+        const result = await authAPI.getStatus();
+        
+        if (!isMounted) return;
+
+        // Check if result has a status property (error response)
+        if (result?.status && result.status !== 200) {
+          // Authentication failed, user is not logged in
+          setUser(null);
+        } else if (result && result.teacher_id) {
+          // Successfully got user data (has teacher_id means it's a valid user object)
+          setUser(result);
+        } else {
+          // Unexpected response format
+          setUser(null);
+        }
+      } catch (error) {
+        // Network error or other unexpected issue
+        if (isMounted) {
+          console.error('Auth status check failed:', error);
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     };
 
-    initializeAuth();
+    checkAuthStatus();
+
+    // Cleanup function to prevent state updates on unmounted components
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const value: AuthContextType = {
@@ -116,11 +182,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     loading,
     login,
+    verifyEmail,
     signup,
+    forgotPassword,
+    resetPassword,
     logout,
-    setAccessToken,
-    getAccessToken,
-    enhancedAPI,
+    getStatus,
+    setUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

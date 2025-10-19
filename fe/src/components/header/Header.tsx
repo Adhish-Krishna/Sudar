@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import './Header.css';
 import SudarLogo from '../../assets/Sudar.png';
 
@@ -10,23 +11,15 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ sidebarExpanded }) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const navigate = useNavigate();
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
-  
-  // Hardcoded user data - comment out API call for now
-  const user = {
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    role: 'Mathematics Teacher'
-  };
 
-  const handleLogout = () => {
-    // await logout(); // Comment out API call
-    console.log('Logout clicked - backend integration needed');
+  const handleLogout = async () => {
+    await logout();
     setShowUserDropdown(false);
     navigate('/login');
   };
@@ -112,11 +105,11 @@ const Header: React.FC<HeaderProps> = ({ sidebarExpanded }) => {
               onClick={() => setShowUserDropdown(!showUserDropdown)}
             >
               <div className="user-avatar">
-                <span>{user.firstName.charAt(0)}</span>
+                <span>{user?.teacher_name?.charAt(0) || 'U'}</span>
               </div>
               <div className="user-info">
-                <p className="user-name">{user.firstName} {user.lastName}</p>
-                <p className="user-role">{user.role}</p>
+                <p className="user-name">{user?.teacher_name || 'User'}</p>
+                <p className="user-role">Teacher</p>
               </div>
               <svg className="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

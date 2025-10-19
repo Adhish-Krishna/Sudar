@@ -1,58 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './SignUp.css';
 import SudarLogo from '../../assets/Sudar.png';
 import loginTeacherImage from '../../assets/login_teacher.png';
 import Button from '../../components/Button';
-// import { useAuth } from '../../contexts/AuthContext';
-// import type { SignUpData } from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
+import type { SignUp , EmailVerification } from '../../api';
 
 interface SignUpFormData {
-  firstName: string;
-  lastName: string;
+  teacherName: string;
   email: string;
   password: string;
   confirmPassword: string;
-  phoneNumber: string;
-  schoolName: string;
-  subject: string;
-  experience: string;
-  agreeToTerms: boolean;
 }
 
 interface SignUpFormErrors {
-  firstName?: string;
-  lastName?: string;
+  teacherName?: string;
   email?: string;
   password?: string;
   confirmPassword?: string;
-  phoneNumber?: string;
-  schoolName?: string;
-  subject?: string;
-  experience?: string;
-  agreeToTerms?: string;
+  verificationCode?: string;
 }
 
-const SignUp: React.FC = () => {
+const SignUpPage: React.FC = () => {
   const [formData, setFormData] = useState<SignUpFormData>({
-    firstName: '',
-    lastName: '',
+    teacherName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    phoneNumber: '',
-    schoolName: '',
-    subject: '',
-    experience: '',
-    agreeToTerms: false,
   });
   const [errors, setErrors] = useState<SignUpFormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isVerificationSent, setIsVerificationSent] = useState(false);
   const navigate = useNavigate();
-  // const { signup } = useAuth();
+  const { verifyEmail, signup, isAuthenticated, loading } = useAuth();
+
+  // Redirect to home if already authenticated
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      navigate('/home', { replace: true });
+    }
+  }, [isAuthenticated, loading, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -70,8 +62,7 @@ const SignUp: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: SignUpFormErrors = {};
 
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
+    if (!formData.teacherName.trim()) newErrors.teacherName = 'Teacher name is required';
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -89,17 +80,10 @@ const SignUp: React.FC = () => {
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-    
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required';
-    } else if (!/^\d{10}$/.test(formData.phoneNumber.replace(/\D/g, ''))) {
-      newErrors.phoneNumber = 'Please enter a valid 10-digit phone number';
+
+    if (isVerificationSent && !verificationCode.trim()) {
+      newErrors.verificationCode = 'Verification code is required';
     }
-    
-    if (!formData.schoolName.trim()) newErrors.schoolName = 'School name is required';
-    if (!formData.subject) newErrors.subject = 'Subject is required';
-    if (!formData.experience) newErrors.experience = 'Teaching experience is required';
-    if (!formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to the terms and conditions';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -114,27 +98,29 @@ const SignUp: React.FC = () => {
     setSubmitError('');
     
     try {
-      // Convert form data to API format
-      const signupData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-        phoneNumber: formData.phoneNumber,
-        schoolName: formData.schoolName,
-        subject: formData.subject,
-        experience: formData.experience,
-      };
-      
-      // await signup(signupData);
-      console.log('Signup attempt:', signupData);
-      // Simulate API call delay
-      setTimeout(() => {
+      if (!isVerificationSent) {
+        // Step 1: Send verification email
+        const verifyData: EmailVerification = {
+          email: formData.email,
+          teacher_name: formData.teacherName,
+        };
+        await verifyEmail(verifyData);
+        setIsVerificationSent(true);
         setIsLoading(false);
+        return; // Wait for user to enter code
+      } else {
+        // Step 2: Sign up with verification code
+        const signupData: SignUp = {
+          teacher_name: formData.teacherName,
+          email: formData.email,
+          password: formData.password,
+          verification_code: verificationCode,
+        };
+        await signup(signupData);
         navigate('/home');
-      }, 2000);
+      }
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Account creation failed');
+      setSubmitError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -158,39 +144,28 @@ const SignUp: React.FC = () => {
             </div>
             
             <h1 className="login-title">Create Your Account</h1>
-            <p className="signup-subtitle">Join Sudar and start creating amazing educational content</p>
+            <p className="signup-subtitle">
+              {isVerificationSent 
+                ? 'Enter the verification code sent to your email to complete signup' 
+                : 'Join Sudar and start creating amazing educational content'
+              }
+            </p>
             
             {submitError && <div className="error-message">{submitError}</div>}
             
             <form onSubmit={handleSignUp} className="login-form signup-form">
-              <div className="form-row">
-                <div className="input-group half-width">
-                  <label htmlFor="firstName" className="input-label">First Name</label>
-                  <input
-                    type="text"
-                    id="firstName"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    className={`input-field ${errors.firstName ? 'error' : ''}`}
-                    placeholder="Enter your first name"
-                  />
-                  {errors.firstName && <span className="error-text">{errors.firstName}</span>}
-                </div>
-                
-                <div className="input-group half-width">
-                  <label htmlFor="lastName" className="input-label">Last Name</label>
-                  <input
-                    type="text"
-                    id="lastName"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    className={`input-field ${errors.lastName ? 'error' : ''}`}
-                    placeholder="Enter your last name"
-                  />
-                  {errors.lastName && <span className="error-text">{errors.lastName}</span>}
-                </div>
+              <div className="input-group">
+                <label htmlFor="teacherName" className="input-label">Teacher Name</label>
+                <input
+                  type="text"
+                  id="teacherName"
+                  name="teacherName"
+                  value={formData.teacherName}
+                  onChange={handleInputChange}
+                  className={`input-field ${errors.teacherName ? 'error' : ''}`}
+                  placeholder="Enter your full name"
+                />
+                {errors.teacherName && <span className="error-text">{errors.teacherName}</span>}
               </div>
 
               <div className="input-group">
@@ -206,6 +181,22 @@ const SignUp: React.FC = () => {
                 />
                 {errors.email && <span className="error-text">{errors.email}</span>}
               </div>
+
+              {isVerificationSent && (
+                <div className="input-group">
+                  <label htmlFor="verificationCode" className="input-label">Verification Code</label>
+                  <input
+                    type="text"
+                    id="verificationCode"
+                    name="verificationCode"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    className={`input-field ${errors.verificationCode ? 'error' : ''}`}
+                    placeholder="Enter the verification code sent to your email"
+                  />
+                  {errors.verificationCode && <span className="error-text">{errors.verificationCode}</span>}
+                </div>
+              )}
 
               <div className="form-row">
                 <div className="input-group half-width">
@@ -255,92 +246,6 @@ const SignUp: React.FC = () => {
                 </div>
               </div>
 
-              <div className="input-group">
-                <label htmlFor="phoneNumber" className="input-label">Phone Number</label>
-                <input
-                  type="tel"
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  className={`input-field ${errors.phoneNumber ? 'error' : ''}`}
-                  placeholder="Enter your phone number"
-                />
-                {errors.phoneNumber && <span className="error-text">{errors.phoneNumber}</span>}
-              </div>
-
-              <div className="input-group">
-                <label htmlFor="schoolName" className="input-label">School Name</label>
-                <input
-                  type="text"
-                  id="schoolName"
-                  name="schoolName"
-                  value={formData.schoolName}
-                  onChange={handleInputChange}
-                  className={`input-field ${errors.schoolName ? 'error' : ''}`}
-                  placeholder="Enter your school name"
-                />
-                {errors.schoolName && <span className="error-text">{errors.schoolName}</span>}
-              </div>
-
-              <div className="form-row">
-                <div className="input-group half-width">
-                  <label htmlFor="subject" className="input-label">Primary Subject</label>
-                  <select
-                    id="subject"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleInputChange}
-                    className={`input-field ${errors.subject ? 'error' : ''}`}
-                  >
-                    <option value="">Select subject</option>
-                    <option value="mathematics">Mathematics</option>
-                    <option value="science">Science</option>
-                    <option value="english">English</option>
-                    <option value="social-studies">Social Studies</option>
-                    <option value="languages">Languages</option>
-                    <option value="arts">Arts</option>
-                    <option value="physical-education">Physical Education</option>
-                    <option value="other">Other</option>
-                  </select>
-                  {errors.subject && <span className="error-text">{errors.subject}</span>}
-                </div>
-                
-                <div className="input-group half-width">
-                  <label htmlFor="experience" className="input-label">Teaching Experience</label>
-                  <select
-                    id="experience"
-                    name="experience"
-                    value={formData.experience}
-                    onChange={handleInputChange}
-                    className={`input-field ${errors.experience ? 'error' : ''}`}
-                  >
-                    <option value="">Select experience</option>
-                    <option value="0-1">0-1 years</option>
-                    <option value="2-5">2-5 years</option>
-                    <option value="6-10">6-10 years</option>
-                    <option value="11-15">11-15 years</option>
-                    <option value="15+">15+ years</option>
-                  </select>
-                  {errors.experience && <span className="error-text">{errors.experience}</span>}
-                </div>
-              </div>
-
-              <div className="checkbox-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    name="agreeToTerms"
-                    checked={formData.agreeToTerms}
-                    onChange={handleInputChange}
-                    className="checkbox-input"
-                  />
-                  <span className="checkmark"></span>
-                  I agree to the <a href="/terms" className="terms-link">Terms and Conditions</a> and <a href="/privacy" className="terms-link">Privacy Policy</a>
-                </label>
-                {errors.agreeToTerms && <span className="error-text">{errors.agreeToTerms}</span>}
-              </div>
-              
               <Button
                 type="submit"
                 variant="primary"
@@ -352,7 +257,7 @@ const SignUp: React.FC = () => {
                   fontSize: '16px',
                 }}
               >
-                {isLoading ? 'Creating Account...' : 'Create Account'}
+                {isLoading ? (isVerificationSent ? 'Creating Account...' : 'Sending Code...') : (isVerificationSent ? 'Create Account' : 'Send Verification Code')}
               </Button>
             </form>
             
@@ -379,4 +284,4 @@ const SignUp: React.FC = () => {
   );
 };
 
-export default SignUp;
+export default SignUpPage;

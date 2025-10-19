@@ -1,18 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './login.css';
 import SudarLogo from '../../assets/Sudar.png';
 import loginTeacherImage from '../../assets/login_teacher.png';
 import Button from '../../components/Button';
-// import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Login } from '../../api';
 
-const Login: React.FC = () => {
+const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  // const { login } = useAuth();
+  const { login, isAuthenticated, loading } = useAuth();
+
+  // Redirect to home if already authenticated
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      navigate('/home', { replace: true });
+    }
+  }, [isAuthenticated, loading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,15 +29,15 @@ const Login: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // await login(email, password);
-      console.log('Login attempt:', { email, password });
-      // Simulate API call delay
-      setTimeout(() => {
-        setIsLoading(false);
-        navigate('/home');
-      }, 1500);
+      const loginData: Login = {
+        email,
+        password,
+      };
+      await login(loginData);
+      navigate('/home');
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Login failed');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -74,15 +83,24 @@ const Login: React.FC = () => {
               
               <div className="input-group">
                 <label htmlFor="password" className="input-label">Password</label>
-                <input
-                  type="password"
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-field"
-                  placeholder="Enter your password"
-                  required
-                />
+                <div className="password-input-container">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field"
+                    placeholder="Enter your password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
               </div>
               
               <Button
@@ -96,7 +114,7 @@ const Login: React.FC = () => {
                   fontSize: '16px',
                 }}
               >
-                {isLoading ? 'Signing In...' : 'Login'}
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
             
@@ -138,4 +156,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login;
+export default LoginPage;

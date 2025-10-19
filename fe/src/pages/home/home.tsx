@@ -1,24 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './home.css';
-// import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 // import { protectedAPI } from '../../api';
 
 const Home: React.FC = () => {
-  // const { user, isAuthenticated, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  
-  // Temporary: Mock authentication state for frontend development
-  const isAuthenticated = true; // Set to false to test unauthenticated view
-  const loading = false;
-  const user = {
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    schoolName: 'Springfield Elementary',
-    subject: 'Mathematics',
-    experience: '5-10 years'
-  };
 
   if (loading) {
     return (
@@ -31,52 +19,11 @@ const Home: React.FC = () => {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="home-container">
-        <div className="hero-section">
-          <h1 className="hero-title">Welcome to Sudar</h1>
-          <p className="hero-subtitle">
-            Empowering educators with intelligent content creation and worksheet generation tools.
-          </p>
-          <div className="hero-features">
-            <div className="feature-item">
-              <h3>Smart Content Creation</h3>
-              <p>Generate educational content tailored to your curriculum and students' needs.</p>
-            </div>
-            <div className="feature-item">
-              <h3>Automated Worksheets</h3>
-              <p>Create custom worksheets with various question types and difficulty levels.</p>
-            </div>
-            <div className="feature-item">
-              <h3>Subject Management</h3>
-              <p>Organize your teaching materials by subjects and grade levels.</p>
-            </div>
-          </div>
-          <div className="hero-actions">
-            <button
-              className="btn btn-primary"
-              onClick={() => navigate('/signup')}
-            >
-              Get Started
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => navigate('/login')}
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Authenticated user dashboard
   return (
     <div className="home-container">
       <div className="dashboard-header">
-        <h1>Welcome back, {user?.firstName}!</h1>
+        <h1>Welcome back, {user?.teacher_name}!</h1>
         <p>Ready to create amazing educational content?</p>
       </div>
 
