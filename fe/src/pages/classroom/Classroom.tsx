@@ -331,6 +331,8 @@ const Classroom: React.FC = () => {
             <div className="classroom-subjects-grid">
               {subjects.map((subject, index) => {
                 const color = getSubjectColor(index);
+                const bgColorEncoded = color.bg.replace('#', '');
+                const textColorEncoded = color.text.replace('#', '');
                 return (
                   <div
                     key={subject.subject_id}
@@ -339,20 +341,27 @@ const Classroom: React.FC = () => {
                       background: color.bg,
                       color: color.text,
                     }}
+                    onClick={() => navigate(`/classroom/${classroomId}/subject/${subject.subject_id}?bgColor=${bgColorEncoded}&textColor=${textColorEncoded}`)}
                   >
                   <div className="classroom-subject-header">
                       <h3>{subject.subject_name.toUpperCase()}</h3>
                       <div className="classroom-subject-actions">
                         <button
                           className="classroom-subject-action-btn classroom-subject-edit-btn"
-                          onClick={() => handleOpenSubjectModal(subject)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenSubjectModal(subject);
+                          }}
                           title="Edit subject"
                         >
                           <MdEdit size={18} />
                         </button>
                         <button
                           className="classroom-subject-action-btn classroom-subject-delete-btn"
-                          onClick={() => handleDeleteSubject(subject.subject_id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSubject(subject.subject_id);
+                          }}
                           title="Delete subject"
                         >
                           <MdDelete size={18} />

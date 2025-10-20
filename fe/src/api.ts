@@ -112,6 +112,38 @@ export interface StudentResponse {
   grade: number;
 }
 
+// ============= Activity Interfaces =============
+export type ActivityTypeEnum = 'Worksheet' | 'Content';
+
+export interface FileCreate {
+  minio_path: string;
+}
+
+export interface FileResponse {
+  file_id: string;
+  minio_path: string;
+  activity_id: string;
+}
+
+export interface ActivityCreate {
+  title: string;
+  type: ActivityTypeEnum;
+  files?: FileCreate[];
+}
+
+export interface ActivityUpdate {
+  title?: string;
+}
+
+export interface ActivityResponse {
+  activity_id: string;
+  subject_id: string;
+  title: string;
+  type: ActivityTypeEnum;
+  created_at: string;
+  files: FileResponse[];
+}
+
 
 export const authAPI = {
   signUp : async (body: SignUp): Promise<SignUpSuccRes | any>=>{
@@ -587,3 +619,118 @@ export const students = {
     }
   },
 }
+
+export const activities = {
+  // Create a new activity (worksheet or content) with associated files
+  createActivity: async (subjectId: string, body: ActivityCreate): Promise<ActivityResponse | any> => {
+    try {
+      const response = await apiClient.post(
+        `${API_BASE_URL}/api/activities/subject/${subjectId}`,
+        body
+      );
+      if (response.status == 201) {
+        return response.data as ActivityResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || "Create activity failed",
+      };
+    }
+  },
+
+  // Get all activities for a specific subject
+  getActivitiesBySubject: async (subjectId: string): Promise<ActivityResponse[] | any> => {
+    try {
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/activities/subject/${subjectId}`
+      );
+      if (response.status == 200) {
+        return response.data as ActivityResponse[];
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || "Get activities failed",
+      };
+    }
+  },
+
+  // Get a specific activity by ID
+  getActivity: async (activityId: string): Promise<ActivityResponse | any> => {
+    try {
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/activities/${activityId}`
+      );
+      if (response.status == 200) {
+        return response.data as ActivityResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || "Get activity failed",
+      };
+    }
+  },
+
+  // Update an activity's title
+  updateActivity: async (activityId: string, body: ActivityUpdate): Promise<ActivityResponse | any> => {
+    try {
+      const response = await apiClient.put(
+        `${API_BASE_URL}/api/activities/${activityId}`,
+        body
+      );
+      if (response.status == 200) {
+        return response.data as ActivityResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || "Update activity failed",
+      };
+    }
+  },
+
+  // Delete an activity and its associated files
+  deleteActivity: async (activityId: string): Promise<any> => {
+    try {
+      const response = await apiClient.delete(
+        `${API_BASE_URL}/api/activities/${activityId}`
+      );
+      if (response.status == 204) {
+        return { message: "Deleted" };
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || "Delete activity failed",
+      };
+    }
+  },
+}
+

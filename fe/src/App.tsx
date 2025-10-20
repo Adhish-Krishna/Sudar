@@ -67,7 +67,7 @@ function App() {
               } 
             />
             <Route 
-              path="/subject/:subjectId" 
+              path="/classroom/:classroomId/subject/:subjectId" 
               element={
                 <ProtectedRoute>
                   <MainLayout>

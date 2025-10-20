@@ -4,33 +4,37 @@
   gap: 2rem;
 }
 
-.subject-header-card {
+/* Subject Banner */
+.subject-banner {
   border-radius: var(--border-radius-lg);
-  padding: 2rem;
-  color: white;
-  margin-bottom: 1rem;
+  padding: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  position: relative;
+  overflow: hidden;
 }
 
-.subject-header-card.from-cyan-500.to-blue-600 {
-  background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+.subject-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  position: relative;
+  z-index: 2;
 }
 
-.subject-header-card.from-orange-500.to-red-600 {
-  background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
-}
-
-.subject-header-card.from-blue-500.to-indigo-600 {
-  background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%);
-}
-
-.subject-title {
-  font-size: 2.5rem;
-  font-weight: bold;
+.subject-banner-title {
+  font-size: 3rem;
+  font-weight: 700;
   margin: 0;
+  letter-spacing: 2px;
   text-align: center;
-  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
+/* Recent Activity Section */
 .recent-activity-section {
   background-color: var(--surface-color);
   border-radius: var(--border-radius-lg);
@@ -38,10 +42,22 @@
   box-shadow: var(--shadow-sm);
 }
 
-.section-title {
+.recent-activity-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.recent-activity-icon {
   font-size: 1.5rem;
+  color: var(--text-muted);
+}
+
+.recent-activity-title {
+  font-size: 1.25rem;
   font-weight: 600;
-  margin: 0 0 1.5rem 0;
+  margin: 0;
   color: var(--text-color);
 }
 
@@ -54,42 +70,44 @@
 .activity-item {
   display: flex;
   align-items: center;
-  padding: 1rem;
+  padding: 1.25rem;
   background-color: var(--background-color);
   border-radius: var(--border-radius);
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  gap: 1rem;
 }
 
 .activity-item:hover {
   background-color: var(--border-color);
+  transform: translateX(4px);
+}
+
+.activity-icon-wrapper {
+  flex-shrink: 0;
 }
 
 .activity-icon {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--border-radius);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 1rem;
   color: white;
+  font-size: 1.5rem;
 }
 
 .activity-icon.document {
-  background-color: var(--primary-color);
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
 }
 
 .activity-icon.video {
-  background-color: var(--warning-color);
-}
-
-.activity-icon svg {
-  width: 24px;
-  height: 24px;
+  background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
 }
 
 .activity-content {
   flex: 1;
+  min-width: 0;
 }
 
 .activity-title {
@@ -97,59 +115,101 @@
   font-size: 1rem;
   font-weight: 500;
   color: var(--text-color);
+  word-break: break-word;
 }
 
 .activity-date {
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.empty-activities {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+}
+
+.empty-activities p {
+  margin: 0;
+  font-size: 1rem;
 }
 
 /* Mobile responsiveness */
 @media (max-width: 768px) {
-  .subject-title {
+  .subject-banner {
+    padding: 2rem;
+    min-height: 120px;
+  }
+
+  .subject-banner-title {
+    font-size: 2rem;
+    letter-spacing: 1.5px;
+  }
+
+  .subject-banner-icon {
     font-size: 2rem;
   }
-  
-  .subject-header-card {
-    padding: 1.5rem;
-  }
-  
+
   .recent-activity-section {
     padding: 1rem;
   }
-  
+
   .activity-item {
-    padding: 0.75rem;
+    padding: 1rem;
+    gap: 0.75rem;
   }
-  
+
   .activity-icon {
-    width: 40px;
-    height: 40px;
-    margin-right: 0.75rem;
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
   }
-  
-  .activity-icon svg {
-    width: 20px;
-    height: 20px;
+
+  .activity-title {
+    font-size: 0.95rem;
+  }
+
+  .activity-date {
+    font-size: 0.8rem;
   }
 }
 
 @media (max-width: 480px) {
-  .subject-title {
-    font-size: 1.75rem;
+  .subject-banner {
+    padding: 1.5rem;
+    min-height: 100px;
   }
-  
+
+  .subject-banner-title {
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+  }
+
+  .subject-banner-icon {
+    font-size: 1.5rem;
+  }
+
   .activity-item {
     flex-direction: column;
     align-items: flex-start;
+    padding: 0.75rem;
     gap: 0.5rem;
   }
-  
+
   .activity-icon {
-    margin-right: 0;
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
   }
-  
+
   .activity-date {
+    margin-left: 0;
     align-self: flex-end;
+  }
+
+  .recent-activity-header {
+    margin-bottom: 1rem;
   }
 }

@@ -1,42 +1,88 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
 import SubjectDetail from '../../components/subject/SubjectDetail';
 import WorksheetGeneration from '../../components/subject/WorksheetGeneration';
+import { activities as activitiesAPI, subjects as subjectsAPI, type ActivityResponse } from '../../api';
 import './SubjectPage.css';
 
 type TabType = 'Subject' | 'AI Assistant';
 
 const SubjectPage = () => {
-  const { subjectId } = useParams<{ subjectId: string }>();
+  const { classroomId, subjectId } = useParams<{ classroomId: string; subjectId: string }>();
+  const location = useLocation();
+  
   const [activeTab, setActiveTab] = useState<TabType>('Subject');
+  const [activities, setActivities] = useState<ActivityResponse[]>([]);
+  const [subjectName, setSubjectName] = useState<string>('');
+  const [bannerColor, setBannerColor] = useState({ bg: '#3b82f6', text: '#ffffff' });
 
-  // TODO: Replace with API call to fetch subject details
-  const getSubjectName = (id: string | undefined): string => {
-    const subjects: Record<string, string> = {
-      '1': 'MATHEMATICS',
-      '2': 'SCIENCE', 
-      '3': 'ENGLISH',
-      '4': 'HISTORY',
-      '5': 'GEOGRAPHY',
-      '6': 'COMPUTER SCIENCE',
-      // Legacy support for old string IDs
-      'math': 'MATHEMATICS',
-      'science': 'SCIENCE', 
-      'tamil': 'TAMIL'
-    };
-    return subjects[id || ''] || 'UNKNOWN SUBJECT';
+  // Fetch subject details and activities on component mount
+  useEffect(() => {
+    if (classroomId && subjectId) {
+      fetchSubjectAndActivities();
+    }
+    
+    // Extract color from URL query parameters
+    const searchParams = new URLSearchParams(location.search);
+    const bgColor = searchParams.get('bgColor');
+    const textColor = searchParams.get('textColor');
+    
+    if (bgColor && textColor) {
+      setBannerColor({ 
+        bg: `#${bgColor}`, 
+        text: `#${textColor}` 
+      });
+    }
+  }, [classroomId, subjectId, location.search]);
+
+  const fetchSubjectAndActivities = async () => {
+    if (!classroomId || !subjectId) return;
+
+    try {
+      // Fetch subject details
+      const subjectResponse = await subjectsAPI.getSubject(classroomId, subjectId);
+      if (!subjectResponse.status && subjectResponse.subject_name) {
+        setSubjectName(subjectResponse.subject_name);
+      } else {
+        setSubjectName('Unknown Subject');
+      }
+
+      // Fetch activities for the subject
+      const activitiesResponse = await activitiesAPI.getActivitiesBySubject(subjectId);
+      
+      if (activitiesResponse.status || (activitiesResponse.message && activitiesResponse.status && activitiesResponse.status >= 400)) {
+        setActivities([]);
+      } else if (Array.isArray(activitiesResponse)) {
+        setActivities(activitiesResponse);
+      } else {
+        setActivities([]);
+      }
+    } catch (err) {
+      setSubjectName('Unknown Subject');
+      setActivities([]);
+    }
   };
-
-  const subjectName = getSubjectName(subjectId);
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'Subject':
-        return <SubjectDetail subjectName={subjectName} subjectId={subjectId || ''} />;
+        return (
+          <SubjectDetail 
+            subjectName={subjectName} 
+            activities={activities}
+            bannerColor={bannerColor}
+          />
+        );
       case 'AI Assistant':
         return <WorksheetGeneration subjectName={subjectName} />;
       default:
-        return <SubjectDetail subjectName={subjectName} subjectId={subjectId || ''} />;
+        return (
+          <SubjectDetail 
+            subjectName={subjectName} 
+            activities={activities}
+            bannerColor={bannerColor}
+          />
+        );
     }
   };
 
