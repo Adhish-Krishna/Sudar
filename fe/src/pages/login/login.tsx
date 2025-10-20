@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
 import './login.css';
 import SudarLogo from '../../assets/Sudar.png';
 import loginTeacherImage from '../../assets/login_teacher.png';
@@ -98,7 +99,7 @@ const LoginPage: React.FC = () => {
                     className="password-toggle"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                    {showPassword ? <AiOutlineEye size={20} /> : <AiOutlineEyeInvisible size={20} />}
                   </button>
                 </div>
               </div>

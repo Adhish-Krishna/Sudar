@@ -5,6 +5,7 @@ import Login from './pages/login/login.tsx';
 import ForgotPassword from './pages/login/ForgotPassword.tsx';
 import SignUp from './pages/login/SignUp.tsx';
 import Home from './pages/home/home';
+import Classroom from './pages/classroom/Classroom';
 import Classes from './pages/classes/Classes';
 // Add this import at the top with other component imports
 import ClassSubjects from './pages/classSubjects/ClassSubjects';
@@ -31,6 +32,16 @@ function App() {
                 <ProtectedRoute>
                   <MainLayout>
                     <Home />
+                  </MainLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/classSubjects/:classroomId" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Classroom />
                   </MainLayout>
                 </ProtectedRoute>
               } 
