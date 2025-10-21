@@ -6,6 +6,7 @@ from .students import router as students_router
 from .subjects import router as subjects_router
 from .activity import router as activity_router
 from .performance import router as performance_router
+from .minio import router as minio_router
 import uvicorn
 from dotenv import load_dotenv
 import os
@@ -37,6 +38,7 @@ app.include_router(students_router)
 app.include_router(subjects_router)
 app.include_router(activity_router)
 app.include_router(performance_router)
+app.include_router(minio_router)
 
 
 @app.get("/", tags=["Root"])

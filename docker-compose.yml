@@ -52,6 +52,11 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
       - SMTP_FROM_NAME=${SMTP_FROM_NAME}
+      - MINIO_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_INPUT_BUCKET_NAME=rag-documents
+      - MINIO_OUTPUT_BUCKET_NAME=sudar-content
     expose:
       - "3006"
     depends_on:
