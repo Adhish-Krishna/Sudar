@@ -12,15 +12,15 @@ from ..config.config import config
 class DoubtClearanceFlow(Flow):
     """Flow for answering doubts and questions directly."""
     
-    def __init__(self, user_id: str, chat_id: str, classroom_id: str):
+    def __init__(self, user_id: str, chat_id: str, subject_id: str):
         super().__init__()
         self.user_id = user_id
         self.chat_id = chat_id
-        self.classroom_id = classroom_id
+        self.subject_id = subject_id
         self.llm = self._get_llm()
         
         # Initialize content retriever tool
-        self.content_retriever = ContentRetrieverTool(user_id=user_id, chat_id=chat_id, classroom_id=self.classroom_id)
+        self.content_retriever = ContentRetrieverTool(user_id=user_id, chat_id=chat_id, subject_id=self.subject_id)
     
     def _get_llm(self) -> LLM:
         """Get configured LLM."""

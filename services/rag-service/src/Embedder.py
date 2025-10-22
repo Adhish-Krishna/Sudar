@@ -98,7 +98,7 @@ class Embedder:
         chunks: List[str], 
         user_id: str, 
         chat_id: str,
-        classroom_id: str = None,
+        subject_id: str = None,
         metadata: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
@@ -108,7 +108,7 @@ class Embedder:
             chunks: List of text chunks to embed
             user_id: The user ID
             chat_id: The chat ID
-            classroom_id: Optional classroom ID for organizing by classroom
+            subject_id: Optional subject ID for organizing by subject
             metadata: Additional metadata to store with chunks
         
         Returns:
@@ -141,9 +141,9 @@ class Embedder:
                     "chunk_index": idx
                 }
                 
-                # Add classroom_id if provided
-                if classroom_id:
-                    payload["classroom_id"] = classroom_id
+                # Add subject_id if provided
+                if subject_id:
+                    payload["subject_id"] = subject_id
                 
                 # Add additional metadata if provided
                 if metadata:
@@ -191,14 +191,14 @@ class Embedder:
         
         return response
     
-    def delete_by_chat(self, user_id: str, chat_id: str, classroom_id: str = None) -> Dict[str, Any]:
+    def delete_by_chat(self, user_id: str, chat_id: str, subject_id: str = None) -> Dict[str, Any]:
         """
         Delete all chunks for a specific user and chat.
         
         Args:
             user_id: The user ID
             chat_id: The chat ID
-            classroom_id: Optional classroom ID to filter by classroom
+            subject_id: Optional classroom ID to filter by classroom
         
         Returns:
             Dict containing deletion status
@@ -208,10 +208,10 @@ class Embedder:
             FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
         ]
         
-        # Add classroom_id filter if provided
-        if classroom_id:
+        # Add subject_id filter if provided
+        if subject_id:
             must_conditions.append(
-                FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
+                FieldCondition(key="subject_id", match=MatchValue(value=subject_id))
             )
         
         self.qdrant_client.delete(
@@ -221,5 +221,5 @@ class Embedder:
         
         return {
             "status": "success",
-            "message": f"Deleted all chunks for user_id={user_id}, chat_id={chat_id}, classroom_id={classroom_id}"
+            "message": f"Deleted all chunks for user_id={user_id}, chat_id={chat_id}, subject_id={subject_id}"
         }

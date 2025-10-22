@@ -41,18 +41,11 @@ RUN uv pip install --system . --index-strategy unsafe-best-match
 # Copy application code
 COPY . .
 
-# Create docling models directory before switching to non-root user
+# Create docling models directory
 # This will be mounted as a volume for persistence
-RUN mkdir -p /docling_models && \
-    chmod 777 /docling_models
+RUN mkdir -p /docling_models /docling_models/RapidOcr
 
-# Create a non-root user for security
-RUN useradd -m -u 1000 raguser && \
-    chown -R raguser:raguser /app && \
-    chown -R raguser:raguser /docling_models
-
-# Switch to non-root user
-USER raguser
+# Running as root user to avoid permission issues with RapidOCR font downloads
 
 ARG OLLAMA_BASE_URL
 ARG EMBEDDING_MODEL_NAME

@@ -22,8 +22,7 @@ from src.MinIOStorage import MinIOStorage
 from src.database import get_db
 from src.auth_dependency import (
     get_current_user,
-    verify_user_access,
-    verify_classroom_access
+    verify_user_access
 )
 
 # Load environment variables
@@ -33,7 +32,10 @@ load_dotenv()
 kafka_bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
 producer = KafkaProducer(
     bootstrap_servers=[kafka_bootstrap_servers],
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+    max_request_size=104857600,  # 100 MB - increased from default 1MB
+    buffer_memory=134217728,  # 128 MB - increased buffer memory
+    compression_type='gzip'  # Enable compression for large messages
 )
 
 # Initialize Redis
@@ -95,7 +97,7 @@ class IngestResponse(BaseModel):
     job_id: str
     user_id: str
     chat_id: str
-    classroom_id: Optional[str] = None
+    subject_id: Optional[str] = None
     filename: str
 
 
@@ -103,7 +105,7 @@ class RetrievalRequest(BaseModel):
     query: str
     user_id: str
     chat_id: str
-    classroom_id: Optional[str] = None
+    subject_id: Optional[str] = None
     top_k: int = 5
     filenames: Optional[List[str]] = None  # Optional list of filenames to filter by
 
@@ -113,7 +115,7 @@ class RetrievalResponse(BaseModel):
     query: str
     user_id: str
     chat_id: str
-    classroom_id: Optional[str] = None
+    subject_id: Optional[str] = None
     results: List[dict]
     count: int
 
@@ -146,7 +148,7 @@ async def ingest_document(
     file: UploadFile = File(...),
     user_id: str = Form(...),
     chat_id: str = Form(...),
-    classroom_id: Optional[str] = Form(None),
+    subject_id: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -158,7 +160,7 @@ async def ingest_document(
         file: Uploaded file (PDF, DOCX, PPTX, XLSX, MD, TXT)
         user_id: User identifier
         chat_id: Chat/conversation identifier
-        classroom_id: Optional classroom identifier
+        subject_id: Optional classroom identifier
         current_user: Authenticated user from cookie
         db: Database session
     
@@ -171,14 +173,6 @@ async def ingest_document(
             request_user_id=user_id,
             token_user_id=current_user["user_id"]
         )
-        
-        # Verify classroom access if classroom_id is provided
-        if classroom_id:
-            verify_classroom_access(
-                user_id=current_user["user_id"],
-                classroom_id=classroom_id,
-                db=db
-            )
         
         # Read file content
         file_content = await file.read()
@@ -193,23 +187,26 @@ async def ingest_document(
             filename=filename,
             user_id=user_id,
             chat_id=chat_id,
-            classroom_id=classroom_id,
+            subject_id=subject_id,
             content_type=file.content_type
         )
         
         if not minio_result.get("success"):
-            print(f"Warning: MinIO upload failed - {minio_result.get('error')}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO upload failed - {minio_result.get('error')}"
+            )
         
-        # Prepare job data
+        # Prepare job data (only metadata, NOT file content)
         job_data = {
             "job_id": job_id,
             "user_id": user_id,
             "chat_id": chat_id,
-            "classroom_id": classroom_id,
+            "subject_id": subject_id,
             "filename": filename,
-            "file_content": file_content.decode('latin-1'),  # Encode for JSON
+            "minio_object_name": minio_result.get("object_name"),  # MinIO path
             "content_type": file.content_type,
-            "minio_result": minio_result
+            "file_size": len(file_content)
         }
         
         # Publish to Kafka
@@ -221,7 +218,7 @@ async def ingest_document(
             "status": "queued",
             "user_id": user_id,
             "chat_id": chat_id,
-            "classroom_id": classroom_id,
+            "subject_id": subject_id,
             "filename": filename,
             "created_at": str(os.times()[4])  # Simple timestamp
         }))
@@ -232,7 +229,7 @@ async def ingest_document(
             job_id=job_id,
             user_id=user_id,
             chat_id=chat_id,
-            classroom_id=classroom_id,
+            subject_id=subject_id,
             filename=filename
         )
     
@@ -308,7 +305,7 @@ async def retrieve_context(
             query=request.query,
             user_id=request.user_id,
             chat_id=request.chat_id,
-            classroom_id=request.classroom_id,
+            subject_id=request.subject_id,
             top_k=request.top_k if request.top_k else 5,
             filenames=request.filenames
         )
@@ -318,7 +315,7 @@ async def retrieve_context(
             query=request.query,
             user_id=request.user_id,
             chat_id=request.chat_id,
-            classroom_id=request.classroom_id,
+            subject_id=request.subject_id,
             results=results,
             count=len(results)
         )
@@ -334,7 +331,7 @@ async def retrieve_context(
 async def delete_chat_data(
     user_id: str,
     chat_id: str,
-    classroom_id: Optional[str] = None,
+    subject_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -345,7 +342,7 @@ async def delete_chat_data(
     Args:
         user_id: User identifier
         chat_id: Chat/conversation identifier
-        classroom_id: Optional classroom identifier for filtering
+        subject_id: Optional classroom identifier for filtering
         current_user: Authenticated user from cookie
         db: Database session
     
@@ -359,15 +356,7 @@ async def delete_chat_data(
             token_user_id=current_user["user_id"]
         )
         
-        # Verify classroom access if classroom_id is provided
-        if classroom_id:
-            verify_classroom_access(
-                user_id=current_user["user_id"],
-                classroom_id=classroom_id,
-                db=db
-            )
-        
-        result = embedder.delete_by_chat(user_id, chat_id, classroom_id)
+        result = embedder.delete_by_chat(user_id, chat_id, subject_id)
         return result
     except Exception as e:
         raise HTTPException(
@@ -380,7 +369,7 @@ async def delete_chat_data(
 async def list_chat_chunks(
     user_id: str, 
     chat_id: str, 
-    classroom_id: Optional[str] = None,
+    subject_id: Optional[str] = None,
     limit: int = 100,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -392,7 +381,7 @@ async def list_chat_chunks(
     Args:
         user_id: User identifier
         chat_id: Chat/conversation identifier
-        classroom_id: Optional classroom identifier for filtering
+        subject_id: Optional classroom identifier for filtering
         limit: Maximum number of chunks to return
         current_user: Authenticated user from cookie
         db: Database session
@@ -407,20 +396,12 @@ async def list_chat_chunks(
             token_user_id=current_user["user_id"]
         )
         
-        # Verify classroom access if classroom_id is provided
-        if classroom_id:
-            verify_classroom_access(
-                user_id=current_user["user_id"],
-                classroom_id=classroom_id,
-                db=db
-            )
-        
-        chunks = retriever.retrieve_all_for_chat(user_id, chat_id, classroom_id, limit)
+        chunks = retriever.retrieve_all_for_chat(user_id, chat_id, subject_id, limit)
         return {
             "status": "success",
             "user_id": user_id,
             "chat_id": chat_id,
-            "classroom_id": classroom_id,
+            "subject_id": subject_id,
             "chunks": chunks,
             "count": len(chunks)
         }

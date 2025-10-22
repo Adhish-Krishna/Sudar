@@ -56,7 +56,7 @@ class MinIOStorage:
         filename: str,
         user_id: str,
         chat_id: str,
-        classroom_id: Optional[str] = None,
+        subject_id: Optional[str] = None,
         content_type: Optional[str] = None
     ) -> dict:
         """Upload a file to MinIO.
@@ -66,7 +66,7 @@ class MinIOStorage:
             filename: Original filename
             user_id: User identifier
             chat_id: Chat identifier
-            classroom_id: Optional classroom identifier
+            subject_id: Optional subject identifier
             content_type: MIME type of the file
             
         Returns:
@@ -74,8 +74,8 @@ class MinIOStorage:
         """
         try:
             # Create object name with user/classroom/chat structure
-            if classroom_id:
-                object_name = f"{user_id}/{classroom_id}/{chat_id}/{filename}"
+            if subject_id:
+                object_name = f"{user_id}/{subject_id}/{chat_id}/{filename}"
             else:
                 object_name = f"{user_id}/{chat_id}/{filename}"
             
@@ -83,8 +83,8 @@ class MinIOStorage:
             tags = Tags(for_object=True)
             tags["user_id"] = user_id
             tags["chat_id"] = chat_id
-            if classroom_id:
-                tags["classroom_id"] = classroom_id
+            if subject_id:
+                tags["subject_id"] = subject_id
             tags["type"] = "uploaded_document"
             tags["filename"] = filename
             
@@ -215,3 +215,26 @@ class MinIOStorage:
         except S3Error as e:
             print(f"Error listing files: {e}")
             return []
+    
+    def get_file(self, object_name: str) -> Optional[bytes]:
+        """Retrieve a file from MinIO.
+        
+        Args:
+            object_name: Full object path in MinIO
+            
+        Returns:
+            File content as bytes, or None if retrieval fails
+        """
+        try:
+            response = self.client.get_object(self.bucket_name, object_name)
+            # Read all data from response
+            data = response.read()
+            response.close()
+            response.release_conn()
+            return data
+        except S3Error as e:
+            print(f"Error retrieving file {object_name}: {e}")
+            return None
+        except Exception as e:
+            print(f"Unexpected error retrieving file {object_name}: {e}")
+            return None

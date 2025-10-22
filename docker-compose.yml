@@ -141,6 +141,9 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_MESSAGE_MAX_BYTES: 104857600  # 100 MB
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 104857600  # 100 MB
+      KAFKA_MAX_REQUEST_SIZE: 104857600  # 100 MB
     restart: unless-stopped
     networks:
       - sudar-network

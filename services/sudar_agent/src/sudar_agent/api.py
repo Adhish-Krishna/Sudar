@@ -13,8 +13,9 @@ from sqlalchemy.orm import Session
 
 from .orchestrator import SudarAgentOrchestrator
 from .config.config import config
-from .auth_dependency import get_current_user, verify_user_access, verify_classroom_access
+from .auth_dependency import get_current_user, verify_user_access
 from .database import get_db
+from .services.chat_service import ChatService
 
 # Configure logging
 logging.basicConfig(
@@ -28,15 +29,30 @@ logger = logging.getLogger(__name__)
 class ChatRequest(BaseModel):
     user_id: str
     chat_id: str
-    classroom_id: Optional[str] = None
+    subject_id: Optional[str] = None
     query: str
 
 
 class ChatResponse(BaseModel):
     user_id: str
     chat_id: str
-    classroom_id: Optional[str] = None
+    subject_id: Optional[str] = None
     response: str
+
+
+class ChatHistoryResponse(BaseModel):
+    user_id: str
+    chat_id: str
+    subject_id: Optional[str] = None
+    messages: list
+
+
+class DeleteChatResponse(BaseModel):
+    user_id: str
+    chat_id: str
+    subject_id: Optional[str] = None
+    deleted_count: int
+    message: str
 
 
 # Lifespan context manager
@@ -143,7 +159,7 @@ async def chat(
     Requires JWT authentication via Bearer token.
     
     Args:
-        request: Chat request containing user_id, chat_id, classroom_id, and query
+        request: Chat request containing user_id, chat_id, subject_id, and query
         current_user: Authenticated user information from JWT token
         db: Database session for classroom verification
         
@@ -161,25 +177,17 @@ async def chat(
             request_user_id=request.user_id,
             token_user_id=current_user["user_id"]
         )
-        
-        # Verify classroom access if classroom_id is provided
-        if request.classroom_id:
-            verify_classroom_access(
-                user_id=current_user["user_id"],
-                classroom_id=request.classroom_id,
-                db=db
-            )
-        
+    
         logger.info(
             f"Received chat request from user: {request.user_id}, "
-            f"chat: {request.chat_id}, classroom: {request.classroom_id}"
+            f"chat: {request.chat_id}, subject: {request.subject_id}"
         )
         
         # Create orchestrator
         orchestrator = SudarAgentOrchestrator(
             user_id=request.user_id,
             chat_id=request.chat_id,
-            classroom_id=request.classroom_id
+            subject_id=request.subject_id
         )
         
         # Return SSE stream
@@ -211,7 +219,7 @@ async def chat_sync(
     Requires JWT authentication via Bearer token.
     
     Args:
-        request: Chat request containing user_id, chat_id, classroom_id, and query
+        request: Chat request containing user_id, chat_id, subject_id, and query
         current_user: Authenticated user information from JWT token
         db: Database session for classroom verification
         
@@ -230,24 +238,16 @@ async def chat_sync(
             token_user_id=current_user["user_id"]
         )
         
-        # Verify classroom access if classroom_id is provided
-        if request.classroom_id:
-            verify_classroom_access(
-                user_id=current_user["user_id"],
-                classroom_id=request.classroom_id,
-                db=db
-            )
-        
         logger.info(
             f"Received sync chat request from user: {request.user_id}, "
-            f"chat: {request.chat_id}, classroom: {request.classroom_id}"
+            f"chat: {request.chat_id}, classroom: {request.subject_id}"
         )
         
         # Create orchestrator
         orchestrator = SudarAgentOrchestrator(
             user_id=request.user_id,
             chat_id=request.chat_id,
-            classroom_id=request.classroom_id
+            subject_id=request.subject_id
         )
         
         # Process query
@@ -257,12 +257,226 @@ async def chat_sync(
         return ChatResponse(
             user_id=request.user_id,
             chat_id=request.chat_id,
-            classroom_id=request.classroom_id,
+            subject_id=request.subject_id,
             response=result
         )
         
     except Exception as e:
         logger.error(f"Error in sync chat endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/chat/history/{user_id}/{chat_id}", response_model=ChatHistoryResponse)
+async def get_chat_history(
+    user_id: str,
+    chat_id: str,
+    subject_id: Optional[str] = None,
+    limit: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get chat history for a specific chat.
+    
+    Retrieves all messages for a given chat_id and user_id, optionally filtered by subject_id.
+    Requires JWT authentication via Bearer token.
+    
+    Args:
+        user_id: User identifier
+        chat_id: Chat session identifier
+        subject_id: Optional subject identifier to filter messages
+        limit: Optional limit on number of messages to retrieve
+        current_user: Authenticated user information from JWT token
+        db: Database session for verification
+        
+    Returns:
+        ChatHistoryResponse: List of chat messages sorted by timestamp
+        
+    Raises:
+        HTTPException 401: If authentication fails
+        HTTPException 403: If user_id doesn't match authenticated user
+        HTTPException 500: If retrieval fails
+    """
+    try:
+        # Verify user has permission to access this chat
+        verify_user_access(
+            request_user_id=user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        logger.info(
+            f"Retrieving chat history for user: {user_id}, "
+            f"chat: {chat_id}, subject: {subject_id}"
+        )
+        
+        # Get chat service and retrieve history
+        chat_service = ChatService()
+        messages = chat_service.get_chat_history(
+            user_id=user_id,
+            chat_id=chat_id,
+            subject_id=subject_id,
+            limit=limit
+        )
+        chat_service.close()
+        
+        return ChatHistoryResponse(
+            user_id=user_id,
+            chat_id=chat_id,
+            subject_id=subject_id,
+            messages=messages
+        )
+        
+    except Exception as e:
+        logger.error(f"Error retrieving chat history: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/chat/list/{user_id}")
+async def list_user_chats(
+    user_id: str,
+    subject_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    List all unique chats for a user, optionally filtered by subject.
+    
+    Returns a list of unique chat_ids for the given user_id and optional subject_id.
+    Requires JWT authentication via Bearer token.
+    
+    Args:
+        user_id: User identifier
+        subject_id: Optional subject identifier to filter chats
+        current_user: Authenticated user information from JWT token
+        db: Database session for verification
+        
+    Returns:
+        dict: List of unique chat_ids with metadata (latest message timestamp, message count)
+        
+    Raises:
+        HTTPException 401: If authentication fails
+        HTTPException 403: If user_id doesn't match authenticated user
+        HTTPException 500: If retrieval fails
+    """
+    try:
+        # Verify user has permission to access these chats
+        verify_user_access(
+            request_user_id=user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        logger.info(
+            f"Listing chats for user: {user_id}, subject: {subject_id}"
+        )
+        
+        # Get chat service
+        chat_service = ChatService()
+        
+        # Build query
+        query = {"user_id": user_id}
+        if subject_id:
+            query["subject_id"] = subject_id
+        
+        # Aggregate to get unique chat_ids with metadata
+        pipeline = [
+            {"$match": query},
+            {
+                "$group": {
+                    "_id": "$chat_id",
+                    "latest_timestamp": {"$max": "$timestamp"},
+                    "message_count": {"$sum": 1},
+                    "subject_id": {"$first": "$subject_id"}
+                }
+            },
+            {"$sort": {"latest_timestamp": -1}}
+        ]
+        
+        chats = list(chat_service.collection.aggregate(pipeline))
+        chat_service.close()
+        
+        # Format response
+        formatted_chats = [
+            {
+                "chat_id": chat["_id"],
+                "subject_id": chat.get("subject_id"),
+                "latest_timestamp": chat["latest_timestamp"].isoformat(),
+                "message_count": chat["message_count"]
+            }
+            for chat in chats
+        ]
+        
+        return {
+            "user_id": user_id,
+            "subject_id": subject_id,
+            "chats": formatted_chats,
+            "total_chats": len(formatted_chats)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing user chats: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/chat/{user_id}/{chat_id}", response_model=DeleteChatResponse)
+async def delete_chat(
+    user_id: str,
+    chat_id: str,
+    subject_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete all messages for a specific chat.
+    
+    Deletes all messages for the given chat_id and user_id, optionally filtered by subject_id.
+    Requires JWT authentication via Bearer token.
+    
+    Args:
+        user_id: User identifier
+        chat_id: Chat session identifier to delete
+        subject_id: Optional subject identifier to filter deletion
+        current_user: Authenticated user information from JWT token
+        db: Database session for verification
+        
+    Returns:
+        DeleteChatResponse: Confirmation with number of deleted messages
+        
+    Raises:
+        HTTPException 401: If authentication fails
+        HTTPException 403: If user_id doesn't match authenticated user
+        HTTPException 500: If deletion fails
+    """
+    try:
+        # Verify user has permission to delete this chat
+        verify_user_access(
+            request_user_id=user_id,
+            token_user_id=current_user["user_id"]
+        )
+        
+        logger.info(
+            f"Deleting chat for user: {user_id}, "
+            f"chat: {chat_id}, subject: {subject_id}"
+        )
+        
+        # Get chat service and delete chat
+        chat_service = ChatService()
+        deleted_count = chat_service.delete_chat(
+            user_id=user_id,
+            chat_id=chat_id,
+            subject_id=subject_id
+        )
+        chat_service.close()
+        
+        return DeleteChatResponse(
+            user_id=user_id,
+            chat_id=chat_id,
+            subject_id=subject_id,
+            deleted_count=deleted_count,
+            message=f"Successfully deleted {deleted_count} messages"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error deleting chat: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

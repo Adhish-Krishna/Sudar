@@ -49,7 +49,9 @@ consumer = KafkaConsumer(
     value_deserializer=lambda m: json.loads(m.decode('utf-8')),
     auto_offset_reset='earliest',
     enable_auto_commit=True,
-    group_id='rag-worker-group'
+    group_id='rag-worker-group',
+    max_partition_fetch_bytes=104857600,  # 100 MB - increased from default 1MB
+    fetch_max_bytes=104857600  # 100 MB - maximum data returned per fetch
 )
 
 # Initialize Redis
@@ -60,9 +62,10 @@ redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=Tr
 def process_ingest_job(job_data):
     """
     Process an ingestion job: parse, chunk, embed, and store.
+    Retrieves file from MinIO instead of from Kafka message.
     
     Args:
-        job_data: Job data from Kafka
+        job_data: Job data from Kafka (metadata only)
     
     Returns:
         Result dict
@@ -70,9 +73,9 @@ def process_ingest_job(job_data):
     job_id = job_data["job_id"]
     user_id = job_data["user_id"]
     chat_id = job_data["chat_id"]
-    classroom_id = job_data["classroom_id"]
+    subject_id = job_data.get("subject_id")  # Use get() for optional field
     filename = job_data["filename"]
-    file_content = job_data["file_content"].encode('latin-1')  # Decode back
+    minio_object_name = job_data["minio_object_name"]
     content_type = job_data["content_type"]
     
     try:
@@ -81,10 +84,15 @@ def process_ingest_job(job_data):
             "status": "processing",
             "user_id": user_id,
             "chat_id": chat_id,
-            "classroom_id": classroom_id,
+            "subject_id": subject_id,
             "filename": filename,
             "updated_at": str(os.times()[4])
         }))
+        
+        # Retrieve file from MinIO
+        file_content = minio_storage.get_file(minio_object_name)
+        if not file_content:
+            raise ValueError(f"Failed to retrieve file from MinIO: {minio_object_name}")
         
         # Step 1: Parse document to markdown
         markdown_content = document_parser.parse(file_content, filename)
@@ -100,7 +108,7 @@ def process_ingest_job(job_data):
             chunks=chunks,
             user_id=user_id,
             chat_id=chat_id,
-            classroom_id=classroom_id,
+            subject_id=subject_id,  # Changed from subject_id to subject_id
             metadata={"filename": filename}
         )
         
@@ -109,7 +117,7 @@ def process_ingest_job(job_data):
             "status": "completed",
             "user_id": user_id,
             "chat_id": chat_id,
-            "classroom_id": classroom_id,
+            "subject_id": subject_id,  # Changed from subject_id to subject_id
             "filename": filename,
             "inserted_count": result["inserted_count"],
             "updated_at": str(os.times()[4])
@@ -123,7 +131,7 @@ def process_ingest_job(job_data):
             "status": "failed",
             "user_id": user_id,
             "chat_id": chat_id,
-            "classroom_id": classroom_id,
+            "subject_id": subject_id,  # Changed from subject_id to subject_id
             "filename": filename,
             "error": str(e),
             "updated_at": str(os.times()[4])

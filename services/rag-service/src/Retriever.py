@@ -91,7 +91,7 @@ class Retriever:
         user_id: str, 
         chat_id: str, 
         top_k: int = 5,
-        classroom_id: str = None,
+        subject_id: str = None,
         filenames: List[str] = None
     ) -> List[Dict[str, Any]]:
         """
@@ -102,7 +102,7 @@ class Retriever:
             user_id: The user ID to filter by
             chat_id: The chat ID to filter by
             top_k: Number of top results to return after reranking
-            classroom_id: Optional classroom ID to filter by classroom
+            subject_id: Optional subject ID to filter by subject
             filenames: Optional list of filenames to filter by (OR condition)
         
         Returns:
@@ -117,10 +117,10 @@ class Retriever:
             FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
         ]
         
-        # Add classroom_id filter if provided
-        if classroom_id:
+        # Add subject_id filter if provided
+        if subject_id:
             must_conditions.append(
-                FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
+                FieldCondition(key="subject_id", match=MatchValue(value=subject_id))
             )
         
         # Add filename filter if provided (OR condition)
@@ -164,7 +164,7 @@ class Retriever:
                 'metadata': {
                     'user_id': result.payload.get('user_id'),
                     'chat_id': result.payload.get('chat_id'),
-                    'classroom_id': result.payload.get('classroom_id'),
+                    'subject_id': result.payload.get('subject_id'),
                     'chunk_index': result.payload.get('chunk_index'),
                     'type': result.payload.get('type'),
                     'filename': result.payload.get('filename')
@@ -180,7 +180,7 @@ class Retriever:
         self, 
         user_id: str, 
         chat_id: str, 
-        classroom_id: str = None,
+        subject_id: str = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
@@ -189,7 +189,7 @@ class Retriever:
         Args:
             user_id: The user ID
             chat_id: The chat ID
-            classroom_id: Optional classroom ID to filter by classroom
+            subject_id: Optional classroom ID to filter by classroom
             limit: Maximum number of results to return
         
         Returns:
@@ -201,10 +201,10 @@ class Retriever:
             FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
         ]
         
-        # Add classroom_id filter if provided
-        if classroom_id:
+        # Add subject_id filter if provided
+        if subject_id:
             must_conditions.append(
-                FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
+                FieldCondition(key="subject_id", match=MatchValue(value=subject_id))
             )
         
         # Use scroll to get all points with filters
@@ -222,7 +222,7 @@ class Retriever:
                 'metadata': {
                     'user_id': result.payload.get('user_id'),
                     'chat_id': result.payload.get('chat_id'),
-                    'classroom_id': result.payload.get('classroom_id'),
+                    'subject_id': result.payload.get('subject_id'),
                     'chunk_index': result.payload.get('chunk_index'),
                     'type': result.payload.get('type')
                 }
