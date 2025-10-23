@@ -1,5 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './WorksheetGeneration.css';
+import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from '../../contexts/AuthContext';
+import { sudarAgent, ragService, documents as docsAPI } from '../../api';
+import type {
+  ChatRequest,
+  ChatMessage,
+  ChatMetadata,
+  SSEEvent,
+  MinioDocument,
+} from '../../api';
+import { IoAdd } from 'react-icons/io5';
+import { MdHistory, MdInsertDriveFile, MdAttachFile, MdSend, MdFullscreen, MdFullscreenExit } from 'react-icons/md';
+import { AiOutlineClose } from 'react-icons/ai';
 
 interface WorksheetGenerationProps {
   subjectName: string;
@@ -16,255 +29,393 @@ interface WorksheetHistory {
 }
 
 const WorksheetGeneration = ({ subjectName }: WorksheetGenerationProps) => {
-  const [topics, setTopics] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { user } = useAuth();
   const [mode, setMode] = useState<Mode>('worksheet');
-  const [showHistory, setShowHistory] = useState(false);
-  
-  // Mock history data - Replace with API call
-  const [history] = useState<WorksheetHistory[]>([
-    {
-      id: 1,
-      title: 'Mathematics - Algebra Basics',
-      topics: 'Linear equations, quadratic equations, polynomials',
-      date: '2024-01-15',
-      type: 'worksheet'
-    },
-    {
-      id: 2,
-      title: 'Science - Photosynthesis',
-      topics: 'Plant biology, chemical reactions, energy conversion',
-      date: '2024-01-14',
-      type: 'worksheet'
-    },
-    {
-      id: 3,
-      title: 'English - Grammar Exercises',
-      topics: 'Tenses, articles, prepositions',
-      date: '2024-01-13',
-      type: 'worksheet'
-    }
-  ]);
+  const [input, setInput] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string>('');
+  const [chatHistory, setChatHistory] = useState<ChatMetadata[]>([]);
+  const [inputDocuments, setInputDocuments] = useState<MinioDocument[]>([]);
+  const [outputDocuments, setOutputDocuments] = useState<MinioDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showChatHistory, setShowChatHistory] = useState(false);
+  const [showFiles, setShowFiles] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  const handleViewHistory = () => {
-    setShowHistory(!showHistory);
-    console.log('View worksheet history clicked');
+  // Initialize chat on component mount
+  useEffect(() => {
+    if (user?.teacher_id) {
+      initializeChat();
+      fetchChatHistory();
+    }
+  }, [user?.teacher_id]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const initializeChat = () => {
+    const newChatId = uuidv4();
+    setCurrentChatId(newChatId);
+    setChatMessages([]);
   };
 
-  const handleGenerate = async () => {
-    if (!topics.trim()) return;
+  const fetchChatHistory = async () => {
+    if (!user?.teacher_id) return;
     
-    setIsGenerating(true);
-    
-    // TODO: API call to generate worksheet or content based on mode
-    if (mode === 'worksheet') {
-      console.log('Generating worksheet for topics:', topics);
-      console.log('Subject:', subjectName);
-    } else {
-      console.log('Creating content for:', topics);
-      console.log('Subject:', subjectName);
+    try {
+      const response = await sudarAgent.getChats(user.teacher_id, subjectName);
+      if (response.chats && Array.isArray(response.chats)) {
+        setChatHistory(response.chats);
+      }
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
     }
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      setIsGenerating(false);
-      const message = mode === 'worksheet' 
-        ? 'Worksheet generation feature coming soon!' 
-        : 'Content creation feature coming soon!';
-      alert(message);
-    }, 2000);
   };
 
-  const handleAttachFiles = () => {
-    // TODO: Implement file attachment functionality
-    console.log('Attach files clicked');
-    alert('File attachment feature coming soon!');
+  const fetchDocuments = async () => {
+    if (!user?.teacher_id || !currentChatId) return;
+
+    try {
+      const [inputRes, outputRes] = await Promise.all([
+        docsAPI.getInputDocuments(user.teacher_id, subjectName, currentChatId),
+        docsAPI.getOutputDocuments(user.teacher_id, subjectName, currentChatId),
+      ]);
+
+      if (inputRes.documents) {
+        setInputDocuments(inputRes.documents);
+      }
+      if (outputRes.documents) {
+        setOutputDocuments(outputRes.documents);
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!input.trim() || !user?.teacher_id || !currentChatId) return;
+
+    const userMessage: ChatMessage = {
+      _id: uuidv4(),
+      user_id: user.teacher_id,
+      chat_id: currentChatId,
+      subject_id: subjectName,
+      role: 'user',
+      content: input,
+      timestamp: new Date().toISOString(),
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const chatRequest: ChatRequest = {
+        user_id: user.teacher_id,
+        chat_id: currentChatId,
+        subject_id: subjectName,
+        query: input,
+      };
+
+      const aiMessage: ChatMessage = {
+        _id: uuidv4(),
+        user_id: user.teacher_id,
+        chat_id: currentChatId,
+        subject_id: subjectName,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+      };
+
+      setChatMessages(prev => [...prev, aiMessage]);
+
+      const stopStream = await sudarAgent.streamChat(chatRequest, {
+        onEvent: (event: SSEEvent) => {
+          if (event.type === 'token') {
+            setChatMessages(prev => {
+              const updated = [...prev];
+              const lastMsg = updated[updated.length - 1];
+              if (lastMsg.role === 'assistant') {
+                lastMsg.content += event.content;
+              }
+              return updated;
+            });
+          } else if (event.type === 'done') {
+            setIsLoading(false);
+            fetchChatHistory();
+          } else if (event.type === 'error') {
+            console.error('Chat error:', event.content);
+            setIsLoading(false);
+          }
+        },
+        onError: (err) => {
+          console.error('Streaming error:', err);
+          setIsLoading(false);
+        },
+      });
+
+      return stopStream;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    initializeChat();
+    fetchChatHistory();
+  };
+
+  const handleHistoryClick = (chatMetadata: ChatMetadata) => {
+    setCurrentChatId(chatMetadata.chat_id);
+    setShowChatHistory(false);
+    // Fetch messages for this chat
+    fetchChatMessagesForChat(chatMetadata.chat_id);
+  };
+
+  const fetchChatMessagesForChat = async (chatId: string) => {
+    if (!user?.teacher_id) return;
+
+    try {
+      const messages = await sudarAgent.getChatHistory(chatId, user.teacher_id, subjectName);
+      if (Array.isArray(messages)) {
+        setChatMessages(messages);
+      }
+    } catch (error) {
+      console.error('Error fetching chat messages:', error);
+    }
+  };
+
+  const handleFileAttach = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const filesArray = Array.from(event.target.files);
+      setAttachedFiles(prev => [...prev, ...filesArray]);
+      uploadFiles(filesArray);
+    }
+  };
+
+  const uploadFiles = async (files: File[]) => {
+    if (!user?.teacher_id || !currentChatId) return;
+
+    for (const file of files) {
+      try {
+        const response = await ragService.ingestDocument(
+          file,
+          user.teacher_id,
+          currentChatId,
+          subjectName
+        );
+        
+        if (response.job_id) {
+          // Check job status periodically
+          checkJobStatus(response.job_id);
+        }
+      } catch (error) {
+        console.error(`Error uploading file ${file.name}:`, error);
+      }
+    }
+  };
+
+  const checkJobStatus = async (jobId: string) => {
+    try {
+      const status = await ragService.getJobStatus(jobId);
+      if (status.status === 'completed') {
+        fetchDocuments();
+      } else if (status.status === 'failed') {
+        console.error('Job failed:', jobId);
+      }
+    } catch (error) {
+      console.error('Error checking job status:', error);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(prev => !prev);
   };
 
   return (
-    <div className="worksheet-generation">
-      <div className="worksheet-container">
-        <div className="greeting-section">
-          <h2 className="greeting-title">
-            Hi, <span className="educator-highlight">Educator</span> !
-          </h2>
-          
-          {/* History Button - Only show in worksheet mode */}
-          {mode === 'worksheet' && (
-            <button 
-              onClick={handleViewHistory}
-              className="history-button"
-              title="View Previous Worksheets"
-            >
-              <svg className="history-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span className="history-badge">3</span>
-            </button>
+    <div className={`chat-container ${isFullscreen ? 'chat-fullscreen' : ''}`}>
+      {/* Top Navigation */}
+      <div className="chat-header">
+        <button className="chat-header-btn" onClick={toggleFullscreen}>
+          {isFullscreen ? (
+            <>
+              <MdFullscreenExit className="chat-header-icon" />
+              Exit Fullscreen
+            </>
+          ) : (
+            <>
+              <MdFullscreen className="chat-header-icon" />
+              Expand
+            </>
           )}
-        </div>
+        </button>
+        <button className="chat-header-btn" onClick={handleNewChat}>
+          <IoAdd className="chat-header-icon" />
+          New Chat
+        </button>
+        <button className="chat-header-btn" onClick={() => setShowChatHistory(!showChatHistory)}>
+          <MdHistory className="chat-header-icon" />
+          History
+        </button>
+        <button className="chat-header-btn" onClick={() => { fetchDocuments(); setShowFiles(!showFiles); }}>
+          <MdInsertDriveFile className="chat-header-icon" />
+          Files
+        </button>
+      </div>
 
-        {/* Mode Switcher */}
-        <div className="mode-switcher">
-          <button 
-            className={`mode-button ${mode === 'worksheet' ? 'active' : ''}`}
-            onClick={() => setMode('worksheet')}
-          >
-            <svg className="mode-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Generate Worksheet
-          </button>
-          
-          <button 
-            className={`mode-button ${mode === 'content' ? 'active' : ''}`}
-            onClick={() => setMode('content')}
-          >
-            <svg className="mode-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Create Content
-          </button>
-        </div>
-
-        <div className="input-section">
-          <div className="chat-input-container">
-            <textarea
-              value={topics}
-              onChange={(e) => setTopics(e.target.value)}
-              placeholder={
-                mode === 'worksheet' 
-                  ? "List down the topics to generate the worksheet." 
-                  : "Describe the content you want to create or concepts you want to explain."
-              }
-              className="topics-input"
-              rows={4}
-            />
-            
-            <div className="input-actions">
-              <button 
-                onClick={handleAttachFiles}
-                className="attach-button"
-                title="Attach Files"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="attach-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-                Attach Files
-              </button>
-              
-              <button 
-                onClick={handleGenerate}
-                disabled={!topics.trim() || isGenerating}
-                className="generate-button"
-                title={mode === 'worksheet' ? "Generate Worksheet" : "Create Content"}
-              >
-                {isGenerating ? (
-                  <div className="loading-spinner"></div>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="send-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                )}
-              </button>
-            </div>
+      {/* Chat Content Area */}
+      <div className="chat-content" ref={contentRef}>
+        {/* Chat History Sidebar */}
+        {showChatHistory && (
+          <div className="chat-history-panel">
+            <h3>Chat History</h3>
+            {chatHistory.length > 0 ? (
+              <div className="chat-history-list">
+                {chatHistory.map((chat) => (
+                  <button
+                    key={chat.chat_id}
+                    className={`chat-history-item ${currentChatId === chat.chat_id ? 'active' : ''}`}
+                    onClick={() => handleHistoryClick(chat)}
+                  >
+                    <span className="chat-history-title">{new Date(chat.latest_timestamp).toLocaleString()}</span>
+                    <span className="chat-history-count">{chat.message_count} messages</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="chat-history-empty">No chat history</p>
+            )}
           </div>
-        </div>
+        )}
 
-        <div className="info-section">
-          <p className="info-text">
-            <strong>Subject:</strong> {subjectName}
-          </p>
-          <p className="info-text">
-            {mode === 'worksheet' ? '📝' : '✍️'} <em>
-              {mode === 'worksheet' 
-                ? 'Worksheet generation functionality will be implemented with AI integration.' 
-                : 'Content creation functionality will be implemented with AI assistance.'}
-            </em>
-          </p>
-        </div>
-
-        {/* History Modal */}
-        {showHistory && (
-          <div className="history-overlay" onClick={handleViewHistory}>
-            <div className="history-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="history-header">
-                <h3>Previously Generated Worksheets</h3>
-                <button 
-                  className="close-button"
-                  onClick={handleViewHistory}
-                  title="Close"
-                >
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="history-content">
-                {history.length === 0 ? (
-                  <div className="no-history">
-                    <svg className="no-history-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p>No worksheets generated yet</p>
-                  </div>
-                ) : (
-                  <div className="history-list">
-                    {history.map((item) => (
-                      <div key={item.id} className="history-item">
-                        <div className="history-item-header">
-                          <h4>{item.title}</h4>
-                          <span className="history-date">
-                            {new Date(item.date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </span>
-                        </div>
-                        <p className="history-topics">{item.topics}</p>
-                        <div className="history-actions">
-                          <button 
-                            className="history-action-btn view-btn"
-                            onClick={() => console.log('View worksheet:', item.id)}
-                            title="View Worksheet"
-                          >
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            View
-                          </button>
-                          <button 
-                            className="history-action-btn download-btn"
-                            onClick={() => console.log('Download worksheet:', item.id)}
-                            title="Download Worksheet"
-                          >
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download
-                          </button>
-                          <button 
-                            className="history-action-btn delete-btn"
-                            onClick={() => console.log('Delete worksheet:', item.id)}
-                            title="Delete Worksheet"
-                          >
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+        {/* Files Panel */}
+        {showFiles && (
+          <div className="chat-files-panel">
+            <h3>Files</h3>
+            <div className="chat-files-section">
+              <h4>Input Files</h4>
+              {inputDocuments.length > 0 ? (
+                <div className="chat-files-list">
+                  {inputDocuments.map((doc) => (
+                    <div key={doc.name} className="chat-file-list-item">
+                      <MdInsertDriveFile />
+                      <span>{doc.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="chat-files-empty">No input files</p>
+              )}
+            </div>
+            <div className="chat-files-section">
+              <h4>Output Files</h4>
+              {outputDocuments.length > 0 ? (
+                <div className="chat-files-list">
+                  {outputDocuments.map((doc) => (
+                    <div key={doc.name} className="chat-file-list-item">
+                      <MdInsertDriveFile />
+                      <span>{doc.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="chat-files-empty">No output files</p>
+              )}
             </div>
           </div>
         )}
+        {/* File Attachments Display */}
+        {attachedFiles.length > 0 && (
+          <div className="chat-files-display">
+            {attachedFiles.map((file, index) => (
+              <div key={index} className="chat-file-item">
+                <MdInsertDriveFile className="chat-file-icon" />
+                <div className="chat-file-info">
+                  <div className="chat-file-name">{file.name}</div>
+                  <button 
+                    className="chat-file-remove"
+                    onClick={() => removeFile(index)}
+                  >
+                    <AiOutlineClose />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Chat Messages */}
+        <div className="chat-messages">
+          {chatMessages.length === 0 ? (
+            <div className="chat-empty-state">
+              <p>Start a new conversation</p>
+            </div>
+          ) : (
+            chatMessages.map((message) => (
+              <div key={message._id} className="chat-message-group">
+                {message.role === 'user' ? (
+                  <div className="chat-message chat-message-user">
+                    {message.content}
+                  </div>
+                ) : (
+                  <div className="chat-message chat-message-ai">
+                    {message.content}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+          {isLoading && (
+            <div className="chat-loading">
+              <div className="chat-loading-dot"></div>
+              <div className="chat-loading-dot"></div>
+              <div className="chat-loading-dot"></div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Input Area */}
+      <div className="chat-input-container">
+        <form className="chat-input-wrapper" onSubmit={handleSendMessage}>
+          <input
+            type="text"
+            className="chat-input"
+            placeholder="Ask Sudar AI"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isLoading}
+          />
+          <div className="chat-input-actions">
+            <label className="chat-attach-btn">
+              <input
+                type="file"
+                multiple
+                onChange={handleFileAttach}
+                style={{ display: 'none' }}
+                disabled={isLoading}
+              />
+              <MdAttachFile />
+              Attach Files
+            </label>
+            <button className="chat-send-btn" type="submit" disabled={isLoading || !input.trim()}>
+              <MdSend className="chat-send-icon" />
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

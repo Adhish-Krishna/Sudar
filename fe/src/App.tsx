@@ -6,11 +6,6 @@ import ForgotPassword from './pages/login/ForgotPassword.tsx';
 import SignUp from './pages/login/SignUp.tsx';
 import Home from './pages/home/home';
 import Classroom from './pages/classroom/Classroom';
-import Classes from './pages/classes/Classes';
-// Add this import at the top with other component imports
-import ClassSubjects from './pages/classSubjects/ClassSubjects';
-import ManageStudents from './pages/students/ManageStudents';
-import DoubtClearance from './pages/doubtClearance/DoubtClearance';
 import SubjectPage from './pages/subject/SubjectPage';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -47,64 +42,11 @@ function App() {
               } 
             />
             <Route 
-              path="/classes" 
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <Classes />
-                  </MainLayout>
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/classes/:classId/subjects" 
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <ClassSubjects />
-                  </MainLayout>
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
               path="/classroom/:classroomId/subject/:subjectId" 
               element={
                 <ProtectedRoute>
                   <MainLayout>
                     <SubjectPage />
-                  </MainLayout>
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/students" 
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <ManageStudents />
-                  </MainLayout>
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/doubt-clearance" 
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <DoubtClearance />
-                  </MainLayout>
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/ai-character" 
-              element={
-                <ProtectedRoute>
-                  <MainLayout>
-                    <div style={{padding: '2rem', textAlign: 'center', color: 'var(--text-color)'}}>
-                      <h1>AI Character</h1>
-                      <p>Coming Soon...</p>
-                    </div>
                   </MainLayout>
                 </ProtectedRoute>
               } 

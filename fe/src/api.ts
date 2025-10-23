@@ -144,6 +144,112 @@ export interface ActivityResponse {
   files: FileResponse[];
 }
 
+// ============= MinIO / Documents Interfaces =============
+export interface MinioDocument {
+  name: string;
+  size: number;
+  last_modified: string | null;
+}
+
+export interface DocumentListResponse {
+  bucket: string;
+  prefix: string;
+  documents: MinioDocument[];
+  count: number;
+}
+
+// ============= Sudar Agent Chat Interfaces =============
+export interface ChatRequest {
+  user_id: string;
+  chat_id: string;
+  subject_id?: string | null;
+  query: string;
+}
+
+export interface ChatResponse {
+  user_id: string;
+  chat_id: string;
+  subject_id?: string | null;
+  response: string;
+}
+
+export interface ChatMetadata {
+  chat_id: string;
+  subject_id?: string | null;
+  latest_timestamp: string;
+  message_count: number;
+}
+
+export interface ListChatsResponse {
+  user_id: string;
+  subject_id?: string | null;
+  chats: ChatMetadata[];
+  total_chats: number;
+}
+
+export interface DeleteChatResponse {
+  user_id: string;
+  chat_id: string;
+  subject_id?: string | null;
+  deleted_count: number;
+  message: string;
+}
+
+export interface ChatMessage {
+  _id: string;
+  user_id: string;
+  chat_id: string;
+  subject_id?: string | null;
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
+export type SSEEventType = 'start' | 'token' | 'done' | 'error' | string;
+export interface SSEEvent {
+  type: SSEEventType;
+  content: string;
+}
+
+// ============= RAG Service Interfaces =============
+export interface IngestResponse {
+  status: string;
+  message: string;
+  job_id: string;
+  user_id: string;
+  chat_id: string;
+  classroom_id?: string | null;
+  filename: string;
+}
+
+export interface RetrievalRequest {
+  query: string;
+  user_id: string;
+  chat_id: string;
+  subject_id?: string | null;
+  top_k?: number;
+  filenames?: string[] | null;
+}
+
+export interface RetrievalResponse {
+  status: string;
+  query: string;
+  user_id: string;
+  chat_id: string;
+  classroom_id?: string | null;
+  results: any[];
+  count: number;
+}
+
+export interface ListChunksResponse {
+  status: string;
+  user_id: string;
+  chat_id: string;
+  classroom_id?: string | null;
+  chunks: any[];
+  count: number;
+}
+
 
 export const authAPI = {
   signUp : async (body: SignUp): Promise<SignUpSuccRes | any>=>{
@@ -733,4 +839,363 @@ export const activities = {
     }
   },
 }
+
+export const documents = {
+  // List input bucket documents for a user/classroom/chat
+  getInputDocuments: async (
+    userId: string,
+    subjectId: string,
+    chatId: string
+  ): Promise<DocumentListResponse | any> => {
+    try {
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/documents/input-documents/${userId}/${subjectId}/${chatId}`
+      );
+      if (response.status == 200) {
+        return response.data as DocumentListResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message:
+          error.response?.data?.message || error.message || "Get input documents failed",
+      };
+    }
+  },
+
+  // List output bucket documents for a user/classroom/chat
+  getOutputDocuments: async (
+    userId: string,
+    subjectId: string,
+    chatId: string
+  ): Promise<DocumentListResponse | any> => {
+    try {
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/documents/output-documents/${userId}/${subjectId}/${chatId}`
+      );
+      if (response.status == 200) {
+        return response.data as DocumentListResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message:
+          error.response?.data?.message || error.message || "Get output documents failed",
+      };
+    }
+  },
+
+  // Download a document from either input or output bucket. Returns blob and filename.
+  downloadDocument: async (
+    bucketType: 'input' | 'output',
+    documentName: string
+  ): Promise<{ blob: Blob; filename: string } | any> => {
+    try {
+      // Encode each segment of the path to preserve slashes while encoding special characters
+      const safeName = documentName.split('/').map(encodeURIComponent).join('/');
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/documents/download/${bucketType}/${safeName}`,
+        { responseType: 'blob' }
+      );
+
+      if (response.status == 200) {
+        // Try to extract filename from Content-Disposition header if available
+        const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+        let filename = documentName.split('/').pop() || 'download';
+        if (contentDisposition) {
+          const matches = /filename="?([^";]+)"?/.exec(contentDisposition);
+          if (matches && matches[1]) filename = matches[1];
+        }
+        return { blob: response.data as Blob, filename };
+      } else {
+        return {
+          status: response.status,
+          message: response.data,
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || "Download document failed",
+      };
+    }
+  },
+};
+
+const AGENT_BASE = `${API_BASE_URL}/agent/api`;
+
+// Helper to POST and stream SSE (Server Sent Events) from a POST endpoint
+async function streamSSEPost(
+  url: string,
+  body: unknown,
+  onEvent: (ev: SSEEvent) => void,
+  onError?: (err: any) => void
+): Promise<() => void> {
+  const controller = new AbortController();
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!res.ok || !res.body) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Network error: ${res.status} ${text}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buf = '';
+
+    const processBuffer = () => {
+      // split on double-newline (SSE event boundary)
+      let boundary = buf.indexOf('\n\n');
+      while (boundary === -1 && buf.indexOf('\r\n\r\n') !== -1) {
+        boundary = buf.indexOf('\r\n\r\n');
+      }
+      while (boundary !== -1) {
+        const rawEvent = buf.slice(0, boundary);
+        buf = buf.slice(boundary + (buf[boundary] === '\r' ? 4 : 2));
+
+        const lines = rawEvent.split(/\r?\n/);
+        const dataLines: string[] = [];
+        for (const l of lines) {
+          const idx = l.indexOf('data:');
+          if (idx !== -1) dataLines.push(l.slice(idx + 5).trim());
+        }
+        if (dataLines.length === 0) {
+          boundary = buf.indexOf('\n\n');
+          continue;
+        }
+        const dataStr = dataLines.join('\n');
+
+        // Try to parse JSON; fall back to string parsing for Python-like dicts
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(dataStr);
+        } catch (e) {
+          // Convert Python-style single-quoted dicts to JSON-ish string
+          try {
+            let s = dataStr;
+            s = s.replace(/\bNone\b/g, 'null');
+            s = s.replace(/\bTrue\b/g, 'true');
+            s = s.replace(/\bFalse\b/g, 'false');
+            // keys: 'key': -> "key":
+            s = s.replace(/([\{,\s])'([^']+?)'\s*:/g, '$1"$2":');
+            // values: : 'value' -> : "value"
+            s = s.replace(/:\s*'([^']*?)'(?=[,}])/g, ': "$1"');
+            parsed = JSON.parse(s);
+          } catch (e2) {
+            parsed = null;
+          }
+        }
+
+        if (parsed && typeof parsed === 'object' && 'type' in parsed) {
+          onEvent({ type: parsed.type, content: parsed.content ?? '' });
+        } else {
+          // Raw text fallback
+          onEvent({ type: 'message', content: dataStr });
+        }
+
+        boundary = buf.indexOf('\n\n');
+      }
+    };
+
+    // read loop
+    (async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          processBuffer();
+        }
+        // final
+        buf += decoder.decode();
+        processBuffer();
+      } catch (err) {
+        if (onError) onError(err);
+      }
+    })();
+
+    return () => controller.abort();
+  } catch (err) {
+    if (onError) onError(err);
+    return () => controller.abort();
+  }
+}
+
+export const sudarAgent = {
+  streamChat: async (
+    request: ChatRequest,
+    handlers: {
+      onEvent: (ev: SSEEvent) => void;
+      onError?: (err: any) => void;
+    }
+  ): Promise<() => void> => {
+    const url = `${AGENT_BASE}/chat`;
+    return streamSSEPost(url, request, handlers.onEvent, handlers.onError);
+  },
+
+  chatSync: async (request: ChatRequest): Promise<ChatResponse | any> => {
+    try {
+      const response = await apiClient.post(`${AGENT_BASE}/chat/sync`, request);
+      if (response.status === 200) return response.data as ChatResponse;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Chat sync failed' };
+    }
+  },
+
+  getChats: async (userId: string, subjectId?: string | null): Promise<ListChatsResponse | any> => {
+    try {
+      let url = `${AGENT_BASE}/chat/list/${userId}`;
+      const params: any = {};
+      if (subjectId) params.subject_id = subjectId;
+      const response = await apiClient.get(url, { params });
+      if (response.status === 200) return response.data as ListChatsResponse;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Get chats failed' };
+    }
+  },
+
+  getChatHistory: async (
+    chatId: string,
+    userId: string,
+    subjectId?: string | null,
+    limit?: number
+  ): Promise<ChatMessage[] | any> => {
+    try {
+      let url = `${AGENT_BASE}/chat/history/${userId}/${chatId}`;
+      const params: any = {};
+      if (subjectId) params.subject_id = subjectId;
+      if (limit) params.limit = limit;
+      const response = await apiClient.get(url, { params });
+      if (response.status === 200) return response.data.messages as ChatMessage[];
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Get chat history failed' };
+    }
+  },
+
+  deleteChat: async (chatId: string, userId: string, subjectId?: string | null): Promise<DeleteChatResponse | any> => {
+    try {
+      let url = `${AGENT_BASE}/chat/${userId}/${chatId}`;
+      const params: any = {};
+      if (subjectId) params.subject_id = subjectId;
+      const response = await apiClient.delete(url, { params });
+      if (response.status === 200) return response.data as DeleteChatResponse;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Delete chat failed' };
+    }
+  },
+
+  health: async (): Promise<any> => {
+    try {
+      const response = await apiClient.get(`${API_BASE_URL}/agent/health`);
+      if (response.status === 200) return response.data;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Agent health check failed' };
+    }
+  }
+};
+
+const RAG_BASE = `${API_BASE_URL}/rag`;
+
+export const ragService = {
+  ingestDocument: async (
+    file: File,
+    userId: string,
+    chatId: string,
+    subjectId?: string | null
+  ): Promise<IngestResponse | any> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('user_id', userId);
+      formData.append('chat_id', chatId);
+      if (subjectId) formData.append('subject_id', subjectId);
+
+      // Let axios set the Content-Type for FormData automatically
+      const response = await apiClient.post(`${RAG_BASE}/ingest`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (response.status === 200) return response.data as IngestResponse;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Ingest failed' };
+    }
+  },
+
+  getJobStatus: async (jobId: string): Promise<any> => {
+    try {
+      const response = await apiClient.get(`${RAG_BASE}/job-status/${jobId}`);
+      if (response.status === 200) return response.data;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Get job status failed' };
+    }
+  },
+
+  retrieveContext: async (request: RetrievalRequest): Promise<RetrievalResponse | any> => {
+    try {
+      const response = await apiClient.post(`${RAG_BASE}/retrieve`, request);
+      if (response.status === 200) return response.data as RetrievalResponse;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Retrieve failed' };
+    }
+  },
+
+  deleteChatData: async (userId: string, chatId: string, subjectId?: string | null): Promise<any> => {
+    try {
+      const params: any = {};
+      if (subjectId) params.classroom_id = subjectId;
+      const response = await apiClient.delete(`${RAG_BASE}/delete/${userId}/${chatId}`, { params });
+      if (response.status === 200) return response.data;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Delete chat data failed' };
+    }
+  },
+
+  listChatChunks: async (userId: string, chatId: string, subjectId?: string | null, limit?: number): Promise<ListChunksResponse | any> => {
+    try {
+      const params: any = {};
+      if (subjectId) params.classroom_id = subjectId;
+      if (limit) params.limit = limit;
+      const response = await apiClient.get(`${RAG_BASE}/list/${userId}/${chatId}`, { params });
+      if (response.status === 200) return response.data as ListChunksResponse;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'List chunks failed' };
+    }
+  },
+
+  health: async (): Promise<any> => {
+    try {
+      const response = await apiClient.get(`${RAG_BASE}/health`);
+      if (response.status === 200) return response.data;
+      return { status: response.status, message: response.data };
+    } catch (error: any) {
+      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'RAG health check failed' };
+    }
+  }
+};
 
