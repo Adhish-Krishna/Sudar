@@ -1,0 +1,1 @@
+## Frontend application for Sudar AI
