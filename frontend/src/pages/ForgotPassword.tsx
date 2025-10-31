@@ -25,6 +25,7 @@ const ForgotPassword = ()=>{
     const [email, setEmail] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [passwordMismatch, setPasswordMismatch] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
@@ -36,15 +37,23 @@ const ForgotPassword = ()=>{
         setError("");
         setSuccess("");
 
+        // Validate all fields are filled
+        if (!email.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+            toast.error("Please fill in all fields");
+            return;
+        }
+
         // Validate passwords match
         if (newPassword !== confirmPassword) {
             setError("Passwords do not match");
+            toast.error("Passwords do not match");
             return;
         }
 
         // Validate password length
         if (newPassword.length < 8) {
             setError("Password must be at least 8 characters long");
+            toast.error("Password must be at least 8 characters long");
             return;
         }
 
@@ -147,7 +156,15 @@ const ForgotPassword = ()=>{
                                             placeholder="••••••••"
                                             className="h-10"
                                             value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            onChange={(e) => {
+                                                setNewPassword(e.target.value);
+                                                // Check if passwords match when new password changes
+                                                if (confirmPassword && e.target.value !== confirmPassword) {
+                                                    setPasswordMismatch(true);
+                                                } else {
+                                                    setPasswordMismatch(false);
+                                                }
+                                            }}
                                             required
                                         />
                                     </div>
@@ -157,11 +174,22 @@ const ForgotPassword = ()=>{
                                             id="confirm-password"
                                             type="password"
                                             placeholder="••••••••"
-                                            className="h-10"
+                                            className={`h-10 ${passwordMismatch ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                             value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            onChange={(e) => {
+                                                setConfirmPassword(e.target.value);
+                                                // Check if passwords match
+                                                if (newPassword && e.target.value !== newPassword) {
+                                                    setPasswordMismatch(true);
+                                                } else {
+                                                    setPasswordMismatch(false);
+                                                }
+                                            }}
                                             required
                                         />
+                                        {passwordMismatch && confirmPassword && (
+                                            <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                                        )}
                                     </div>
                                 </div>
                             </form>

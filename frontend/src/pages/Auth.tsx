@@ -52,6 +52,12 @@ export function Auth() {
 		e.preventDefault();
 		setError("");
 		
+		// Validate all fields are filled
+		if (!signupData.teacher_name.trim() || !signupData.email.trim() || !signupData.password.trim()) {
+			toast.error("Please fill in all fields");
+			return;
+		}
+		
 		// First, request verification email
 		setLoading(true);
 		try {
@@ -108,6 +114,13 @@ export function Auth() {
 	const handleLogin = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setError("");
+		
+		// Validate all fields are filled
+		if (!loginData.email.trim() || !loginData.password.trim()) {
+			toast.error("Please fill in all fields");
+			return;
+		}
+		
 		setLoading(true);
 		try {
 			const result = await login(loginData);

@@ -10,6 +10,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
 
 interface VerificationDialogProps {
   open: boolean;
@@ -44,28 +49,23 @@ export function VerificationDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex justify-center items-center flex-col">
           <div className="grid gap-4 py-4">
-            {error && (
-              <div className="text-sm text-red-500 text-center p-2 bg-red-50 dark:bg-red-950/20 rounded">
-                {error}
-              </div>
-            )}
             <div className="grid gap-2">
-              <Label htmlFor="verification-code" className="text-sm font-medium">
-                Enter Code
-              </Label>
-              <Input
-                id="verification-code"
-                type="text"
-                placeholder="Enter 6-digit code"
-                className="h-10"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
+              <InputOTP
                 maxLength={6}
-                pattern="[0-9]{6}"
-                required
-              />
+                value={code}
+                onChange={(value) => setCode(value)}
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} className="h-10 w-10"/>
+                  <InputOTPSlot index={1} className="h-10 w-10" />
+                  <InputOTPSlot index={2} className="h-10 w-10" />
+                  <InputOTPSlot index={3} className="h-10 w-10" />
+                  <InputOTPSlot index={4} className="h-10 w-10" />
+                  <InputOTPSlot index={5}className="h-10 w-10" />
+                </InputOTPGroup>
+              </InputOTP>
             </div>
           </div>
           <DialogFooter>
