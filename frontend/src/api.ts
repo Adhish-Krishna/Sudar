@@ -254,13 +254,13 @@ export const authAPI = {
         else{
           return {
             "status": response.status,
-            "message": response.data
+            "message": response.data?.message || response.data?.detail || "Signup failed"
           }
         }
       } catch (error: any) {
         return {
           "status": error.response?.status || 500,
-          "message": error.response?.data?.message || error.message || "Signup failed"
+          "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Signup failed"
         }
       }
   },
@@ -273,13 +273,13 @@ export const authAPI = {
       else{
         return {
           "status": response.status,
-          "message": response.data
+          "message": response.data?.message || response.data?.detail || "Email verification failed"
         }
       }
     } catch (error: any) {
       return {
         "status": error.response?.status || 500,
-        "message": error.response?.data?.message || error.message || "Email verification failed"
+        "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Email verification failed"
       }
     }
   },
@@ -292,13 +292,13 @@ export const authAPI = {
       else{
         return {
           "status": response.status,
-          "message": response.data
+          "message": response.data?.message || response.data?.detail || "Login failed"
         }
       }
     } catch (error: any) {
       return {
         "status": error.response?.status || 500,
-        "message": error.response?.data?.message || error.message || "Login failed"
+        "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Login failed"
       }
     }
   },
@@ -311,13 +311,13 @@ export const authAPI = {
       else{
         return {
           "status": response.status,
-          "message": response.data
+          "message": response.data?.message || response.data?.detail || "Forgot password failed"
         }
       }
     } catch (error: any) {
       return {
         "status": error.response?.status || 500,
-        "message": error.response?.data?.message || error.message || "Forgot password failed"
+        "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Forgot password failed"
       }
     }
   },
@@ -330,13 +330,13 @@ export const authAPI = {
       else{
         return {
           "status": response.status,
-          "message": response.data
+          "message": response.data?.message || response.data?.detail || "Password reset failed"
         }
       }
     } catch (error: any) {
       return {
         "status": error.response?.status || 500,
-        "message": error.response?.data?.message || error.message || "Password reset failed"
+        "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Password reset failed"
       }
     }
   },
@@ -349,14 +349,14 @@ export const authAPI = {
       else{
         return {
             "status": response.status,
-            "message": response.data
+            "message": response.data?.message || response.data?.detail || "Authentication check failed"
         }
       }
     } catch (error: any) {
       // Handle axios errors (401, 403, network errors, etc.)
       return {
         "status": error.response?.status || 500,
-        "message": error.response?.data?.message || error.message || "Authentication check failed"
+        "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Authentication check failed"
       }
     }
   },
@@ -369,13 +369,13 @@ export const authAPI = {
       else{
         return {
             "status": response.status,
-            "message": response.data
+            "message": response.data?.message || response.data?.detail || "Logout failed"
         }
       }
     } catch (error: any) {
       return {
         "status": error.response?.status || 500,
-        "message": error.response?.data?.message || error.message || "Logout failed"
+        "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Logout failed"
       }
     }
   }

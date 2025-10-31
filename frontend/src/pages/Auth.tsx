@@ -18,20 +18,128 @@ import {
 import { TextHoverEffect } from "@/components/ui/animated-border-text"
 import { useTheme } from "@/contexts/ThemeProvider"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+import { useAuth } from "@/contexts/AuthContext"
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { VerificationDialog } from "@/components/VerificationDialog"
+import { toast } from "sonner"
 
 
 export function Auth() {
 	const {theme} = useTheme();
+	const { login, signup, verifyEmail } = useAuth();
+	const navigate = useNavigate();
+	const [error, setError] = useState<string>("");
+	const [loading, setLoading] = useState<boolean>(false);
+	const [showVerificationDialog, setShowVerificationDialog] = useState<boolean>(false);
+	const [verificationError, setVerificationError] = useState<string>("");
+
+	// Signup form state
+	const [signupData, setSignupData] = useState({
+		teacher_name: "",
+		email: "",
+		password: "",
+		verification_code: ""
+	});
+
+	// Login form state
+	const [loginData, setLoginData] = useState({
+		email: "",
+		password: ""
+	});
+
+	const handleSignupClick = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setError("");
+		
+		// First, request verification email
+		setLoading(true);
+		try {
+			const result = await verifyEmail({
+				email: signupData.email,
+				teacher_name: signupData.teacher_name
+			});
+			
+			// Check for error response
+			if (result.status && result.status !== 200) {
+				throw new Error(result.message);
+			}
+			
+			// Show success message from backend
+			const successMessage = result.message || "Verification code sent to your email!";
+			toast.success(successMessage);
+			setLoading(false);
+			// Open verification dialog after successfully sending the code
+			setShowVerificationDialog(true);
+		} catch (err: any) {
+			setLoading(false);
+			const errorMessage = err.message || "Failed to send verification code. Please try again.";
+			setError(errorMessage);
+			toast.error(errorMessage);
+		}
+	};
+
+	const handleVerifyAndSignup = async (code: string) => {
+		setVerificationError("");
+		setLoading(true);
+		try {
+			const result = await signup({...signupData, verification_code: code});
+			
+			// Check for error response
+			if (result.status && result.status !== 201) {
+				throw new Error(result.message);
+			}
+			
+			setShowVerificationDialog(false);
+			// Show success message from backend
+			const successMessage = result.message || "Account created successfully!";
+			toast.success(successMessage);
+			// Navigate to home or dashboard after successful signup
+			navigate("/");
+		} catch (err: any) {
+			const errorMessage = err.message || "Signup failed. Please try again.";
+			setVerificationError(errorMessage);
+			toast.error(errorMessage);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleLogin = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setError("");
+		setLoading(true);
+		try {
+			const result = await login(loginData);
+			
+			// Check for error response
+			if (result.status && result.status !== 200) {
+				throw new Error(result.message);
+			}
+			
+			// Show success message from backend
+			const successMessage = result.message || "Login successful!";
+			toast.success(successMessage);
+			// Navigate to home or dashboard after successful login
+			navigate("/");
+		} catch (err: any) {
+			const errorMessage = err.message || "Login failed. Please try again.";
+			setError(errorMessage);
+			toast.error(errorMessage);
+		} finally {
+			setLoading(false);
+		}
+	};
   return (
     <>
     <div className="fixed top-4 right-4 z-50">
         <AnimatedThemeToggler/>
     </div>
-		{theme === 'dark' && (
-			<div className="fixed inset-0 flex items-center justify-center z-0 pointer-events-none">
-				<TextHoverEffect text="SUDAR"/>
-			</div>
-		)}
+	{theme === 'dark' && (
+	    <div className="fixed inset-0 flex items-center justify-center z-0 pointer-events-none">
+			<TextHoverEffect text="SUDAR"/>
+		</div>
+	)}
     <div className="flex justify-center items-center min-h-screen relative z-10 p-4">
         <div className="flex w-full max-w-md flex-col gap-8 animate-in fade-in duration-500">
             <Tabs defaultValue="signup" className="w-full ">
@@ -46,38 +154,50 @@ export function Auth() {
                             <CardDescription className="text-center">Enter your details to get started</CardDescription>
                         </CardHeader>
                         <CardContent className="pb-4">
-                            <form>
-                            <div className="flex flex-col gap-4">
-                                <div className="grid gap-2">
-                                <Label htmlFor="username" className="text-sm font-medium">Username</Label>
-                                <Input
-                                    id="username"
-                                    type="text"
-                                    placeholder="John Doe"
-                                    className="h-10"
-                                    required
-                                />
+                            <form onSubmit={handleSignupClick}>
+                                <div className="flex flex-col gap-4">
+                                    <div className="grid gap-2">
+                                    <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+                                    <Input
+                                        id="username"
+                                        type="text"
+                                        placeholder="John Doe"
+                                        className="h-10"
+                                        value={signupData.teacher_name}
+                                        onChange={(e) => setSignupData({...signupData, teacher_name: e.target.value})}
+                                        required={true}
+                                    />
+                                    </div>
+                                    <div className="grid gap-2">
+                                    <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="m@example.com"
+                                        className="h-10"
+                                        value={signupData.email}
+                                        onChange={(e) => setSignupData({...signupData, email: e.target.value})}
+                                        required={true}
+                                    />
+                                    </div>
+                                    <div className="grid gap-2">
+                                    <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                                    <Input 
+                                        id="password" 
+                                        type="password" 
+                                        placeholder="••••••••" 
+                                        className="h-10" 
+                                        value={signupData.password}
+                                        onChange={(e) => setSignupData({...signupData, password: e.target.value})}
+                                        required={true}
+                                    />
+                                    </div>
                                 </div>
-                                <div className="grid gap-2">
-                                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="m@example.com"
-                                    className="h-10"
-                                    required
-                                />
-                                </div>
-                                <div className="grid gap-2">
-                                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-                                <Input id="password" type="password" placeholder="••••••••" className="h-10" required />
-                                </div>
-                            </div>
                             </form>
                         </CardContent>
                         <CardFooter className="flex-col gap-3 pt-2">
-                            <Button type="submit" className="w-full h-10">
-                                Create Account
+                            <Button type="submit" className="w-full h-10" onClick={handleSignupClick} disabled={loading}>
+                                {loading ? "Sending Code..." : "Create Account"}
                             </Button>
                         </CardFooter>
                     </Card>
@@ -89,7 +209,7 @@ export function Auth() {
                             <CardDescription className="text-center">Enter your credentials to continue</CardDescription>
                         </CardHeader>
                         <CardContent className="pb-4">
-                            <form>
+                            <form onSubmit={handleLogin}>
                             <div className="flex flex-col gap-4">
                                 <div className="grid gap-2">
                                 <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
@@ -98,27 +218,37 @@ export function Auth() {
                                     type="email"
                                     placeholder="m@example.com"
                                     className="h-10"
-                                    required
+                                    value={loginData.email}
+                                    onChange={(e) => setLoginData({...loginData, email: e.target.value})}
+                                    required={true}
                                 />
                                 </div>
                                 <div className="grid gap-2">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
                                     <a
-                                    href="#"
-                                    className="text-xs"
+                                    href="/forgotpassword"
+                                    className="text-xs hover:underline"
                                     >
                                     Forgot password?
                                     </a>
                                 </div>
-                                <Input id="login-password" type="password" placeholder="" className="h-10" required />
+                                <Input 
+                                    id="login-password" 
+                                    type="password" 
+                                    placeholder="••••••••" 
+                                    className="h-10" 
+                                    value={loginData.password}
+                                    onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                                    required ={true}
+                                />
                                 </div>
                             </div>
                             </form>
                         </CardContent>
                         <CardFooter className="flex-col gap-3 pt-2">
-                            <Button type="submit" className="w-full h-10">
-                                Login
+                            <Button type="submit" className="w-full h-10" onClick={handleLogin} disabled={loading}>
+                                {loading ? "Logging in..." : "Login"}
                             </Button>
                         </CardFooter>
                     </Card>
@@ -126,6 +256,16 @@ export function Auth() {
             </Tabs>
         </div>
     </div>
+    
+    <VerificationDialog
+        open={showVerificationDialog}
+        onOpenChange={setShowVerificationDialog}
+        onVerify={handleVerifyAndSignup}
+        title="Verify Your Email"
+        description="Please enter the 6-digit verification code sent to your email."
+        loading={loading}
+        error={verificationError}
+    />
     </>
   )
 }
