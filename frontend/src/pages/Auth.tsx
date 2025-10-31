@@ -1,0 +1,133 @@
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { ThemeToggle } from "@/components/ThemeToggle"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { TextHoverEffect } from "@/components/ui/animated-border-text"
+import { useTheme } from "@/contexts/ThemeProvider"
+
+
+export function Auth() {
+	const {theme} = useTheme();
+  return (
+    <>
+    <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle />
+    </div>
+		{theme === 'dark' && (
+			<div className="fixed inset-0 flex items-center justify-center z-0 pointer-events-none">
+				<TextHoverEffect text="SUDAR"/>
+			</div>
+		)}
+    <div className="flex justify-center items-center min-h-screen relative z-10 p-4">
+        <div className="flex w-full max-w-md flex-col gap-8 animate-in fade-in duration-500">
+            <Tabs defaultValue="signup" className="w-full ">
+                <TabsList className="grid w-full grid-cols-2 h-11 glassmorphism">
+                    <TabsTrigger value="signup" className="text-sm font-medium">Create Account</TabsTrigger>
+                    <TabsTrigger value="login" className="text-sm font-medium">Login</TabsTrigger>
+                </TabsList>
+                <TabsContent value="signup" className="mt-6">
+                    <Card className="w-full border-2 shadow-xl">
+                        <CardHeader className="space-y-1 pb-4">
+                            <CardTitle className="text-2xl font-bold text-center">Create your account</CardTitle>
+                            <CardDescription className="text-center">Enter your details to get started</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pb-4">
+                            <form>
+                            <div className="flex flex-col gap-4">
+                                <div className="grid gap-2">
+                                <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+                                <Input
+                                    id="username"
+                                    type="text"
+                                    placeholder="John Doe"
+                                    className="h-10"
+                                    required
+                                />
+                                </div>
+                                <div className="grid gap-2">
+                                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    placeholder="m@example.com"
+                                    className="h-10"
+                                    required
+                                />
+                                </div>
+                                <div className="grid gap-2">
+                                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                                <Input id="password" type="password" placeholder="••••••••" className="h-10" required />
+                                </div>
+                            </div>
+                            </form>
+                        </CardContent>
+                        <CardFooter className="flex-col gap-3 pt-2">
+                            <Button type="submit" className="w-full h-10">
+                                Create Account
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="login" className="mt-6">
+                    <Card className="w-full border-2 shadow-xl">
+                        <CardHeader className="space-y-1 pb-4">
+                            <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
+                            <CardDescription className="text-center">Enter your credentials to continue</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pb-4">
+                            <form>
+                            <div className="flex flex-col gap-4">
+                                <div className="grid gap-2">
+                                <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
+                                <Input
+                                    id="login-email"
+                                    type="email"
+                                    placeholder="m@example.com"
+                                    className="h-10"
+                                    required
+                                />
+                                </div>
+                                <div className="grid gap-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
+                                    <a
+                                    href="#"
+                                    className="text-xs"
+                                    >
+                                    Forgot password?
+                                    </a>
+                                </div>
+                                <Input id="login-password" type="password" placeholder="" className="h-10" required />
+                                </div>
+                            </div>
+                            </form>
+                        </CardContent>
+                        <CardFooter className="flex-col gap-3 pt-2">
+                            <Button type="submit" className="w-full h-10">
+                                Login
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
+    </div>
+    </>
+  )
+}
+
+export default Auth;

@@ -1,9 +1,17 @@
+import Auth from "./pages/Auth";
+import { Route, BrowserRouter, Routes } from "react-router-dom";
+import { ThemeProvider } from "./contexts/ThemeProvider";
+
 function App() {
 
   return (
-    <>
-     <h1 className="font-bold text-[2rem]">Sudar AI</h1>
-    </>
+    <ThemeProvider defaultTheme="dark" storageKey="sudar-ui-theme">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<Auth/>} />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 
