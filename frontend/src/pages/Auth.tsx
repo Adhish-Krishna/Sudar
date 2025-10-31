@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ThemeToggle } from "@/components/ThemeToggle"
 import {
   Tabs,
   TabsContent,
@@ -18,6 +17,7 @@ import {
 } from "@/components/ui/tabs"
 import { TextHoverEffect } from "@/components/ui/animated-border-text"
 import { useTheme } from "@/contexts/ThemeProvider"
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 
 
 export function Auth() {
@@ -25,7 +25,7 @@ export function Auth() {
   return (
     <>
     <div className="fixed top-4 right-4 z-50">
-        <ThemeToggle />
+        <AnimatedThemeToggler/>
     </div>
 		{theme === 'dark' && (
 			<div className="fixed inset-0 flex items-center justify-center z-0 pointer-events-none">
