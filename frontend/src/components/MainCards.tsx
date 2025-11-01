@@ -35,24 +35,24 @@ const MainCard = ({title, editButton, deleteButton, navigateTo, color}:MainCardP
     
     return(
         <div 
-            className={`${color.trim()} w-64 h-40 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer`}
+            className={`${color.trim()} w-full sm:w-64 h-36 sm:h-40 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 p-4 sm:p-6 cursor-pointer active:scale-95`}
             onClick={handleCardClick}
         >
             <div className="flex justify-between items-start h-full">
                 <div className="flex flex-col justify-between h-full">
-                    <p className="font-bold text-2xl text-white">{title}</p>
+                    <p className="font-bold text-xl sm:text-2xl text-white wrap-break-word line-clamp-2">{title}</p>
                 </div>
                 
                 <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                         <button 
-                            className="hover:bg-white/20 rounded-full p-1 transition-colors text-white"
+                            className="hover:bg-white/20 rounded-full p-1.5 sm:p-1 transition-colors text-white shrink-0 ml-2"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <MoreVertical className="h-5 w-5" />
+                            <MoreVertical className="h-5 w-5 sm:h-5 sm:w-5" />
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-48 border-white/30" align="end">
+                    <DropdownMenuContent className="w-40 sm:w-48 border-white/30" align="end">
                         <DropdownMenuItem asChild className="cursor-pointer focus:bg-white/20">
                             {editButton}
                         </DropdownMenuItem>

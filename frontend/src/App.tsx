@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import { SidebarTrigger } from "./components/ui/sidebar";
 import RootLayout, { AuthLayout, DashboardLayout } from "./app/layout";
 import { Toaster } from "./components/ui/sonner";
+import Classroom from "./pages/Classroom";
 
 function App() {
 
@@ -37,6 +38,15 @@ function App() {
               <ProtectedRoute>
                 <SidebarTrigger/>
                 <Home/>
+              </ProtectedRoute>
+            </DashboardLayout>
+          }/>
+
+          <Route path="/classroom/:classroom_id" element={
+            <DashboardLayout>
+              <ProtectedRoute>
+                <SidebarTrigger/>
+                <Classroom/>
               </ProtectedRoute>
             </DashboardLayout>
           }/>

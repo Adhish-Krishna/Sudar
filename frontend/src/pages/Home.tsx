@@ -155,14 +155,21 @@ const Home = ()=>{
     
     return(
         <>
-            <ScrollArea className="h-[97vh] w-screen bg-background mt-2 mb-2 mr-2 border border-accent rounded-2xl glassmorphism block pt-2 pb-2 pl-2 pr-2">
+            <ScrollArea className="h-[97vh] w-full bg-background mt-2 mb-2 mr-0 md:mr-2 border-2 border-muted rounded-2xl block">
                 {classroom.length>0 && (
-                    <div className="flex w-full flex-row gap-3 p-5 justify-between items-center">
-                        <p className="text-3xl font-bold">Classrooms</p>
-                        <Button onClick={() => setIsDialogOpen(true)}><Plus/>Add Classroom</Button>
+                    <div className="flex w-full flex-col sm:flex-row gap-3 p-3 sm:p-5 justify-between items-start sm:items-center sticky top-0 bg-background z-10 border-b border-muted">
+                        <p className="text-2xl sm:text-3xl font-bold">Classrooms</p>
+                        <Button 
+                            onClick={() => setIsDialogOpen(true)} 
+                            className="w-full sm:w-auto"
+                            size="sm"
+                        >
+                            <Plus className="h-4 w-4 sm:mr-1" />
+                            <span className="">Add Classroom</span>
+                        </Button>
                     </div>
                 )}
-                <div className="flex flex-wrap gap-4 pl-5 pr-5 p-0">
+                <div className="flex flex-wrap gap-3 sm:gap-4 p-3 sm:p-5 justify-center sm:justify-start">
                     {classroom.length > 0 ? (
                         classroom.map((classroomItem) => (
                             <MainCard
@@ -171,26 +178,26 @@ const Home = ()=>{
                                 editButton={
                                     <Button 
                                         variant="ghost" 
-                                        className="w-full justify-start gap-2 hover:bg-transparent"
+                                        className="w-full justify-start gap-2 hover:bg-transparent text-sm"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             openEditDialog(classroomItem.classroom_id, classroomItem.classroom_name);
                                         }}
                                     >
-                                        <Edit className="h-4 w-4" />
+                                        <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                         Edit
                                     </Button>
                                 }
                                 deleteButton={
                                     <Button 
                                         variant="ghost" 
-                                        className="w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-transparent"
+                                        className="w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-transparent text-sm"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             deleteClassroom(classroomItem.classroom_id);
                                         }}
                                     >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                         Delete
                                     </Button>
                                 }
@@ -199,21 +206,27 @@ const Home = ()=>{
                             />
                         ))
                     ) : (
-                        <div className="w-full h-[97vh] flex items-center justify-center flex-col gap-3">
+                        <div className="w-full h-[80vh] flex items-center justify-center flex-col gap-3 px-4">
                             {loading? (
                             <div className="flex flex-col items-center gap-4">
-                                <Button disabled size="lg">
+                                <Button disabled size="default" className="w-full sm:w-auto">
                                     <Spinner />
-                                    Loading Classrooms
+                                    <span className="ml-2">Loading Classrooms</span>
                                 </Button>
                             </div>
                             ): (
-                                <>
-                                    <p className="text-muted-foreground text-2xl mb-3">No classrooms found. Create your classroom</p>
-                                    <Button onClick={() => setIsDialogOpen(true)}>
-                                        <Plus/>Create Classroom
+                                <div className="flex flex-col items-center gap-4 text-center">
+                                    <p className="text-muted-foreground text-lg sm:text-2xl mb-2 sm:mb-3 px-4">
+                                        No classrooms found. Create your classroom
+                                    </p>
+                                    <Button 
+                                        onClick={() => setIsDialogOpen(true)}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Create Classroom
                                     </Button>
-                                </>
+                                </div>
                             )}
                         </div>
                     )}

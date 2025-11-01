@@ -20,11 +20,12 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import { useNavigate } from "react-router-dom";
 
 const sidebarContentItems = [
   {
     title: "Home",
-    url: "#",
+    url: "/home",
     icon: Home,
   },
   {
@@ -35,6 +36,8 @@ const sidebarContentItems = [
 ]
 
 export function AppSidebar() {
+
+  const navigate = useNavigate();
 
   const {user, logout} = useAuth();
 
@@ -62,7 +65,6 @@ export function AppSidebar() {
     <Sidebar
       variant="sidebar"
       collapsible="icon"
-      className="glassmorphism"
     >
       <SidebarHeader>
           <SidebarGroupLabel className="font-bold text-3xl text-blue-400 mb-2.5">Sudar</SidebarGroupLabel>
@@ -74,10 +76,10 @@ export function AppSidebar() {
               {sidebarContentItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="h-12">
-                    <a href={item.url}>
+                    <button onClick={()=>navigate(item.url)}>
                       <item.icon />
                       <span>{item.title}</span>
-                    </a>
+                    </button>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
