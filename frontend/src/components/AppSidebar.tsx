@@ -1,5 +1,6 @@
 import {Home, Inbox, LogOut, User, Sun, Moon, Mail, IdCard, ChevronRight, Users, BookOpen} from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
+import { ScrollArea } from "./ui/scroll-area";
 import {
   Sidebar,
   SidebarContent,
@@ -138,9 +139,10 @@ export function AppSidebar() {
           <SidebarGroupLabel className="font-bold text-3xl text-blue-400 mb-2.5">Sudar</SidebarGroupLabel>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
+        <ScrollArea className="h-full w-full">
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
               {sidebarContentItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Tooltip>
@@ -259,6 +261,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        </ScrollArea>
       </SidebarContent>
       <SidebarFooter>
           <SidebarMenuItem>

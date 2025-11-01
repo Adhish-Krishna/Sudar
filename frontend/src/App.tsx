@@ -4,10 +4,10 @@ import Landing from "./pages/Landing";
 import ForgotPassword from "./pages/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
-import { SidebarTrigger } from "./components/ui/sidebar";
 import RootLayout, { AuthLayout, DashboardLayout } from "./app/layout";
 import { Toaster } from "./components/ui/sonner";
 import Classroom from "./pages/Classroom";
+import Subject from "./pages/Subject";
 
 function App() {
 
@@ -36,7 +36,6 @@ function App() {
           <Route path="/home" element={
             <DashboardLayout>
               <ProtectedRoute>
-                <SidebarTrigger/>
                 <Home/>
               </ProtectedRoute>
             </DashboardLayout>
@@ -45,8 +44,15 @@ function App() {
           <Route path="/classroom/:classroom_id" element={
             <DashboardLayout>
               <ProtectedRoute>
-                <SidebarTrigger/>
                 <Classroom/>
+              </ProtectedRoute>
+            </DashboardLayout>
+          }/>
+
+          <Route path="/subject/:classroom_id/:subject_id/:color" element={
+            <DashboardLayout>
+              <ProtectedRoute>
+                <Subject/>
               </ProtectedRoute>
             </DashboardLayout>
           }/>

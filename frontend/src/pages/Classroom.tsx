@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { colors as subjectColors } from "@/colors";
 
 const Classroom = ()=>{
     const { classroom_id } = useParams<{ classroom_id: string }>();
@@ -59,17 +61,6 @@ const Classroom = ()=>{
     const [studentActionLoading, setStudentActionLoading] = useState<boolean>(false);
     const [studentEditMode, setStudentEditMode] = useState<boolean>(false);
     const [editingStudentRollno, setEditingStudentRollno] = useState<string>("");
-
-    const subjectColors = [
-        "bg-gradient-to-br from-blue-500 to-cyan-500",
-        "bg-gradient-to-br from-purple-500 to-pink-500",
-        "bg-gradient-to-br from-green-500 to-teal-500",
-        "bg-gradient-to-br from-red-500 to-orange-500",
-        "bg-gradient-to-br from-yellow-500 to-lime-500",
-        "bg-gradient-to-br from-indigo-500 to-blue-500",
-        "bg-gradient-to-br from-pink-500 to-rose-500",
-        "bg-gradient-to-br from-teal-500 to-cyan-500",
-    ];
 
     // Fetch subjects
     useEffect(() => {
@@ -359,31 +350,35 @@ const Classroom = ()=>{
 
     return(
         <>
-            <ScrollArea className="h-[97vh] w-full bg-background mt-3.5 mb-2 mr-0 md:mr-2 block">
-                <div className="mt-2 pb-3 sticky top-0 bg-background z-10 border-b-2 border-muted">
-                    <Breadcrumb>
-                        <BreadcrumbList>
-                            <BreadcrumbItem>
-                                <BreadcrumbLink asChild>
-                                    <button 
-                                        onClick={() => navigate('/home')}
-                                        className="flex items-center gap-1.5"
-                                    >
-                                        <HomeIcon className="h-4 w-4" />
-                                        Home
-                                    </button>
-                                </BreadcrumbLink>
-                            </BreadcrumbItem>
-                            <BreadcrumbSeparator />
-                            <BreadcrumbItem>
-                                <BreadcrumbPage className="flex items-center gap-1.5">
-                                    <Users className="h-4 w-4"/>{classroomName || "Classroom"}
-                                </BreadcrumbPage>
-                            </BreadcrumbItem>
-                        </BreadcrumbList>
-                    </Breadcrumb>
-                </div>
-                <Tabs defaultValue="subjects" className="w-full p-3 sm:p-5">
+            {/* Header with Sidebar Trigger and Breadcrumb */}
+            <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-50">
+                <SidebarTrigger className="-ml-1" />
+                <Breadcrumb>
+                    <BreadcrumbList>
+                        <BreadcrumbItem>
+                            <BreadcrumbLink asChild>
+                                <button 
+                                    onClick={() => navigate('/home')}
+                                    className="flex items-center gap-1.5"
+                                >
+                                    <HomeIcon className="h-4 w-4" />
+                                    Home
+                                </button>
+                            </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                            <BreadcrumbPage className="flex items-center gap-1.5">
+                                <Users className="h-4 w-4"/>{classroomName || "Classroom"}
+                            </BreadcrumbPage>
+                        </BreadcrumbItem>
+                    </BreadcrumbList>
+                </Breadcrumb>
+            </header>
+
+            {/* Main Content */}
+            <ScrollArea className="h-[calc(100vh-3.5rem)] w-full">
+                <Tabs defaultValue="subjects" className="w-full p-4 lg:p-6">
                     <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
                         <TabsTrigger value="subjects" className="flex items-center gap-2">
                             <BookOpen className="h-4 w-4" />
@@ -398,7 +393,7 @@ const Classroom = ()=>{
                     {/* Subjects Tab */}
                     <TabsContent value="subjects" className="space-y-4">
                         {subjectList.length > 0 && (
-                            <div className="flex w-full flex-col sm:flex-row gap-3 justify-between items-start sm:items-center pb-3 border-b border-muted">
+                            <div className="flex w-full flex-col sm:flex-row gap-3 justify-between items-start sm:items-center pb-3">
                                 <p className="text-2xl sm:text-3xl font-bold">Subjects</p>
                                 <Button 
                                     onClick={() => setIsSubjectDialogOpen(true)} 
@@ -443,7 +438,7 @@ const Classroom = ()=>{
                                                 Delete
                                             </Button>
                                         }
-                                        navigateTo={`/subject/${subject.subject_id}`}
+                                        navigateTo={`/subject/${classroom_id}/${subject.subject_id}/${encodeURIComponent(subjectColors[index % subjectColors.length])}`}
                                         color={subjectColors[index % subjectColors.length]}
                                     />
                                 ))
@@ -479,7 +474,7 @@ const Classroom = ()=>{
                     {/* Students Tab */}
                     <TabsContent value="students" className="space-y-4">
                         {studentList.length > 0 && (
-                            <div className="flex w-full flex-col sm:flex-row gap-3 justify-between items-start sm:items-center pb-3 border-b border-muted">
+                            <div className="flex w-full flex-col sm:flex-row gap-3 justify-between items-start sm:items-center pb-3">
                                 <p className="text-2xl sm:text-3xl font-bold">Students</p>
                                 <Button 
                                     onClick={() => setIsStudentDialogOpen(true)} 

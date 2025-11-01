@@ -11,12 +11,14 @@ import { CreateEditDialogue } from "@/components/CreateEditDialogue";
 import { Spinner } from "@/components/ui/spinner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useClassroomRefresh } from "@/contexts/ClassroomContext";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Breadcrumb,
   BreadcrumbList,
   BreadcrumbItem,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
+import { colors } from "@/colors";
 
 const Home = ()=>{
     const [classroom, setClassroom] = useState<ClassroomResponse[]>([]);
@@ -28,19 +30,6 @@ const Home = ()=>{
     const [editingClassroomId, setEditingClassroomId] = useState<string>("");
     
     const { triggerRefresh } = useClassroomRefresh();
-
-    const colors = [
-        "bg-gradient-to-br from-blue-500 to-cyan-500",
-        "bg-gradient-to-br from-purple-500 to-pink-500",
-        "bg-gradient-to-br from-green-500 to-teal-500",
-        "bg-gradient-to-br from-red-500 to-orange-500",
-        "bg-gradient-to-br from-yellow-500 to-lime-500",
-        "bg-gradient-to-br from-indigo-500 to-blue-500",
-        "bg-gradient-to-br from-pink-500 to-rose-500",
-        "bg-gradient-to-br from-teal-500 to-cyan-500",
-        "bg-gradient-to-br from-orange-500 to-yellow-500",
-        "bg-gradient-to-br from-lime-500 to-green-500"
-    ]
     
     useEffect(()=>{
         const fetchClassrooms = async () => {
@@ -167,21 +156,26 @@ const Home = ()=>{
     
     return(
         <>
-            <ScrollArea className="h-[97vh] w-full bg-background mt-3.5 mb-2 mr-0 md:mr-2 p-0 pr-6 sm:pr-4 block">
-                <div className="mt-2 sticky top-0 bg-background z-10 pb-3 border-b-2 border-muted">
-                    <Breadcrumb>
-                        <BreadcrumbList>
-                            <BreadcrumbItem>
-                                <BreadcrumbPage className="flex items-center gap-1.5">
-                                    <HomeIcon className="h-4 w-4" />
-                                    Home
-                                </BreadcrumbPage>
-                            </BreadcrumbItem>
-                        </BreadcrumbList>
-                    </Breadcrumb>
-                </div>
+            {/* Header with Sidebar Trigger and Breadcrumb */}
+            <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-50">
+                <SidebarTrigger className="-ml-1" />
+                <Breadcrumb>
+                    <BreadcrumbList>
+                        <BreadcrumbItem>
+                            <BreadcrumbPage className="flex items-center gap-1.5">
+                                <HomeIcon className="h-4 w-4" />
+                                Home
+                            </BreadcrumbPage>
+                        </BreadcrumbItem>
+                    </BreadcrumbList>
+                </Breadcrumb>
+            </header>
+
+            {/* Main Content */}
+            <ScrollArea className="h-[calc(100vh-3.5rem)] w-full">
+                <div className="flex flex-col gap-4 p-4 lg:p-6">
                 {classroom.length>0 && (
-                    <div className="flex w-full flex-col sm:flex-row gap-3 p-0 pb-5 pt-3 justify-between items-start sm:items-center">
+                    <div className="flex w-full flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
                         <p className="text-xl sm:text-2xl font-bold">Classrooms</p>
                         <Button 
                             onClick={() => setIsDialogOpen(true)} 
@@ -193,7 +187,7 @@ const Home = ()=>{
                         </Button>
                     </div>
                 )}
-                <div className="flex flex-wrap gap-3 sm:gap-4 justify-center sm:justify-start mt-4">
+                <div className="flex flex-wrap gap-3 sm:gap-4 justify-center sm:justify-start">
                     {classroom.length > 0 ? (
                         classroom.map((classroomItem, index) => (
                             <MainCard
@@ -230,7 +224,7 @@ const Home = ()=>{
                             />
                         ))
                     ) : (
-                        <div className="w-full h-[80vh] flex items-center justify-center flex-col gap-3 px-4">
+                        <div className="w-full h-[70vh] flex items-center justify-center flex-col gap-3">
                             {loading? (
                             <div className="flex flex-col items-center gap-4">
                                 <Button disabled size="default" className="w-full sm:w-auto">
@@ -255,6 +249,7 @@ const Home = ()=>{
                             )}
                         </div>
                     )}
+                </div>
                 </div>
             </ScrollArea>
 
