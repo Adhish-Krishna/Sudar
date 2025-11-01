@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useNavigate } from "react-router-dom"
 import { VerificationDialog } from "@/components/VerificationDialog"
@@ -20,7 +20,7 @@ import { toast } from "sonner"
 
 const ForgotPassword = ()=>{
     const {theme} = useTheme();
-    const { forgotPassword, resetPassword } = useAuth();
+    const { forgotPassword, resetPassword, isAuthenticated, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -31,6 +31,13 @@ const ForgotPassword = ()=>{
     const [loading, setLoading] = useState(false);
     const [showTokenDialog, setShowTokenDialog] = useState(false);
     const [tokenError, setTokenError] = useState("");
+
+    // Redirect authenticated users to home
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            navigate("/home");
+        }
+    }, [isAuthenticated, authLoading, navigate]);
 
     const handleResetClick = async (e: React.FormEvent) => {
         e.preventDefault();

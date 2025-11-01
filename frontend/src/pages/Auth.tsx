@@ -19,7 +19,7 @@ import { TextHoverEffect } from "@/components/ui/animated-border-text"
 import { useTheme } from "@/contexts/ThemeProvider"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { useAuth } from "@/contexts/AuthContext"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { VerificationDialog } from "@/components/VerificationDialog"
 import { toast } from "sonner"
@@ -27,12 +27,19 @@ import { toast } from "sonner"
 
 export function Auth() {
 	const {theme} = useTheme();
-	const { login, signup, verifyEmail } = useAuth();
+	const { login, signup, verifyEmail, isAuthenticated, loading: authLoading } = useAuth();
 	const navigate = useNavigate();
 	const [error, setError] = useState<string>("");
 	const [loading, setLoading] = useState<boolean>(false);
 	const [showVerificationDialog, setShowVerificationDialog] = useState<boolean>(false);
 	const [verificationError, setVerificationError] = useState<string>("");
+
+	// Redirect authenticated users to home
+	useEffect(() => {
+		if (!authLoading && isAuthenticated) {
+			navigate("/home");
+		}
+	}, [isAuthenticated, authLoading, navigate]);
 
 	// Signup form state
 	const [signupData, setSignupData] = useState({
@@ -101,7 +108,7 @@ export function Auth() {
 			const successMessage = result.message || "Account created successfully!";
 			toast.success(successMessage);
 			// Navigate to home or dashboard after successful signup
-			navigate("/");
+			navigate("/home");
 		} catch (err: any) {
 			const errorMessage = err.message || "Signup failed. Please try again.";
 			setVerificationError(errorMessage);
@@ -134,7 +141,7 @@ export function Auth() {
 			const successMessage = result.message || "Login successful!";
 			toast.success(successMessage);
 			// Navigate to home or dashboard after successful login
-			navigate("/");
+			navigate("/home");
 		} catch (err: any) {
 			const errorMessage = err.message || "Login failed. Please try again.";
 			setError(errorMessage);
