@@ -1,6 +1,7 @@
 import { TextHoverEffect } from "@/components/ui/animated-border-text"
 import { useTheme } from "@/contexts/ThemeProvider"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+import LightRays from "@/components/LightRays"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -114,11 +115,30 @@ const ForgotPassword = ()=>{
 
     return(
         <>
+            {theme === "dark" && 
+                <div className="fixed inset-0 z-0">
+                    <LightRays
+                        raysOrigin="top-center"
+                        raysColor={'#fffff'}
+                        raysSpeed={1}
+                        lightSpread={1.2}
+                        rayLength={0.5}
+                        pulsating={false}
+                        fadeDistance={1.8}
+                        saturation={1.6}
+                        followMouse={true}
+                        mouseInfluence={0.15}
+                        noiseAmount={0}
+                        distortion={0}
+                    />
+                </div>
+            }
+            
             <div className="fixed top-4 right-4 z-50">
                 <AnimatedThemeToggler/>
             </div>
             {theme === 'dark' && (
-                <div className="fixed inset-0 flex items-center justify-center z-0 pointer-events-none">
+                <div className="fixed inset-0 flex items-center justify-center z-1 pointer-events-none">
                     <TextHoverEffect text="SUDAR"/>
                 </div>
             )}

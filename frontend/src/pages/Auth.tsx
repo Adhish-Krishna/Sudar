@@ -23,6 +23,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { VerificationDialog } from "@/components/VerificationDialog"
 import { toast } from "sonner"
+import LightRays from "@/components/LightRays"
 
 
 export function Auth() {
@@ -147,11 +148,29 @@ export function Auth() {
 	};
   return (
     <>
+    {theme === "dark" && 
+        <div className="fixed inset-0 z-0">
+            <LightRays
+                raysOrigin="top-center"
+                raysColor={'#fffff'}
+                raysSpeed={1}
+                lightSpread={1.2}
+                rayLength={0.5}
+                pulsating={false}
+                fadeDistance={1.8}
+                saturation={1.6}
+                followMouse={true}
+                mouseInfluence={0.15}
+                noiseAmount={0}
+                distortion={0}
+            />
+        </div>
+    }
     <div className="fixed top-4 right-4 z-50">
         <AnimatedThemeToggler/>
     </div>
 	{theme === 'dark' && (
-	    <div className="fixed inset-0 flex items-center justify-center z-0 pointer-events-none">
+	    <div className="fixed inset-0 flex items-center justify-center z-1 pointer-events-none">
 			<TextHoverEffect text="SUDAR"/>
 		</div>
 	)}
@@ -241,12 +260,12 @@ export function Auth() {
                                 <div className="grid gap-2">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
-                                    <a
-                                    href="/forgotpassword"
+                                    <button
+                                    onClick={()=>navigate("/forgotpassword")}
                                     className="text-xs hover:underline"
                                     >
                                     Forgot password?
-                                    </a>
+                                    </button>
                                 </div>
                                 <Input 
                                     id="login-password" 
