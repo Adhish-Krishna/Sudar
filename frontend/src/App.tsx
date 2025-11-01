@@ -3,7 +3,7 @@ import { Route, BrowserRouter, Routes } from "react-router-dom";
 import Landing from "./pages/Landing";
 import ForgotPassword from "./pages/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
+import Home from "./pages/Home";
 import { SidebarTrigger } from "./components/ui/sidebar";
 import RootLayout, { AuthLayout, DashboardLayout } from "./app/layout";
 import { Toaster } from "./components/ui/sonner";
@@ -36,7 +36,7 @@ function App() {
             <DashboardLayout>
               <ProtectedRoute>
                 <SidebarTrigger/>
-                <Dashboard/>
+                <Home/>
               </ProtectedRoute>
             </DashboardLayout>
           }/>
