@@ -42,6 +42,8 @@ class Config:
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "embeddinggemma:300m")
     EMBEDDING_DIMENSION: int = int(os.getenv("EMBEDDING_DIMENSION", "768"))
+
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL")
     
     # Server Configuration
     HOST: str = os.getenv("HOST", "0.0.0.0")

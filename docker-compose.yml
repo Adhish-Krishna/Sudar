@@ -57,6 +57,7 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_INPUT_BUCKET_NAME=rag-documents
       - MINIO_OUTPUT_BUCKET_NAME=sudar-content
+      - FRONTEND_URL=${FRONTEND_URL}
     expose:
       - "3006"
     depends_on:
@@ -226,6 +227,7 @@ services:
       - HOST=0.0.0.0
       - PORT=3001
       - DOCLING_ARTIFACTS_PATH=/docling_models
+      - FRONTEND_URL=${FRONTEND_URL}
     expose:
       - "3001"
     volumes:
@@ -343,6 +345,7 @@ services:
       - EMBEDDING_DIMENSION=768
       - HOST=0.0.0.0
       - PORT=3005
+      - FRONTEND_URL=${FRONTEND_URL}
     expose:
       - "3005"
     depends_on:

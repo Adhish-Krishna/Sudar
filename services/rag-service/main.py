@@ -43,6 +43,8 @@ redis_host = os.getenv("REDIS_HOST", "localhost")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
 redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 
+FRONTEND_URL=os.getenv("FRONTEND_URL")
+
 # Initialize FastAPI app
 app = FastAPI(
     title="RAG Microservice",
@@ -54,7 +56,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Add your frontend URLs
+    allow_origins=[FRONTEND_URL],  # Add your frontend URLs
     allow_credentials=True,  # Required for cookies
     allow_methods=["*"],
     allow_headers=["*"],

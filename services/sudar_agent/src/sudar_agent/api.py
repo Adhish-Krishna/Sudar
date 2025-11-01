@@ -67,6 +67,7 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down Sudar Agent Service...")
 
+FRONTEND_URL = config.FRONTEND_URL
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -80,7 +81,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[FRONTEND_URL],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
