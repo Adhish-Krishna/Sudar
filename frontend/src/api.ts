@@ -390,13 +390,13 @@ export const classrooms = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Create classroom failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Create classroom failed",
       };
     }
   },
@@ -409,13 +409,13 @@ export const classrooms = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Get classrooms failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get classrooms failed",
       };
     }
   },
@@ -428,13 +428,13 @@ export const classrooms = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Get classroom failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get classroom failed",
       };
     }
   },
@@ -447,13 +447,13 @@ export const classrooms = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Update classroom failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Update classroom failed",
       };
     }
   },
@@ -466,13 +466,13 @@ export const classrooms = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Delete classroom failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Delete classroom failed",
       };
     }
   },
@@ -490,13 +490,13 @@ export const subjects = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Create subject failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Create subject failed",
       };
     }
   },
@@ -510,13 +510,13 @@ export const subjects = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Get subjects failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get subjects failed",
       };
     }
   },
@@ -531,13 +531,13 @@ export const subjects = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Get subject failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get subject failed",
       };
     }
   },
@@ -557,13 +557,13 @@ export const subjects = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Update subject failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Update subject failed",
       };
     }
   },
@@ -578,13 +578,13 @@ export const subjects = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Delete subject failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Delete subject failed",
       };
     }
   },
@@ -602,13 +602,13 @@ export const students = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Create student failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Create student failed",
       };
     }
   },
@@ -623,13 +623,13 @@ export const students = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Get students failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get students failed",
       };
     }
   },
@@ -644,13 +644,13 @@ export const students = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Get student failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get student failed",
       };
     }
   },
@@ -670,13 +670,13 @@ export const students = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Update student failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Update student failed",
       };
     }
   },
@@ -691,13 +691,13 @@ export const students = {
       } else {
         return {
           status: response.status,
-          message: response.data,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
         };
       }
     } catch (error: any) {
       return {
         status: error.response?.status || 500,
-        message: error.response?.data?.message || error.message || "Delete student failed",
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Delete student failed",
       };
     }
   },
