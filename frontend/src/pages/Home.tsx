@@ -2,7 +2,7 @@ import MainCard from "@/components/MainCards";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Edit, Trash2, Plus, Users} from "lucide-react";
+import { Edit, Trash2, Plus, Users, Home as HomeIcon} from "lucide-react";
 import { classrooms } from "@/api";
 import type { ClassroomResponse } from "@/api";
 import { useState, useEffect} from "react";
@@ -10,7 +10,13 @@ import { toast } from "sonner";
 import { CreateEditDialogue } from "@/components/CreateEditDialogue";
 import { Spinner } from "@/components/ui/spinner";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useClassroomRefresh } from "@/contexts/ClassroomContext"
+import { useClassroomRefresh } from "@/contexts/ClassroomContext";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbPage,
+} from "@/components/ui/breadcrumb"
 
 const Home = ()=>{
     const [classroom, setClassroom] = useState<ClassroomResponse[]>([]);
@@ -161,21 +167,33 @@ const Home = ()=>{
     
     return(
         <>
-            <ScrollArea className="h-[97vh] w-full bg-background mt-2 mb-2 mr-0 md:mr-2 border-2 border-muted rounded-2xl block">
+            <ScrollArea className="h-[97vh] w-full bg-background mt-3.5 mb-2 mr-0 md:mr-2 p-0 pr-6 sm:pr-4 block">
+                <div className="mt-2 sticky top-0 bg-background z-10 pb-3 border-b-2 border-muted">
+                    <Breadcrumb>
+                        <BreadcrumbList>
+                            <BreadcrumbItem>
+                                <BreadcrumbPage className="flex items-center gap-1.5">
+                                    <HomeIcon className="h-4 w-4" />
+                                    Home
+                                </BreadcrumbPage>
+                            </BreadcrumbItem>
+                        </BreadcrumbList>
+                    </Breadcrumb>
+                </div>
                 {classroom.length>0 && (
-                    <div className="flex w-full flex-col sm:flex-row gap-3 p-3 sm:p-5 justify-between items-start sm:items-center sticky top-0 bg-background z-10 border-b border-muted">
-                        <p className="text-2xl sm:text-3xl font-bold">Classrooms</p>
+                    <div className="flex w-full flex-col sm:flex-row gap-3 p-0 pb-5 pt-3 justify-between items-start sm:items-center">
+                        <p className="text-xl sm:text-2xl font-bold">Classrooms</p>
                         <Button 
                             onClick={() => setIsDialogOpen(true)} 
                             className="w-full sm:w-auto"
-                            size="sm"
+                            size="lg"
                         >
                             <Plus className="h-4 w-4 sm:mr-1" />
                             <span className="">Add Classroom</span>
                         </Button>
                     </div>
                 )}
-                <div className="flex flex-wrap gap-3 sm:gap-4 p-3 sm:p-5 justify-center sm:justify-start">
+                <div className="flex flex-wrap gap-3 sm:gap-4 justify-center sm:justify-start mt-4">
                     {classroom.length > 0 ? (
                         classroom.map((classroomItem, index) => (
                             <MainCard

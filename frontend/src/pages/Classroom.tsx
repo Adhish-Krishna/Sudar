@@ -1,7 +1,7 @@
-import { subjects, students } from "@/api";
+import { subjects, students, classrooms } from "@/api";
 import type { SubjectResponse, StudentResponse, SubjectCreate, SubjectUpdate, StudentCreate, StudentUpdate } from "@/api";
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import MainCard from "@/components/MainCards";
 import CreateEditDialogue from "@/components/CreateEditDialogue";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Edit, Trash2, Plus, BookOpen, Users, MoreVertical } from "lucide-react";
+import { Edit, Trash2, Plus, BookOpen, Users, MoreVertical, Home as HomeIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useClassroomRefresh } from "@/contexts/ClassroomContext";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 
 const Classroom = ()=>{
     const { classroom_id } = useParams<{ classroom_id: string }>();
     const { triggerRefresh } = useClassroomRefresh();
+    const navigate = useNavigate();
+    
+    // Classroom state
+    const [classroomName, setClassroomName] = useState<string>("");
     
     // Subject states
     const [subjectList, setSubjectList] = useState<SubjectResponse[]>([]);
@@ -63,6 +75,7 @@ const Classroom = ()=>{
     useEffect(() => {
         if (classroom_id) {
             fetchSubjects();
+            fetchClassroomName();
         }
     }, [classroom_id]);
 
@@ -72,6 +85,22 @@ const Classroom = ()=>{
             fetchStudents();
         }
     }, [classroom_id]);
+
+    const fetchClassroomName = async () => {
+        if (!classroom_id) return;
+        
+        try {
+            const response = await classrooms.getClassrooms();
+            if (Array.isArray(response)) {
+                const classroom = response.find(c => c.classroom_id === classroom_id);
+                if (classroom) {
+                    setClassroomName(classroom.classroom_name);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch classroom name:", error);
+        }
+    };
 
     const fetchSubjects = async () => {
         if (!classroom_id) return;
@@ -330,7 +359,30 @@ const Classroom = ()=>{
 
     return(
         <>
-            <ScrollArea className="h-[97vh] w-full bg-background mt-2 mb-2 mr-0 md:mr-2 border-2 border-muted rounded-2xl block">
+            <ScrollArea className="h-[97vh] w-full bg-background mt-3.5 mb-2 mr-0 md:mr-2 block">
+                <div className="mt-2 pb-3 sticky top-0 bg-background z-10 border-b-2 border-muted">
+                    <Breadcrumb>
+                        <BreadcrumbList>
+                            <BreadcrumbItem>
+                                <BreadcrumbLink asChild>
+                                    <button 
+                                        onClick={() => navigate('/home')}
+                                        className="flex items-center gap-1.5"
+                                    >
+                                        <HomeIcon className="h-4 w-4" />
+                                        Home
+                                    </button>
+                                </BreadcrumbLink>
+                            </BreadcrumbItem>
+                            <BreadcrumbSeparator />
+                            <BreadcrumbItem>
+                                <BreadcrumbPage className="flex items-center gap-1.5">
+                                    <Users className="h-4 w-4"/>{classroomName || "Classroom"}
+                                </BreadcrumbPage>
+                            </BreadcrumbItem>
+                        </BreadcrumbList>
+                    </Breadcrumb>
+                </div>
                 <Tabs defaultValue="subjects" className="w-full p-3 sm:p-5">
                     <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
                         <TabsTrigger value="subjects" className="flex items-center gap-2">

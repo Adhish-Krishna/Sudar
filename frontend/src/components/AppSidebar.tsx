@@ -1,5 +1,5 @@
 import {Home, Inbox, LogOut, User, Sun, Moon, Mail, IdCard, ChevronRight, Users, BookOpen} from "lucide-react"
-
+import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +14,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner";
@@ -52,6 +53,8 @@ export function AppSidebar() {
   const {theme, setTheme} = useTheme();
 
   const { refreshTrigger } = useClassroomRefresh();
+
+  const { state } = useSidebar();
 
   const [classroomList, setClassroomList] = useState<ClassroomResponse[]>([]);
   const [isClassroomsOpen, setIsClassroomsOpen] = useState(false);
@@ -140,12 +143,21 @@ export function AppSidebar() {
             <SidebarMenu>
               {sidebarContentItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="h-12">
-                    <button onClick={()=>navigate(item.url)}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </button>
-                  </SidebarMenuButton>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton asChild className="h-12">
+                        <button onClick={()=>navigate(item.url)}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </button>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    {state === "collapsed" && (
+                      <TooltipContent side="right">
+                        {item.title}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                 </SidebarMenuItem>
               ))}
               
@@ -156,13 +168,22 @@ export function AppSidebar() {
                 className="group/collapsible"
               >
                 <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton className="h-12">
-                      <Users/>
-                      <span>Classrooms</span>
-                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton className="h-12">
+                          <Users/>
+                          <span>Classrooms</span>
+                          <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                    </TooltipTrigger>
+                    {state === "collapsed" && (
+                      <TooltipContent side="right">
+                        Classrooms
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {classroomList.length > 0 ? (
@@ -241,24 +262,51 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="cursor-pointer h-12" onClick={updateTheme}>
-              <p>{theme=="light" ? <Sun/> : <Moon/>}Theme</p>
-            </SidebarMenuButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SidebarMenuButton asChild className="cursor-pointer h-12" onClick={updateTheme}>
+                  <p>{theme=="light" ? <Sun/> : <Moon/>}Theme</p>
+                </SidebarMenuButton>
+              </TooltipTrigger>
+              {state === "collapsed" && (
+                <TooltipContent side="right">
+                  Theme
+                </TooltipContent>
+              )}
+            </Tooltip>
           </SidebarMenuItem>
 
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="cursor-pointer h-12" onClick={handleLogout}>
-              <p><LogOut className="text-red-500 "/>Logout</p>
-            </SidebarMenuButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SidebarMenuButton asChild className="cursor-pointer h-12" onClick={handleLogout}>
+                  <p><LogOut className="text-red-500 "/>Logout</p>
+                </SidebarMenuButton>
+              </TooltipTrigger>
+              {state === "collapsed" && (
+                <TooltipContent side="right">
+                  Logout
+                </TooltipContent>
+              )}
+            </Tooltip>
           </SidebarMenuItem>
 
           <SidebarMenuItem>
             <HoverCard>
-              <HoverCardTrigger asChild>
-                <SidebarMenuButton asChild className="cursor-pointer h-12">
-                  <p><User/>{user?.teacher_name}</p>
-                </SidebarMenuButton>
-              </HoverCardTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HoverCardTrigger asChild>
+                    <SidebarMenuButton asChild className="cursor-pointer h-12">
+                      <p><User/>{user?.teacher_name}</p>
+                    </SidebarMenuButton>
+                  </HoverCardTrigger>
+                </TooltipTrigger>
+                {state === "collapsed" && (
+                  <TooltipContent side="right">
+                    {user?.teacher_name}
+                  </TooltipContent>
+                )}
+              </Tooltip>
               <HoverCardContent className="w-80 ml-2.5 mb-2.5">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-3 pb-2 border-b">
