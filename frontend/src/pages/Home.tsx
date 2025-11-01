@@ -2,14 +2,15 @@ import MainCard from "@/components/MainCards";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Edit, Trash2, Plus} from "lucide-react";
+import { Edit, Trash2, Plus, Users} from "lucide-react";
 import { classrooms } from "@/api";
 import type { ClassroomResponse } from "@/api";
 import { useState, useEffect} from "react";
 import { toast } from "sonner";
 import { CreateEditDialogue } from "@/components/CreateEditDialogue";
 import { Spinner } from "@/components/ui/spinner";
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useClassroomRefresh } from "@/contexts/ClassroomContext"
 
 const Home = ()=>{
     const [classroom, setClassroom] = useState<ClassroomResponse[]>([]);
@@ -19,6 +20,8 @@ const Home = ()=>{
     const [createLoading, setCreateLoading] = useState<boolean>(false);
     const [editMode, setEditMode] = useState<boolean>(false);
     const [editingClassroomId, setEditingClassroomId] = useState<string>("");
+    
+    const { triggerRefresh } = useClassroomRefresh();
 
     const colors = [
         "bg-gradient-to-br from-blue-500 to-cyan-500",
@@ -71,6 +74,7 @@ const Home = ()=>{
                 if (Array.isArray(updatedClassrooms)) {
                     setClassroom(updatedClassrooms);
                 }
+                triggerRefresh(); // Notify sidebar to refresh
             }
         } catch (error: any) {
             toast.error(error.message || "Failed to delete classroom");
@@ -98,6 +102,7 @@ const Home = ()=>{
                 if (Array.isArray(updatedClassrooms)) {
                     setClassroom(updatedClassrooms);
                 }
+                triggerRefresh(); // Notify sidebar to refresh
             }
         } catch (error: any) {
             toast.error(error.message || "Failed to create classroom");
@@ -131,6 +136,7 @@ const Home = ()=>{
                 if (Array.isArray(updatedClassrooms)) {
                     setClassroom(updatedClassrooms);
                 }
+                triggerRefresh(); // Notify sidebar to refresh
             }
         } catch (error: any) {
             toast.error(error.message || "Failed to update classroom");
@@ -171,7 +177,7 @@ const Home = ()=>{
                 )}
                 <div className="flex flex-wrap gap-3 sm:gap-4 p-3 sm:p-5 justify-center sm:justify-start">
                     {classroom.length > 0 ? (
-                        classroom.map((classroomItem) => (
+                        classroom.map((classroomItem, index) => (
                             <MainCard
                                 key={classroomItem.classroom_id}
                                 title={classroomItem.classroom_name}
@@ -202,7 +208,7 @@ const Home = ()=>{
                                     </Button>
                                 }
                                 navigateTo={`/classroom/${classroomItem.classroom_id}`}
-                                color={colors[Math.floor(Math.random() * colors.length)]}
+                                color={colors[index%colors.length]}
                             />
                         ))
                     ) : (
@@ -216,6 +222,7 @@ const Home = ()=>{
                             </div>
                             ): (
                                 <div className="flex flex-col items-center gap-4 text-center">
+                                    <Users className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground"/>
                                     <p className="text-muted-foreground text-lg sm:text-2xl mb-2 sm:mb-3 px-4">
                                         No classrooms found. Create your classroom
                                     </p>

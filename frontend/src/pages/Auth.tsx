@@ -29,7 +29,6 @@ export function Auth() {
 	const {theme} = useTheme();
 	const { login, signup, verifyEmail, isAuthenticated, loading: authLoading } = useAuth();
 	const navigate = useNavigate();
-	const [error, setError] = useState<string>("");
 	const [loading, setLoading] = useState<boolean>(false);
 	const [showVerificationDialog, setShowVerificationDialog] = useState<boolean>(false);
 	const [verificationError, setVerificationError] = useState<string>("");
@@ -57,7 +56,6 @@ export function Auth() {
 
 	const handleSignupClick = async (e: React.FormEvent) => {
 		e.preventDefault();
-		setError("");
 		
 		// Validate all fields are filled
 		if (!signupData.teacher_name.trim() || !signupData.email.trim() || !signupData.password.trim()) {
@@ -87,7 +85,6 @@ export function Auth() {
 		} catch (err: any) {
 			setLoading(false);
 			const errorMessage = err.message || "Failed to send verification code. Please try again.";
-			setError(errorMessage);
 			toast.error(errorMessage);
 		}
 	};
@@ -120,7 +117,6 @@ export function Auth() {
 
 	const handleLogin = async (e: React.FormEvent) => {
 		e.preventDefault();
-		setError("");
 		
 		// Validate all fields are filled
 		if (!loginData.email.trim() || !loginData.password.trim()) {
@@ -144,7 +140,6 @@ export function Auth() {
 			navigate("/home");
 		} catch (err: any) {
 			const errorMessage = err.message || "Login failed. Please try again.";
-			setError(errorMessage);
 			toast.error(errorMessage);
 		} finally {
 			setLoading(false);

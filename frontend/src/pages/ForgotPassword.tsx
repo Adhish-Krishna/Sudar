@@ -26,8 +26,6 @@ const ForgotPassword = ()=>{
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [passwordMismatch, setPasswordMismatch] = useState(false);
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
     const [showTokenDialog, setShowTokenDialog] = useState(false);
     const [tokenError, setTokenError] = useState("");
@@ -41,8 +39,6 @@ const ForgotPassword = ()=>{
 
     const handleResetClick = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError("");
-        setSuccess("");
 
         // Validate all fields are filled
         if (!email.trim() || !newPassword.trim() || !confirmPassword.trim()) {
@@ -52,14 +48,12 @@ const ForgotPassword = ()=>{
 
         // Validate passwords match
         if (newPassword !== confirmPassword) {
-            setError("Passwords do not match");
             toast.error("Passwords do not match");
             return;
         }
 
         // Validate password length
         if (newPassword.length < 8) {
-            setError("Password must be at least 8 characters long");
             toast.error("Password must be at least 8 characters long");
             return;
         }
@@ -83,7 +77,6 @@ const ForgotPassword = ()=>{
         } catch (err: any) {
             setLoading(false);
             const errorMessage = err.message || "Failed to send reset code. Please try again.";
-            setError(errorMessage);
             toast.error(errorMessage);
         }
     };
@@ -107,7 +100,6 @@ const ForgotPassword = ()=>{
             // Show success message from backend
             const successMessage = result.message || "Password reset successful!";
             toast.success(successMessage);
-            setSuccess(successMessage + " Redirecting to login...");
             setTimeout(() => {
                 navigate("/auth");
             }, 2000);

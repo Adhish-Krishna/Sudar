@@ -19,9 +19,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Edit, Trash2, Plus, BookOpen, Users, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
+import { useClassroomRefresh } from "@/contexts/ClassroomContext";
 
 const Classroom = ()=>{
     const { classroom_id } = useParams<{ classroom_id: string }>();
+    const { triggerRefresh } = useClassroomRefresh();
     
     // Subject states
     const [subjectList, setSubjectList] = useState<SubjectResponse[]>([]);
@@ -140,6 +142,7 @@ const Classroom = ()=>{
                 setIsSubjectDialogOpen(false);
                 setSubjectName("");
                 await fetchSubjects();
+                triggerRefresh();
             }
         } catch (error: any) {
             toast.error(error.message || "Failed to create subject");
@@ -170,6 +173,7 @@ const Classroom = ()=>{
                 setSubjectEditMode(false);
                 setEditingSubjectId("");
                 await fetchSubjects();
+                triggerRefresh();
             }
         } catch (error: any) {
             toast.error(error.message || "Failed to update subject");
@@ -189,6 +193,7 @@ const Classroom = ()=>{
             } else {
                 toast.success("Subject deleted successfully!");
                 await fetchSubjects();
+                triggerRefresh();
             }
         } catch (error: any) {
             toast.error(error.message || "Failed to delete subject");

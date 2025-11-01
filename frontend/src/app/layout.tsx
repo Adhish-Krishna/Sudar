@@ -1,5 +1,6 @@
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ClassroomProvider } from "@/contexts/ClassroomContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import type { ReactNode } from "react";
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="sudar-ui-theme">
       <AuthProvider>
-        {children}
+        <ClassroomProvider>
+          {children}
+        </ClassroomProvider>
       </AuthProvider>
     </ThemeProvider>
   );
