@@ -39,7 +39,7 @@ const MainCard = ({title, editButton, deleteButton, navigateTo, color}:MainCardP
             onClick={handleCardClick}
         >
             <div className="flex justify-between items-start h-full">
-                <div className="flex flex-col justify-between h-full">
+                <div className="flex flex-col justify-between h-full flex-1 min-w-0 pr-2">
                     <p className="font-bold text-xl sm:text-2xl text-white wrap-break-word line-clamp-2">{title}</p>
                 </div>
                 

@@ -19,6 +19,7 @@ import {
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
 import { colors } from "@/colors";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Home = ()=>{
     const [classroom, setClassroom] = useState<ClassroomResponse[]>([]);
@@ -28,6 +29,7 @@ const Home = ()=>{
     const [createLoading, setCreateLoading] = useState<boolean>(false);
     const [editMode, setEditMode] = useState<boolean>(false);
     const [editingClassroomId, setEditingClassroomId] = useState<string>("");
+    const isMobile = useIsMobile();
     
     const { triggerRefresh } = useClassroomRefresh();
     
@@ -164,7 +166,7 @@ const Home = ()=>{
                         <BreadcrumbItem>
                             <BreadcrumbPage className="flex items-center gap-1.5">
                                 <HomeIcon className="h-4 w-4" />
-                                Home
+                                {!isMobile && "Home"}
                             </BreadcrumbPage>
                         </BreadcrumbItem>
                     </BreadcrumbList>

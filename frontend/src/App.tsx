@@ -8,6 +8,7 @@ import RootLayout, { AuthLayout, DashboardLayout } from "./app/layout";
 import { Toaster } from "./components/ui/sonner";
 import Classroom from "./pages/Classroom";
 import Subject from "./pages/Subject";
+import Chat from "./pages/Chat";
 
 function App() {
 
@@ -56,7 +57,15 @@ function App() {
               </ProtectedRoute>
             </DashboardLayout>
           }/>
-          
+
+          <Route path="/chat/:classroom_id/:subject_id/:color" element={
+            <DashboardLayout>
+              <ProtectedRoute>
+                <Chat/>
+              </ProtectedRoute>
+            </DashboardLayout>
+          }/>
+
         </Routes>
       </BrowserRouter>
       <Toaster position="top-center"/>

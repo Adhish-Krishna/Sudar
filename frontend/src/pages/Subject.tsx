@@ -16,7 +16,8 @@ import ActivityCard from "@/components/ActivityCard";
 import { activities, subjects, classrooms, type ActivityResponse } from "@/api";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
-import { RainbowButton } from "@/components/ui/rainbow-button"
+import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Subject = ()=>{
     const {classroom_id, subject_id, color} = useParams<{classroom_id: string, subject_id: string, color: string}>();
@@ -25,6 +26,7 @@ const Subject = ()=>{
     const [subjectName, setSubjectName] = useState<string>("");
     const [activityList, setActivityList] = useState<ActivityResponse[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const isMobile = useIsMobile();
 
     useEffect(()=>{
         const fetchClassroomAndSubject = async ()=>{
@@ -96,7 +98,7 @@ const Subject = ()=>{
                                     className="flex items-center gap-1.5"
                                 >
                                     <HomeIcon className="h-4 w-4" />
-                                    Home
+                                    {!isMobile && "Home"}
                                 </button>
                             </BreadcrumbLink>
                         </BreadcrumbItem>
@@ -108,14 +110,14 @@ const Subject = ()=>{
                                     className="flex items-center gap-1.5"
                                 >
                                     <Users className="h-4 w-4" />
-                                    {classroomName || "Classroom"}
+                                    {!isMobile && (classroomName || "Classroom")}
                                 </button>
                             </BreadcrumbLink>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator/>
                         <BreadcrumbItem>
                             <BreadcrumbPage className="flex items-center gap-1.5">
-                                <BookOpen className="h-4 w-4"/>{subjectName || "Subject"}
+                                <BookOpen className="h-4 w-4"/>{!isMobile &&(subjectName || "Subject")}
                             </BreadcrumbPage>
                         </BreadcrumbItem>
                     </BreadcrumbList>
@@ -157,12 +159,12 @@ const Subject = ()=>{
                                             <div className="text-center">
                                                 <p className="text-lg font-semibold text-muted-foreground">No Activities Found</p>
                                                 <p className="text-sm text-muted-foreground mt-1">Create your first activity to get started</p>
-                                                <RainbowButton className="mt-4 transition-transform hover:scale-110" size={"lg"} variant={"default"} onClick={()=>navigate("/chat")}>
+                                                <Button className="mt-4 transition-transform hover:scale-110" size={"lg"} onClick={()=>navigate(`/chat/${classroom_id}/${subject_id}/${color}`)}>
                                                     <Bot/> 
                                                     <p className="font-semibold">
                                                         Ask Sudar AI
                                                     </p>
-                                                </RainbowButton>
+                                                </Button>
                                             </div>
                                         </div>
                                     )}
@@ -173,12 +175,12 @@ const Subject = ()=>{
                 </div>
             </div>
             {activityList.length>0 && (
-                <RainbowButton className="fixed bottom-10 right-10 transition-transform hover:scale-110 shadow-lg z-40" size={"sm"} variant={"default"} onClick={()=>navigate('/chat')}>
+                <Button className="fixed bottom-10 right-10 transition-transform hover:scale-110 shadow-lg z-40" size={"sm"} onClick={()=>navigate(`/chat/${classroom_id}/${subject_id}/${color}`)}>
                     <Bot/> 
                     <p className="font-semibold">
                         Ask Sudar AI
                     </p>
-                </RainbowButton>
+                </Button>
             )}
 
         </>

@@ -30,11 +30,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { colors as subjectColors } from "@/colors";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Classroom = ()=>{
     const { classroom_id } = useParams<{ classroom_id: string }>();
     const { triggerRefresh } = useClassroomRefresh();
     const navigate = useNavigate();
+    const isMobile = useIsMobile();
     
     // Classroom state
     const [classroomName, setClassroomName] = useState<string>("");
@@ -362,14 +364,14 @@ const Classroom = ()=>{
                                     className="flex items-center gap-1.5"
                                 >
                                     <HomeIcon className="h-4 w-4" />
-                                    Home
+                                    {!isMobile && "Home"}
                                 </button>
                             </BreadcrumbLink>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
                             <BreadcrumbPage className="flex items-center gap-1.5">
-                                <Users className="h-4 w-4"/>{classroomName || "Classroom"}
+                                <Users className="h-4 w-4"/>{!isMobile && (classroomName || "Classroom")}
                             </BreadcrumbPage>
                         </BreadcrumbItem>
                     </BreadcrumbList>
