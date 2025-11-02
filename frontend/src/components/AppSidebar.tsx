@@ -1,6 +1,7 @@
 import {Home, Inbox, LogOut, User, Sun, Moon, Mail, IdCard, ChevronRight, Users, BookOpen} from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import { ScrollArea } from "./ui/scroll-area";
+import { colors as subjectColors } from "@/colors";
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +32,7 @@ import { useState, useEffect } from "react"
 import { classrooms, subjects } from "@/api"
 import type { ClassroomResponse, SubjectResponse } from "@/api"
 import { useClassroomRefresh } from "@/contexts/ClassroomContext"
+import { AuroraText } from "./ui/aurora-text";
 
 const sidebarContentItems = [
   {
@@ -136,7 +138,11 @@ export function AppSidebar() {
       collapsible="icon"
     >
       <SidebarHeader>
-          <SidebarGroupLabel className="font-bold text-3xl text-blue-400 mb-2.5">Sudar</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            <AuroraText className="text-4xl font-bold">
+              Sudar
+            </AuroraText>
+          </SidebarGroupLabel>
       </SidebarHeader>
       <SidebarContent>
         <ScrollArea className="h-full w-full">
@@ -222,11 +228,11 @@ export function AppSidebar() {
                               <CollapsibleContent>
                                 <SidebarMenuSub className="ml-4 border-l-2 border-muted pl-2">
                                   {classroomSubjects[classroom.classroom_id]?.length > 0 ? (
-                                    classroomSubjects[classroom.classroom_id].map((subject) => (
+                                    classroomSubjects[classroom.classroom_id].map((subject, index) => (
                                       <SidebarMenuSubItem key={subject.subject_id}>
                                         <SidebarMenuSubButton asChild>
                                           <button 
-                                            onClick={() => navigate(`/subject/${subject.subject_id}`)}
+                                            onClick={() => navigate(`/subject/${classroom.classroom_id}/${subject.subject_id}/${encodeURIComponent(subjectColors[index % subjectColors.length])}`)}
                                             className="flex items-center gap-2"
                                           >
                                             <BookOpen className="h-3.5 w-3.5" />

@@ -9,8 +9,8 @@ import enum
 
 class ActivityType(enum.Enum):
     """Enum for activity types"""
-    WORKSHEET = "Worksheet"
-    CONTENT = "Content"
+    Worksheet = "Worksheet"
+    Content = "Content"
 
 
 class Teacher(Base):

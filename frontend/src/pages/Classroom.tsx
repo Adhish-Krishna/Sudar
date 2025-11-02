@@ -446,10 +446,7 @@ const Classroom = ()=>{
                                 <div className="w-full h-[60vh] flex items-center justify-center flex-col gap-3 px-4">
                                     {subjectsLoading ? (
                                         <div className="flex flex-col items-center gap-4">
-                                            <Button disabled size="default" className="w-full sm:w-auto">
-                                                <Spinner />
-                                                <span className="ml-2">Loading Subjects</span>
-                                            </Button>
+                                            <Spinner className="size-8"/>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center gap-4 text-center">
@@ -542,10 +539,7 @@ const Classroom = ()=>{
                                 <div className="w-full h-[60vh] flex items-center justify-center flex-col gap-3 px-4">
                                     {studentsLoading ? (
                                         <div className="flex flex-col items-center gap-4">
-                                            <Button disabled size="default" className="w-full sm:w-auto">
-                                                <Spinner />
-                                                <span className="ml-2">Loading Students</span>
-                                            </Button>
+                                            <Spinner className="size-8" />
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center gap-4 text-center">

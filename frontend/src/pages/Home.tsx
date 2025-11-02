@@ -227,10 +227,7 @@ const Home = ()=>{
                         <div className="w-full h-[70vh] flex items-center justify-center flex-col gap-3">
                             {loading? (
                             <div className="flex flex-col items-center gap-4">
-                                <Button disabled size="default" className="w-full sm:w-auto">
-                                    <Spinner />
-                                    <span className="ml-2">Loading Classrooms</span>
-                                </Button>
+                                <Spinner className="size-8"/>
                             </div>
                             ): (
                                 <div className="flex flex-col items-center gap-4 text-center">
