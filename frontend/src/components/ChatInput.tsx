@@ -40,6 +40,28 @@ const ChatInput = ({maxHeight, messageHandler}:ChatInputProps)=>{
                             contentEditable
                             onInput={(e) => setMessage(e.currentTarget.textContent || "")}
                             onKeyDown={handleKeyDown}
+                            onPaste={(e: React.ClipboardEvent<HTMLDivElement>) => {
+                                e.preventDefault();
+                                const text = e.clipboardData.getData("text/plain");
+                                if (!text) return;
+                                const sel = window.getSelection();
+                                if (!sel || !sel.rangeCount) {
+                                    if (inputRef.current) {
+                                        inputRef.current.textContent = (inputRef.current.textContent || "") + text;
+                                    }
+                                } else {
+                                    const range = sel.getRangeAt(0);
+                                    range.deleteContents();
+                                    const textNode = document.createTextNode(text);
+                                    range.insertNode(textNode);
+                                    // Move caret after inserted text
+                                    range.setStartAfter(textNode);
+                                    range.collapse(true);
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                }
+                                setMessage(inputRef.current?.textContent || "");
+                            }}
                             data-placeholder="Message Sudar"
                             className="w-full min-h-10 px-2 md:px-3 py-2 text-sm md:text-base bg-transparent border-0 outline-none focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/60 empty:before:pointer-events-none"
                             style={{ maxHeight: `${maxHeight}px` }}

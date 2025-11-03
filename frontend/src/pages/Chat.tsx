@@ -11,10 +11,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Home as HomeIcon, Users, MessageSquare, Bot, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
-import { useState, useEffect} from "react";
-import { subjects, classrooms, ragService, documents, sudarAgent, type MinioDocument, type ChatMetadata} from "@/api";
+import { useState, useEffect, useRef} from "react";
+import { subjects, classrooms, documents, sudarAgent, type MinioDocument, type ChatMetadata, type SSEEvent} from "@/api";
 import { toast } from "sonner";
-import { Spinner } from "@/components/ui/spinner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -23,15 +22,36 @@ import { Separator } from "@/components/ui/separator";
 import ChatInput from "@/components/ChatInput";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuroraText } from "@/components/ui/aurora-text";
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Response } from "@/components/ai-elements/response";
 
 const Chat = ()=>{
+    // Generate UUID v4
+    const generateUUID = (): string => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    };
+
     const {classroom_id, subject_id, color} = useParams<{classroom_id: string, subject_id: string, color: string}>();
     const navigate = useNavigate();
     const [classroomName, setClassroomName] = useState<string>("");
     const [subjectName, setSubjectName] = useState<string>("");
     const isMobile = useIsMobile();
-    const [chatId, setChatId] = useState<string | null>(null);
+    const [chatId, setChatId] = useState<string | null>(generateUUID());
     const {user} = useAuth();
+    
+    // Chat messages state
+    interface Message {
+        role: 'user' | 'assistant';
+        content: string;
+    }
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [currentResponse, setCurrentResponse] = useState("");
+    const abortControllerRef = useRef<(() => void) | null>(null);
     
     // Files state
     const [filesOpen, setFilesOpen] = useState(false);
@@ -76,7 +96,87 @@ const Chat = ()=>{
         fetchClassroomAndSubject();
     }, [classroom_id, subject_id]);
 
-    const sendMessage = ()=>{
+    // Load chat history when chatId changes
+    useEffect(() => {
+        const loadChatHistory = async () => {
+            if (!chatId || !user?.teacher_id || !subject_id) return;
+            
+            try {
+                const history = await sudarAgent.getChatHistory(chatId, user.teacher_id, subject_id, 50);
+                
+                if (history.status && history.status !== 200) {
+                    // New chat, no history
+                    setMessages([]);
+                } else if (Array.isArray(history)) {
+                    // Convert chat history to messages
+                    const loadedMessages: Message[] = history.map((msg: any) => ({
+                        role: msg.role === 'user' ? 'user' : 'assistant',
+                        content: msg.content
+                    }));
+                    setMessages(loadedMessages);
+                }
+            } catch (error: any) {
+                console.error("Failed to load chat history:", error);
+                setMessages([]);
+            }
+        };
+
+        loadChatHistory();
+    }, [chatId, user?.teacher_id, subject_id]);
+
+    const sendMessage = async (message: string) => {
+        
+        if (!chatId || !user?.teacher_id || !subject_id || !message.trim()) {
+            toast.error("Cannot send message. Please start a new chat.");
+            return;
+        }
+
+        // Add user message to chat
+        const userMessage: Message = { role: 'user', content: message };
+        setMessages(prev => [...prev, userMessage]);
+        setIsStreaming(true);
+        setCurrentResponse("");
+
+        let accumulatedResponse = "";
+
+        try {
+            const abortFn = await sudarAgent.streamChat(
+                {
+                    user_id: user.teacher_id,
+                    chat_id: chatId,
+                    subject_id: subject_id,
+                    query: message
+                },
+                {
+                    onEvent: (event: SSEEvent) => {
+                        if (event.type === 'token') {
+                            accumulatedResponse += event.content;
+                            setCurrentResponse(accumulatedResponse);
+                        } else if (event.type === 'done') {
+                            // Finalize the assistant message
+                            setMessages(prev => [...prev, { role: 'assistant', content: accumulatedResponse }]);
+                            setCurrentResponse("");
+                            setIsStreaming(false);
+                        } else if (event.type === 'error') {
+                            toast.error(event.content || "Error during streaming");
+                            setIsStreaming(false);
+                            setCurrentResponse("");
+                        }
+                    },
+                    onError: (error: any) => {
+                        toast.error(error.message || "Failed to send message");
+                        setIsStreaming(false);
+                        setCurrentResponse("");
+                    }
+                }
+            );
+
+            abortControllerRef.current = abortFn;
+        } catch (error: any) {
+            toast.error(error.message || "Failed to send message");
+            setIsStreaming(false);
+            setCurrentResponse("");
+        }
 
     }
 
@@ -233,15 +333,6 @@ const Chat = ()=>{
         }
     };
 
-    // Generate UUID v4
-    const generateUUID = (): string => {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    };
-
     // Handle new chat creation
     const handleNewChat = () => {
         const newChatId = generateUUID();
@@ -336,7 +427,7 @@ const Chat = ()=>{
                                         </p>
                                     </div>
                                     
-                                    <ScrollArea className="max-h-[400px]">
+                                    <ScrollArea className="h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px]">
                                         {loadingFiles ? (
                                             <div className="flex items-center justify-center py-8">
                                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -459,7 +550,7 @@ const Chat = ()=>{
                                         </p>
                                     </div>
                                     
-                                    <ScrollArea className="max-h-[400px]">
+                                    <ScrollArea className="h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px]">
                                         {loadingHistory ? (
                                             <div className="flex items-center justify-center py-8">
                                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -538,7 +629,7 @@ const Chat = ()=>{
                 </div>
 
                 {/*Scrollable area for chat messages*/}
-                    {!chatId ? (
+                    {messages.length == 0 ? (
                         <div className="w-full h-[60%] flex flex-col items-center justify-center">
                             <div className="text-center space-y-4 px-4">
                                     <h2 className="text-3xl font-bold">
@@ -550,8 +641,88 @@ const Chat = ()=>{
                             </div>
                         </div>
                     ) : (
-                        
                         <ScrollArea className="w-full h-[60%]">
+                            <Conversation>
+                                <ConversationContent>
+                                    <div className="space-y-6">
+                                        {messages.map((msg, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                            >
+                                                {msg.role === 'assistant' && (
+                                                    <div className="shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                            <Bot className="w-5 h-5 text-primary" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className={`rounded-lg px-4 py-3 max-w-[80%] ${
+                                                        msg.role === 'user'
+                                                            ? 'bg-primary text-primary-foreground'
+                                                            : 'bg-muted'
+                                                    }`}
+                                                >
+                                                    {msg.role === 'user' ? (
+                                                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                    ) : (
+                                                        <Response
+                                                         className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                                                         parseIncompleteMarkdown={true}
+                                                         >
+                                                            {msg.content}
+                                                        </Response>
+                                                    )}
+                                                </div>
+                                                {msg.role === 'user' && (
+                                                    <div className="shrink-0">
+                                                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                                                            {user?.teacher_name?.charAt(0).toUpperCase() || 'T'}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        
+                                        {/* Streaming response */}
+                                        {isStreaming && currentResponse && (
+                                            <div className="flex gap-3 justify-start">
+                                                <div className="shrink-0">
+                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                        <Bot className="w-5 h-5 text-primary animate-pulse" />
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-lg px-4 py-3 max-w-[80%] bg-muted">
+                                                    <Response className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                                                    parseIncompleteMarkdown={true}>
+                                                        {currentResponse}
+                                                    </Response>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Loading indicator */}
+                                        {isStreaming && !currentResponse && (
+                                            <div className="flex gap-3 justify-start">
+                                                <div className="shrink-0">
+                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                        <Bot className="w-5 h-5 text-primary animate-pulse" />
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-lg px-4 py-3 bg-muted">
+                                                    <div className="flex gap-1">
+                                                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]"></div>
+                                                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]"></div>
+                                                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </ConversationContent>
+                                <ConversationScrollButton />
+                            </Conversation>
                         </ScrollArea>
                     )}
                 {/* Div for chat input box */}
