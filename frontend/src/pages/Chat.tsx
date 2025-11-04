@@ -12,27 +12,23 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Home as HomeIcon, Users, MessageSquare, Bot, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
 import { useState, useEffect, useRef} from "react";
-import { subjects, classrooms, documents, sudarAgent, type MinioDocument, type ChatMetadata, type SSEEvent} from "@/api";
+import { subjects, classrooms, documents, sudarAgent, ragService, type MinioDocument, type ChatMetadata, type SSEEvent} from "@/api";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
 import ChatInput from "@/components/ChatInput";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuroraText } from "@/components/ui/aurora-text";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Response } from "@/components/ai-elements/response";
+import FilesAndChat from "@/components/FilesAndChat";
+import type { Section } from "@/components/FilesAndChat";
 
 const Chat = ()=>{
     // Generate UUID v4
     const generateUUID = (): string => {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return crypto.randomUUID();
     };
 
     const {classroom_id, subject_id, color} = useParams<{classroom_id: string, subject_id: string, color: string}>();
@@ -67,6 +63,12 @@ const Chat = ()=>{
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
     // const [input, setInput] = useState<string>("");
+
+    // File upload state
+    const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
+    const [processingFiles, setProcessingFiles] = useState<Map<string, string>>(new Map()); // filename -> job_id
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const pollingIntervalsRef = useRef<Map<string, number>>(new Map());
 
     useEffect(()=>{
         const fetchClassroomAndSubject = async ()=>{
@@ -123,6 +125,88 @@ const Chat = ()=>{
 
         loadChatHistory();
     }, [chatId, user?.teacher_id, subject_id]);
+
+    // Cleanup polling intervals on unmount
+    useEffect(() => {
+        return () => {
+            // Clear all polling intervals when component unmounts
+            pollingIntervalsRef.current.forEach((intervalId) => {
+                clearInterval(intervalId);
+            });
+            pollingIntervalsRef.current.clear();
+        };
+    }, []);
+
+    // Fetch files when dialog opens
+    useEffect(() => {
+        if (filesOpen) {
+            fetchFiles();
+        }
+    }, [filesOpen]);
+
+    // Fetch chat history when dialog opens
+    useEffect(() => {
+        if (historyOpen) {
+            fetchChatHistory();
+        }
+    }, [historyOpen]);
+
+    // Poll for job status
+    const pollJobStatus = async (jobId: string, filename: string) => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const statusResponse = await ragService.getJobStatus(jobId);
+                
+                if (statusResponse.status === 'completed') {
+                    // Job completed successfully
+                    clearInterval(pollInterval);
+                    pollingIntervalsRef.current.delete(filename);
+                    
+                    setProcessingFiles(prev => {
+                        const newMap = new Map(prev);
+                        newMap.delete(filename);
+                        return newMap;
+                    });
+                    
+                    toast.success(`${filename} processed successfully!`);
+                    
+                    // Refresh the files list to show the newly processed file
+                    if (filesOpen) {
+                        fetchFiles();
+                    }
+                } else if (statusResponse.status === 'failed') {
+                    // Job failed
+                    clearInterval(pollInterval);
+                    pollingIntervalsRef.current.delete(filename);
+                    
+                    setProcessingFiles(prev => {
+                        const newMap = new Map(prev);
+                        newMap.delete(filename);
+                        return newMap;
+                    });
+                    
+                    toast.error(`Failed to process ${filename}: ${statusResponse.message || 'Unknown error'}`);
+                } else if (typeof statusResponse.status === 'number') {
+                    // Error response from API
+                    clearInterval(pollInterval);
+                    pollingIntervalsRef.current.delete(filename);
+                    
+                    setProcessingFiles(prev => {
+                        const newMap = new Map(prev);
+                        newMap.delete(filename);
+                        return newMap;
+                    });
+                    
+                    toast.error(`Error checking status for ${filename}`);
+                }
+                // Otherwise, job is still processing, continue polling
+            } catch (error: any) {
+                console.error(`Error polling job status for ${filename}:`, error);
+            }
+        }, 3000); // Poll every 3 seconds
+
+        pollingIntervalsRef.current.set(filename, pollInterval);
+    };
 
     const sendMessage = async (message: string) => {
         
@@ -340,10 +424,94 @@ const Chat = ()=>{
         toast.success("New chat created");
     };
 
+    // Handle file upload
+    const handleAddFiles = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
 
+    // Handle file selection and upload
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+        if (!chatId || !user?.teacher_id || !subject_id) {
+            toast.error("Cannot upload files. Please start a new chat.");
+            return;
+        }
+
+        const acceptedTypes = [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        ];
+
+        const filesToUpload = Array.from(files).filter(file => {
+            if (!acceptedTypes.includes(file.type)) {
+                toast.error(`File ${file.name} is not a supported type. Only .pdf, .docx, and .pptx files are allowed.`);
+                return false;
+            }
+            return true;
+        });
+
+        if (filesToUpload.length === 0) return;
+
+        // Upload files one by one
+        for (const file of filesToUpload) {
+            setUploadingFiles(prev => [...prev, file.name]);
+            
+            const uploadToast = toast.loading(`Uploading ${file.name}...`);
+            
+            try {
+                const response = await ragService.ingestDocument(
+                    file,
+                    user.teacher_id,
+                    chatId,
+                    subject_id
+                );
+
+                // Check if response is an error (has numeric status code)
+                if (typeof response.status === 'number' && response.status !== 200) {
+                    toast.error(response.message || `Failed to upload ${file.name}`, { id: uploadToast });
+                }
+                // Success response has string status and job_id
+                else if (response.job_id) {
+                    toast.success(`${file.name} uploaded successfully. Processing...`, { id: uploadToast });
+                    
+                    // Add to processing files and start polling
+                    setProcessingFiles(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(file.name, response.job_id);
+                        return newMap;
+                    });
+                    
+                    // Start polling for job status
+                    pollJobStatus(response.job_id, file.name);
+                }
+            } catch (error: any) {
+                toast.error(error.message || `Failed to upload ${file.name}`, { id: uploadToast });
+            } finally {
+                setUploadingFiles(prev => prev.filter(name => name !== file.name));
+            }
+        }
+
+        // Reset file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
 
     return(
         <>
+            {/* Hidden file input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.pptx"
+                multiple
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+            />
             {/* Header with Sidebar Trigger and Breadcrumb */}
             <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-50">
                 <SidebarTrigger className="-ml-1" />
@@ -412,209 +580,236 @@ const Chat = ()=>{
                                 </TooltipContent>
                             )}
                         </Tooltip>
-                        <Popover open={filesOpen} onOpenChange={handleFilesOpenChange}>
-                            <PopoverTrigger asChild>
-                                <button className="flex flex-row gap-2 items-center px-4 py-2 rounded-lg hover:bg-accent transition-colors text-sm font-medium border">
-                                    <Files className="h-4 w-4"/> {!isMobile && "Files"}
-                                </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-96 max-h-[500px] p-0 mt-3" align="end">
-                                <div className="flex flex-col">
-                                    <div className="px-4 py-3 border-b">
-                                        <h3 className="font-semibold text-sm">Chat Files</h3>
-                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                            {selectedFiles.size > 0 ? `${selectedFiles.size} file(s) selected` : "Select files to perform actions"}
-                                        </p>
-                                    </div>
-                                    
-                                    <ScrollArea className="h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px]">
-                                        {loadingFiles ? (
-                                            <div className="flex items-center justify-center py-8">
-                                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                            </div>
-                                        ) : (
-                                            <div className="p-2">
-                                                {/* Input Documents */}
-                                                {inputDocs.length > 0 && (
-                                                    <div className="mb-4">
-                                                        <div className="px-2 py-1.5">
-                                                            <h4 className="text-xs font-semibold text-muted-foreground uppercase">Input Files</h4>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            {inputDocs.map((doc) => (
-                                                                <div
-                                                                    key={doc.name}
-                                                                    className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent transition-colors group"
-                                                                >
-                                                                    <Checkbox
-                                                                        checked={selectedFiles.has(doc.name)}
-                                                                        onCheckedChange={() => toggleFileSelection(doc.name)}
-                                                                        className="shrink-0"
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => handleDownloadFile(doc.name, 'input')}
-                                                                        className="flex items-center gap-2 flex-1 text-left min-w-0"
-                                                                        disabled={downloadingFile === doc.name}
-                                                                    >
-                                                                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="text-sm truncate">{doc.name}</p>
-                                                                            <p className="text-xs text-muted-foreground">
-                                                                                {(doc.size / 1024).toFixed(2)} KB
-                                                                            </p>
-                                                                        </div>
-                                                                        {downloadingFile === doc.name ? (
-                                                                            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                                                                        ) : (
-                                                                            <Download className="h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                        )}
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
+                        
+                        {/* Files Button */}
+                        <button 
+                            onClick={() => setFilesOpen(true)}
+                            className="flex flex-row gap-2 items-center px-4 py-2 rounded-lg hover:bg-accent transition-colors text-sm font-medium border relative"
+                        >
+                            <Files className="h-4 w-4"/> {!isMobile && "Files"}
+                            {processingFiles.size > 0 && (
+                                <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-primary text-primary-foreground text-xs rounded-full animate-pulse">
+                                    {processingFiles.size}
+                                </span>
+                            )}
+                        </button>
 
-                                                {/* Separator if both types exist */}
-                                                {inputDocs.length > 0 && outputDocs.length > 0 && (
-                                                    <Separator className="my-2" />
-                                                )}
-
-                                                {/* Output Documents */}
-                                                {outputDocs.length > 0 && (
-                                                    <div>
-                                                        <div className="px-2 py-1.5">
-                                                            <h4 className="text-xs font-semibold text-muted-foreground uppercase">Output Files</h4>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            {outputDocs.map((doc) => (
-                                                                <div
-                                                                    key={doc.name}
-                                                                    className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent transition-colors group"
-                                                                >
-                                                                    <Checkbox
-                                                                        checked={selectedFiles.has(doc.name)}
-                                                                        onCheckedChange={() => toggleFileSelection(doc.name)}
-                                                                        className="shrink-0"
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => handleDownloadFile(doc.name, 'output')}
-                                                                        className="flex items-center gap-2 flex-1 text-left min-w-0"
-                                                                        disabled={downloadingFile === doc.name}
-                                                                    >
-                                                                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="text-sm truncate">{doc.name}</p>
-                                                                            <p className="text-xs text-muted-foreground">
-                                                                                {(doc.size / 1024).toFixed(2)} KB
-                                                                            </p>
-                                                                        </div>
-                                                                        {downloadingFile === doc.name ? (
-                                                                            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                                                                        ) : (
-                                                                            <Download className="h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                        )}
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Empty state */}
-                                                {!loadingFiles && inputDocs.length === 0 && outputDocs.length === 0 && (
-                                                    <div className="py-8 text-center">
-                                                        <Files className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
-                                                        <p className="text-sm text-muted-foreground">No files found</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">Upload files to get started</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </ScrollArea>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-                        <Popover open={historyOpen} onOpenChange={handleHistoryOpenChange}>
-                            <PopoverTrigger asChild>
-                                <button className="flex flex-row gap-2 items-center px-4 py-2 rounded-lg hover:bg-accent transition-colors text-sm font-medium border">
-                                    <History className="h-4 w-4"/> {!isMobile && "History"}
-                                </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-96 max-h-[500px] p-0 mt-3" align="end">
-                                <div className="flex flex-col">
-                                    <div className="px-4 py-3 border-b">
-                                        <h3 className="font-semibold text-sm">Chat History</h3>
-                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                            {chatHistory.length} chat{chatHistory.length !== 1 ? 's' : ''} found
-                                        </p>
-                                    </div>
-                                    
-                                    <ScrollArea className="h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px]">
-                                        {loadingHistory ? (
-                                            <div className="flex items-center justify-center py-8">
-                                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                            </div>
-                                        ) : (
-                                            <div className="p-2">
-                                                {chatHistory.length > 0 ? (
-                                                    <div className="space-y-1">
-                                                        {chatHistory.map((chat) => (
-                                                            <div
-                                                                key={chat.chat_id}
-                                                                className="flex items-center gap-2 px-3 py-3 rounded-md hover:bg-accent transition-colors group border border-transparent hover:border-border"
+                        {/* Files Dialog */}
+                        <FilesAndChat
+                            open={filesOpen}
+                            onOpenChange={handleFilesOpenChange}
+                            title="Chat Files"
+                            description={
+                                processingFiles.size > 0 
+                                    ? `${processingFiles.size} file(s) processing` 
+                                    : selectedFiles.size > 0 
+                                        ? `${selectedFiles.size} file(s) selected` 
+                                        : "Select files to perform actions"
+                            }
+                            maxWidth="max-w-3xl"
+                            scrollAreaHeight="h-[65vh]"
+                            sections={[
+                                ...(loadingFiles ? [{
+                                    id: "loading",
+                                    content: (
+                                        <div className="flex items-center justify-center py-8">
+                                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                        </div>
+                                    )
+                                }] : [
+                                    ...(inputDocs.length > 0 ? [{
+                                        id: "input-files",
+                                        title: "Input Files",
+                                        searchableText: inputDocs.map(doc => doc.name.split('/').pop()).join(' '),
+                                        content: (
+                                            <div className="space-y-1">
+                                                {inputDocs.map((doc) => {
+                                                    const isProcessing = processingFiles.has(doc.name);
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={doc.name}
+                                                            className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent transition-colors group"
+                                                        >
+                                                            {isProcessing ? (
+                                                                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                                                            ) : (
+                                                                <Checkbox
+                                                                    checked={selectedFiles.has(doc.name)}
+                                                                    onCheckedChange={() => toggleFileSelection(doc.name)}
+                                                                    className="shrink-0"
+                                                                />
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleDownloadFile(doc.name, 'input')}
+                                                                className="flex items-center gap-2 flex-1 text-left min-w-0"
+                                                                disabled={downloadingFile === doc.name || isProcessing}
                                                             >
-                                                                <button
-                                                                    onClick={() => setChatId(chat.chat_id)}
-                                                                    className="flex items-start gap-3 flex-1 text-left min-w-0"
-                                                                >
-                                                                    <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <p className="text-sm font-medium truncate">
-                                                                                Chat {chat.chat_id.slice(0, 8)}
-                                                                            </p>
-                                                                            {chat.chat_id === chatId && (
-                                                                                <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
-                                                                                    Active
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                            <span>{chat.message_count} message{chat.message_count !== 1 ? 's' : ''}</span>
-                                                                            <span>•</span>
-                                                                            <span>{formatTimestamp(chat.latest_timestamp)}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteChat(chat.chat_id)}
-                                                                    disabled={deletingChatId === chat.chat_id}
-                                                                    className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                                                                    title="Delete chat"
-                                                                >
-                                                                    {deletingChatId === chat.chat_id ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    )}
-                                                                </button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <div className="py-8 text-center">
-                                                        <History className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
-                                                        <p className="text-sm text-muted-foreground">No chat history</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">Start a conversation to see it here</p>
-                                                    </div>
-                                                )}
+                                                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm truncate">
+                                                                        {doc.name.split('/').pop()}
+                                                                        {isProcessing && (
+                                                                            <span className="ml-2 text-xs text-primary">Processing...</span>
+                                                                        )}
+                                                                    </p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {(doc.size / 1024).toFixed(2)} KB
+                                                                    </p>
+                                                                </div>
+                                                                {downloadingFile === doc.name ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                                                                ) : (
+                                                                    <Download className="h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        )}
-                                    </ScrollArea>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
+                                        )
+                                    }] : []),
+                                    ...(outputDocs.length > 0 ? [{
+                                        id: "output-files",
+                                        title: "Output Files",
+                                        searchableText: outputDocs.map(doc => doc.name.split('/').pop()).join(' '),
+                                        content: (
+                                            <div className="space-y-1">
+                                                {outputDocs.map((doc) => (
+                                                    <div
+                                                        key={doc.name}
+                                                        className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent transition-colors group"
+                                                    >
+                                                        <Checkbox
+                                                            checked={selectedFiles.has(doc.name)}
+                                                            onCheckedChange={() => toggleFileSelection(doc.name)}
+                                                            className="shrink-0"
+                                                        />
+                                                        <button
+                                                            onClick={() => handleDownloadFile(doc.name, 'output')}
+                                                            className="flex items-center gap-2 flex-1 text-left min-w-0"
+                                                            disabled={downloadingFile === doc.name}
+                                                        >
+                                                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm truncate">{doc.name.split('/').pop()}</p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {(doc.size / 1024).toFixed(2)} KB
+                                                                </p>
+                                                            </div>
+                                                            {downloadingFile === doc.name ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                                                            ) : (
+                                                                <Download className="h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
+                                    }] : []),
+                                    ...(!loadingFiles && inputDocs.length === 0 && outputDocs.length === 0 ? [{
+                                        id: "empty",
+                                        content: (
+                                            <div className="py-8 text-center">
+                                                <Files className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
+                                                <p className="text-sm text-muted-foreground">No files found</p>
+                                                <p className="text-xs text-muted-foreground mt-1">Upload files to get started</p>
+                                            </div>
+                                        )
+                                    }] : [])
+                                ])
+                            ] as Section[]}
+                        />
+                        
+                        {/* Chat History Button */}
+                        <button 
+                            onClick={() => setHistoryOpen(true)}
+                            className="flex flex-row gap-2 items-center px-4 py-2 rounded-lg hover:bg-accent transition-colors text-sm font-medium border"
+                        >
+                            <History className="h-4 w-4"/> {!isMobile && "History"}
+                        </button>
+
+                        {/* Chat History Dialog */}
+                        <FilesAndChat
+                            open={historyOpen}
+                            onOpenChange={handleHistoryOpenChange}
+                            title="Chat History"
+                            description={`${chatHistory.length} chat${chatHistory.length !== 1 ? 's' : ''} found`}
+                            maxWidth="max-w-3xl"
+                            scrollAreaHeight="h-[65vh]"
+                            sections={[
+                                ...(loadingHistory ? [{
+                                    id: "loading",
+                                    content: (
+                                        <div className="flex items-center justify-center py-8">
+                                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                        </div>
+                                    )
+                                }] : chatHistory.length > 0 ? [{
+                                    id: "chats",
+                                    searchableText: chatHistory.map(chat => 
+                                        `Chat ${chat.chat_id.slice(0, 8)} ${chat.message_count} messages ${formatTimestamp(chat.latest_timestamp)}`
+                                    ).join(' '),
+                                    content: (
+                                        <div className="space-y-1">
+                                            {chatHistory.map((chat) => (
+                                                <div
+                                                    key={chat.chat_id}
+                                                    className="flex items-center gap-2 px-3 py-3 rounded-md hover:bg-accent transition-colors group border border-transparent hover:border-border"
+                                                >
+                                                    <button
+                                                        onClick={() => setChatId(chat.chat_id)}
+                                                        className="flex items-start gap-3 flex-1 text-left min-w-0"
+                                                    >
+                                                        <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <p className="text-sm font-medium truncate">
+                                                                    Chat {chat.chat_id.slice(0, 8)}
+                                                                </p>
+                                                                {chat.chat_id === chatId && (
+                                                                    <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                                                                        Active
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                <span>{chat.message_count} message{chat.message_count !== 1 ? 's' : ''}</span>
+                                                                <span>•</span>
+                                                                <span>{formatTimestamp(chat.latest_timestamp)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteChat(chat.chat_id)}
+                                                        disabled={deletingChatId === chat.chat_id}
+                                                        className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                                                        title="Delete chat"
+                                                    >
+                                                        {deletingChatId === chat.chat_id ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )
+                                }] : [{
+                                    id: "empty",
+                                    content: (
+                                        <div className="py-8 text-center">
+                                            <History className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
+                                            <p className="text-sm text-muted-foreground">No chat history</p>
+                                            <p className="text-xs text-muted-foreground mt-1">Start a conversation to see it here</p>
+                                        </div>
+                                    )
+                                }])
+                            ] as Section[]}
+                        />
+                        
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <div></div>
@@ -730,6 +925,8 @@ const Chat = ()=>{
                     <ChatInput
                         maxHeight={100}
                         messageHandler={sendMessage}
+                        onAddFiles={handleAddFiles}
+                        isUploadingFiles={uploadingFiles.length > 0}
                     />
                 </div>
             </div>

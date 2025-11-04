@@ -7,9 +7,11 @@ import { useState, useRef } from "react";
 interface ChatInputProps{
     maxHeight: number;
     messageHandler: (message: string) => void;
+    onAddFiles?: () => void;
+    isUploadingFiles?: boolean;
 }
 
-const ChatInput = ({maxHeight, messageHandler}:ChatInputProps)=>{
+const ChatInput = ({maxHeight, messageHandler, onAddFiles, isUploadingFiles = false}:ChatInputProps)=>{
     const [message, setMessage] = useState("");
     const inputRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +77,8 @@ const ChatInput = ({maxHeight, messageHandler}:ChatInputProps)=>{
                             variant="outline" 
                             size="sm"
                             className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
+                            onClick={onAddFiles}
+                            disabled={isUploadingFiles}
                         >
                             <Plus className="size-3.5 md:size-4"/> <span className="hidden sm:inline">Add Files</span><span className="sm:hidden">Files</span>
                         </Button>
