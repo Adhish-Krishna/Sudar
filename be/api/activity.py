@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from .database import get_db
-from .models import Activity, File, Subject, Classroom, Teacher
+from .models import Activity, ActivityFile, Subject, Classroom, Teacher
 from .schemas import ActivityCreate, ActivityUpdate, ActivityResponse
 from .authUtils import get_current_teacher
 
@@ -62,7 +62,7 @@ def create_activity(
         # Add files if provided
         if data.files:
             for file_data in data.files:
-                file = File(
+                file = ActivityFile(
                     minio_path=file_data.minio_path,
                     activity_id=activity.activity_id
                 )

@@ -3,7 +3,7 @@ RAG Worker - Consumer for asynchronous document ingestion
 """
 import os
 import json
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, KafkaProducer
 from dotenv import load_dotenv
 import redis
 
@@ -52,6 +52,12 @@ consumer = KafkaConsumer(
     group_id='rag-worker-group',
     max_partition_fetch_bytes=104857600,  # 100 MB - increased from default 1MB
     fetch_max_bytes=104857600  # 100 MB - maximum data returned per fetch
+)
+
+# Initialize Kafka producer for success events
+producer = KafkaProducer(
+    bootstrap_servers=[kafka_bootstrap_servers],
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
 # Initialize Redis
@@ -112,6 +118,21 @@ def process_ingest_job(job_data):
             metadata={"filename": filename}
         )
         
+        # Produce success event to Kafka topic "ingest_success"
+        success_event = {
+            "job_id": job_id,
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "subject_id": subject_id,
+            "filename": filename,
+            "minio_object_name": minio_object_name,
+            "content_type": content_type,
+            "inserted_count": result["inserted_count"],
+            "status": "success"
+        }
+        producer.send('ingest_success', success_event)
+        producer.flush()  # Ensure the message is sent immediately
+        
         # Update status to completed
         redis_client.setex(f"job:{job_id}", 3600, json.dumps({
             "status": "completed",
@@ -140,11 +161,18 @@ def process_ingest_job(job_data):
 
 if __name__ == "__main__":
     print("Starting RAG Worker...")
-    for message in consumer:
-        job_data = message.value
-        print(f"Processing job: {job_data['job_id']}")
-        try:
-            process_ingest_job(job_data)
-            print(f"Job {job_data['job_id']} completed successfully")
-        except Exception as e:
-            print(f"Job {job_data['job_id']} failed: {str(e)}")
+    try:
+        for message in consumer:
+            job_data = message.value
+            print(f"Processing job: {job_data['job_id']}")
+            try:
+                process_ingest_job(job_data)
+                print(f"Job {job_data['job_id']} completed successfully")
+            except Exception as e:
+                print(f"Job {job_data['job_id']} failed: {str(e)}")
+    except KeyboardInterrupt:
+        print("\nShutting down RAG Worker...")
+    finally:
+        consumer.close()
+        producer.close()
+        print("RAG Worker stopped.")

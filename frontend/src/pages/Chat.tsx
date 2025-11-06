@@ -12,7 +12,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Home as HomeIcon, Users, MessageSquare, Bot, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
 import { useState, useEffect, useRef} from "react";
-import { subjects, classrooms, documents, sudarAgent, ragService, type MinioDocument, type ChatMetadata, type SSEEvent} from "@/api";
+import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type ChatMetadata, type SSEEvent, type IndexedFileResponse} from "@/api";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -69,6 +69,12 @@ const Chat = ()=>{
     const [processingFiles, setProcessingFiles] = useState<Map<string, string>>(new Map()); // filename -> job_id
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pollingIntervalsRef = useRef<Map<string, number>>(new Map());
+
+    // Context state
+    const [contextOpen, setContextOpen] = useState(false);
+    const [indexedFiles, setIndexedFiles] = useState<IndexedFileResponse[]>([]);
+    const [loadingContext, setLoadingContext] = useState(false);
+    const [selectedContext, setSelectedContext] = useState<Set<string>>(new Set());
 
     useEffect(()=>{
         const fetchClassroomAndSubject = async ()=>{
@@ -501,6 +507,47 @@ const Chat = ()=>{
         }
     };
 
+    // Fetch indexed context files
+    const fetchIndexedFiles = async () => {
+        if (!chatId) return;
+        
+        setLoadingContext(true);
+        try {
+            const response = await context.getContext(chatId);
+            
+            if (response.status && response.status !== 200) {
+                toast.error(response.message || "Failed to fetch indexed files");
+            } else if (Array.isArray(response)) {
+                setIndexedFiles(response);
+            }
+        } catch (error: any) {
+            toast.error(error.message || "Failed to fetch indexed files");
+        } finally {
+            setLoadingContext(false);
+        }
+    };
+
+    // Handle context popover open change
+    const handleContextOpenChange = (open: boolean) => {
+        setContextOpen(open);
+        if (open) {
+            fetchIndexedFiles();
+        }
+    };
+
+    // Toggle context file selection
+    const toggleContextSelection = (filename: string) => {
+        setSelectedContext(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(filename)) {
+                newSet.delete(filename);
+            } else {
+                newSet.add(filename);
+            }
+            return newSet;
+        });
+    };
+
     return(
         <>
             {/* Hidden file input */}
@@ -927,6 +974,12 @@ const Chat = ()=>{
                         messageHandler={sendMessage}
                         onAddFiles={handleAddFiles}
                         isUploadingFiles={uploadingFiles.length > 0}
+                        onAddContext={handleContextOpenChange}
+                        contextOpen={contextOpen}
+                        indexedFiles={indexedFiles}
+                        loadingContext={loadingContext}
+                        selectedContext={selectedContext}
+                        onToggleContext={toggleContextSelection}
                     />
                 </div>
             </div>

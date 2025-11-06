@@ -244,6 +244,12 @@ export interface ListChunksResponse {
   count: number;
 }
 
+export interface IndexedFileResponse{
+  file_id: string;
+  filename: string;
+  minio_path: string;
+}
+
 export const authAPI = {
   signUp : async (body: SignUp): Promise<SignUpSuccRes | any>=>{
       try {
@@ -1152,4 +1158,25 @@ export const ragService = {
     }
   }
 };
+
+export const context = {
+  getContext: async (chat_id: string): Promise<IndexedFileResponse[] | any> => {
+    try {
+      const response = await apiClient.get(`${API_BASE_URL}/api/context/${chat_id}`);
+      if (response.status === 200) {
+        return response.data as IndexedFileResponse[];
+      } else {
+        return {
+          status: response.status,
+          message: response.data?.detail || response.data?.message || "Get indexed files failed",
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get indexed files failed",
+      };
+    }
+  }
+}
 

@@ -20,6 +20,7 @@ COPY pyproject.toml ./
 COPY api/ ./api/
 COPY sql/ ./sql/
 COPY run.py ./
+COPY worker.py ./
 
 # Install Python dependencies using uv
 RUN uv pip install --system .

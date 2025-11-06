@@ -74,6 +74,7 @@ class Subject(Base):
     # Relationships
     classroom = relationship("Classroom", back_populates="subjects")
     activities = relationship("Activity", back_populates="subject", cascade="all, delete-orphan")
+    chats = relationship("Chat", back_populates="subject", cascade="all, delete-orphan")
 
 
 class Activity(Base):
@@ -87,19 +88,19 @@ class Activity(Base):
     
     # Relationships
     subject = relationship("Subject", back_populates="activities")
-    files = relationship("File", back_populates="activity", cascade="all, delete-orphan")
+    activity_files = relationship("ActivityFile", back_populates="activity", cascade="all, delete-orphan")
     performances = relationship("Performance", back_populates="activity", cascade="all, delete-orphan")
 
 
-class File(Base):
-    __tablename__ = "files"
+class ActivityFile(Base):
+    __tablename__ = "activity_files"
     
     file_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     minio_path = Column(Text, nullable=False)
     activity_id = Column(UUID(as_uuid=True), ForeignKey("activity.activity_id", ondelete="CASCADE"), nullable=False)
     
     # Relationships
-    activity = relationship("Activity", back_populates="files")
+    activity = relationship("Activity", back_populates="activity_files")
 
 
 class Performance(Base):
@@ -113,3 +114,36 @@ class Performance(Base):
     # Relationships
     student = relationship("Student", back_populates="performances")
     activity = relationship("Activity", back_populates="performances")
+
+
+class Chat(Base):
+    __tablename__ = "chat"
+    
+    chat_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_id = Column(UUID(as_uuid=True), ForeignKey("subjects.subject_id", ondelete="CASCADE"), nullable=False)
+    chat_name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    subject = relationship("Subject", back_populates="chats")
+    chat_files = relationship("ChatFile", back_populates="chat", cascade="all, delete-orphan")
+
+
+class ChatType(enum.Enum):
+    """Enum for chat file types"""
+    Input = "Input"
+    Output = "Output"
+
+
+class ChatFile(Base):
+    __tablename__ = "chat_files"
+    
+    file_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("chat.chat_id", ondelete="CASCADE"), nullable=False)
+    minio_path = Column(Text, nullable=False)
+    type = Column(SQLEnum(ChatType), nullable=False)
+    indexed = Column(Integer, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    chat = relationship("Chat", back_populates="chat_files")

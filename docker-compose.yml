@@ -73,6 +73,22 @@ services:
       retries: 3
       start_period: 40s
 
+  backend-worker:
+    image: sudar-backend:latest
+    container_name: backend-worker
+    environment:
+      - DATABASE_URL=postgresql://sudar_user:sudar_password@postgres:5432/sudar_db
+      - KAFKA_BOOTSTRAP_SERVERS=broker:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker:
+        condition: service_started
+    networks:
+      - sudar-network
+    restart: unless-stopped
+    command: ["python", "worker.py"]
+
   mongodb-server:
     image: mongo:latest
     container_name: mongodb-server
