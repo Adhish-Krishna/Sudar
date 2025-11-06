@@ -56,6 +56,8 @@ First, you need to set up your environment variables.
 Next, use Docker Compose to build and run the required services in the background.
 
 ```bash
+docker-compose build
+
 docker-compose up -d
 ```
 
