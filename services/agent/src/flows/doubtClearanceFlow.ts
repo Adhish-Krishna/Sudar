@@ -52,6 +52,7 @@ export interface DoubtClearanceStep {
     completed?: boolean;
     extractedFiles?: string[];
     fileRetrievals?: number;
+    websitesReferenced?: string[];
   };
 }
 
@@ -119,7 +120,8 @@ export async function* doubtClearanceFlow(
     responseLength: 0,
     completed: false,
     extractedFiles: inputFiles,
-    fileRetrievals: 0
+    fileRetrievals: 0,
+    websitesReferenced: [] as string[]
   };
 
   if (fileExtraction.hasFiles) {
@@ -133,7 +135,7 @@ export async function* doubtClearanceFlow(
 
   try {
     const agent = new Agent({
-      model: google('gemini-2.0-flash'),
+      model: google('gemini-2.5-flash'),
       system: enhancedSystemPrompt,
       tools: filteredTools,
       stopWhen: stepCountIs(10),
@@ -194,6 +196,32 @@ export async function* doubtClearanceFlow(
         yield currentStep;
       } else if (part.type === 'tool-result') {
         const toolResult = 'result' in part ? part.result : part.output;
+        
+        // Extract websites from search results
+        if (part.toolName === 'web_search' && toolResult) {
+          try {
+            // Parse search results to extract domains
+            const resultText = JSON.stringify(toolResult);
+            // Extract URLs using regex
+            const urlMatches = resultText.match(/https?:\/\/[^\s"'\]},]+/g) || [];
+            const domains = urlMatches.map(url => {
+              try {
+                return new URL(url).hostname;
+              } catch {
+                return null;
+              }
+            }).filter((domain): domain is string => domain !== null);
+            
+            // Add unique domains to websitesReferenced
+            domains.forEach(domain => {
+              if (!doubtState.websitesReferenced.includes(domain)) {
+                doubtState.websitesReferenced.push(domain);
+              }
+            });
+          } catch (error) {
+            // Ignore errors in parsing search results
+          }
+        }
         
         const currentStep: DoubtClearanceStep = {
           step: stepCount,
@@ -258,7 +286,8 @@ export async function* doubtClearanceFlow(
                 responseLength: doubtState.responseLength,
                 completed: doubtState.completed,
                 extractedFiles: doubtState.extractedFiles,
-                fileRetrievals: doubtState.fileRetrievals
+                fileRetrievals: doubtState.fileRetrievals,
+                websitesReferenced: doubtState.websitesReferenced
               }
             };
 
@@ -282,7 +311,8 @@ export async function* doubtClearanceFlow(
             responseLength: doubtState.responseLength,
             completed: doubtState.completed,
             extractedFiles: doubtState.extractedFiles,
-            fileRetrievals: doubtState.fileRetrievals
+            fileRetrievals: doubtState.fileRetrievals,
+            websitesReferenced: doubtState.websitesReferenced
           }
         };
         

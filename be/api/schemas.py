@@ -52,6 +52,19 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=6)
 
 
+class VerifyTokenRequest(BaseModel):
+    access_token: str = Field(..., min_length=1)
+
+
+class VerifyTokenResponse(BaseModel):
+    valid: bool = True
+    teacher_id: str
+    exp: int
+    iat: int
+    type: str
+    message: str = "Token is valid"
+
+
 # ============= Teacher Schemas =============
 class TeacherResponse(BaseModel):
     teacher_id: UUID

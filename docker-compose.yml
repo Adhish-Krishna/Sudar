@@ -9,7 +9,7 @@ services:
     depends_on:
       - backend
       - rag-service
-      - sudar-agent
+      - agent
     networks:
       - sudar-network
     restart: unless-stopped
@@ -333,47 +333,21 @@ services:
       - sudar-network
     restart: unless-stopped
 
-  sudar-agent:
+  agent:
     build:
-      context: ./services/sudar_agent
-    container_name: sudar-agent
+      context: ./services/agent
+    container_name: agent
     environment:
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=postgresql://sudar_user:sudar_password@postgres:5432/sudar_db
-      - MODEL_PROVIDER=${MODEL_PROVIDER}
-      - GOOGLE_MODEL=${GOOGLE_MODEL}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - GROQ_MODEL=${GROQ_MODEL}
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
-      - RAG_SERVICE_URL=http://rag-service:3001/rag
-      - MCP_TOOLS_URL=http://sudar-tools-mcp-server:3002
-      - MD_TO_PDF_URL=http://md-to-pdf:3000/convert
-      - MONGODB_URL=mongodb://mongodb-server:27017
-      - MONGODB_DATABASE=sudar_db
-      - MONGODB_COLLECTION=chats
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - QDRANT_COLLECTION_SHORT_TERM=sudar_agent_short_term_memory
-      - QDRANT_COLLECTION_LONG_TERM=sudar_agent_long_term_memory
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - EMBEDDING_MODEL=embeddinggemma:300m
-      - EMBEDDING_DIMENSION=768
-      - HOST=0.0.0.0
-      - PORT=3005
+      - PORT=3003
+      - BACKEND_URL=http://backend:3006
       - FRONTEND_URL=${FRONTEND_URL}
+      - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_API_KEY}
+      - MCP_SERVER_URL=http://sudar-tools-mcp-server/mcp
+      - MONGODB_URI=mongodb://mongodb-server:27017/sudar_agent
     expose:
-      - "3005"
+      - "3003"
     depends_on:
-      postgres:
-        condition: service_started
-      ollama:
-        condition: service_started
-      mongodb-server:
-        condition: service_started
-      qdrant:
-        condition: service_started
-      rag-service:
+      backend:
         condition: service_started
       sudar-tools-mcp-server:
         condition: service_started
@@ -381,11 +355,11 @@ services:
       - sudar-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 40s
 
 volumes:
   postgres-data:

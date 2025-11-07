@@ -11,7 +11,9 @@ from .schemas import (
     TokenResponse, 
     ForgotPasswordRequest, 
     ResetPasswordRequest,
-    TeacherResponse
+    TeacherResponse,
+    VerifyTokenRequest,
+    VerifyTokenResponse
 )
 from .authUtils import (
     check_user_password, 
@@ -23,7 +25,8 @@ from .authUtils import (
     send_email,
     get_current_teacher,
     set_auth_cookies,
-    clear_auth_cookies
+    clear_auth_cookies,
+    decode_token
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -338,6 +341,33 @@ def get_current_user(current_teacher: Teacher = Depends(get_current_teacher)):
     Get the current authenticated teacher's information.
     """
     return current_teacher
+
+
+@router.post("/verify-token", response_model=VerifyTokenResponse)
+def verify_token(data: VerifyTokenRequest):
+    """
+    Verify an access token and return decoded information.
+    """
+    try:
+        # Decode the token
+        payload = decode_token(data.access_token)
+        
+        # Return the decoded information
+        return VerifyTokenResponse(
+            valid=True,
+            teacher_id=payload.get("sub"),
+            exp=payload.get("exp"),
+            iat=payload.get("iat"),
+            type=payload.get("type", "access"),
+            message="Token is valid"
+        )
+    except Exception as e:
+        # If decoding fails, raise HTTP exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}"
+        )
+
 
 @router.post("/logout")
 def logout_teacher(

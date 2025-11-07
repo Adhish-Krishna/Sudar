@@ -113,7 +113,7 @@ These files should be your primary source of context for the research query.` : 
 
   try {
     const agent = new Agent({
-      model: google('gemini-2.0-flash-exp'),
+      model: google('gemini-2.5-flash'),
       system: enhancedSystemPrompt,
       tools: tools,
       stopWhen: stepCountIs(12) // Increased to allow for file retrieval
