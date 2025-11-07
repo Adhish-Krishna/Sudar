@@ -4,6 +4,7 @@ import os
 from typing import List, Optional
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_http_headers
 from starlette.responses import JSONResponse
 
 from .tools import WebSearchTool, WebsiteScraperTool, ContentSaverTool, ContentRetrieverTool
@@ -82,22 +83,17 @@ def scrape_websites(urls: List[str]) -> list:
 @mcp.tool()
 def save_content(
     content: str,
-    title: str,
-    user_id: Optional[str] = None,
-    chat_id: Optional[str] = None,
-    subject_id: Optional[str] = None
+    title: str
 ) -> dict:
     """Convert markdown content to PDF and save it to MinIO storage.
     
     This tool takes markdown-formatted content, converts it to PDF using the md-to-pdf service,
-    and stores it in MinIO object storage with optional user, chat, and classroom context.
+    and stores it in MinIO object storage. User context (user_id, chat_id, subject_id) is 
+    automatically extracted from request headers sent by the agent service.
     
     Args:
         content: The markdown-formatted content to save as PDF
         title: The title for the PDF file (will be used as filename)
-        user_id: Optional user ID for organizing content in MinIO (creates folder structure)
-        chat_id: Optional chat ID for organizing content in MinIO (creates folder structure)
-        subject_id: Optional classroom ID for organizing content in MinIO (creates folder structure)
     
     Returns:
         A dictionary containing:
@@ -112,12 +108,16 @@ def save_content(
     Example:
         save_content(
             content="# My Document\\n\\nThis is the content.",
-            title="My Assignment",
-            user_id="user123",
-            chat_id="chat456",
-            subject_id="classroom789"
+            title="My Assignment"
         )
     """
+    # Extract user context from HTTP headers (injected by agent service)
+    headers = get_http_headers(include_all=True)
+    
+    user_id = headers.get("x-user-id")
+    chat_id = headers.get("x-chat-id")
+    subject_id = headers.get("x-subject-id")
+    
     return content_saver_tool.save_content(
         content=content,
         title=title,
@@ -130,24 +130,17 @@ def save_content(
 @mcp.tool()
 def retrieve_content(
     query: str,
-    user_id: str,
-    chat_id: str,
-    subject_id: Optional[str] = None,
     filenames: Optional[List[str]] = None,
     top_k: int = 5
 ) -> dict:
     """Retrieve relevant content from ingested documents using RAG service.
     
     This tool searches through documents that have been previously ingested into the RAG system
-    and retrieves the most relevant content chunks based on the query. It can optionally filter
-    results by specific filenames mentioned in the query (using @filename.ext syntax) or provided
-    explicitly in the filenames parameter, and by classroom context.
+    and retrieves the most relevant content chunks based on the query. User context (user_id, 
+    chat_id, subject_id) is automatically extracted from request headers sent by the agent service.
     
     Args:
         query: The search query to find relevant content. Can include @filename.ext to reference specific files
-        user_id: User identifier to filter documents by user context
-        chat_id: Chat session identifier to filter documents by chat context
-        subject_id: Optional classroom identifier to filter documents by classroom context
         filenames: Optional list of specific filenames to filter results by. If not provided,
                   will auto-extract from query using @filename.ext pattern
         top_k: Number of most relevant results to return
@@ -168,12 +161,23 @@ def retrieve_content(
     Example:
         retrieve_content(
             query="Explain photosynthesis from @biology.pdf",
-            user_id="user123",
-            chat_id="chat456",
-            subject_id="classroom789",
             top_k=5
         )
     """
+    # Extract user context from HTTP headers (injected by agent service)
+    headers = get_http_headers(include_all=True)
+    
+    user_id = headers.get("x-user-id")
+    chat_id = headers.get("x-chat-id")
+    subject_id = headers.get("x-subject-id")
+    
+    # Validate required context
+    if not user_id or not chat_id:
+        return {
+            "success": False,
+            "error": "Missing required user context. Agent service must provide X-User-Id and X-Chat-Id headers."
+        }
+    
     return content_retriever_tool.retrieve(
         query=query,
         user_id=user_id,
@@ -195,78 +199,6 @@ def health_check(request):
         "tools": ["web_search", "scrape_websites", "save_content", "retrieve_content"]
     })
 
-
-# Add REST API endpoint for tool calls
-@mcp.custom_route("/tools/call", methods=["POST"])
-async def call_tool(request):
-    """REST endpoint for calling MCP tools.
-    
-    Expected JSON body:
-    {
-        "name": "tool_name",
-        "arguments": {
-            "arg1": "value1",
-            "arg2": "value2"
-        }
-    }
-    """
-    import json as json_module
-    
-    try:
-        body = await request.json()
-        tool_name = body.get("name")
-        arguments = body.get("arguments", {})
-        
-        # Call the appropriate tool directly from the tool instances
-        if tool_name == "web_search":
-            result = web_search_tool.search(
-                query=arguments.get("query"),
-                max_results=arguments.get("max_results", 5)
-            )
-        elif tool_name == "scrape_websites":
-            result = website_scraper_tool.scrape_urls(
-                urls=arguments.get("urls", [])
-            )
-        elif tool_name == "save_content":
-            result = content_saver_tool.save_content(
-                content=arguments.get("content"),
-                title=arguments.get("title"),
-                user_id=arguments.get("user_id"),
-                chat_id=arguments.get("chat_id"),
-                subject_id=arguments.get("subject_id")
-            )
-        elif tool_name == "retrieve_content":
-            result = content_retriever_tool.retrieve(
-                query=arguments.get("query"),
-                user_id=arguments.get("user_id"),
-                chat_id=arguments.get("chat_id"),
-                subject_id=arguments.get("subject_id"),
-                filenames=arguments.get("filenames"),
-                top_k=arguments.get("top_k", 5)
-            )
-        else:
-            return JSONResponse({
-                "isError": True,
-                "content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}]
-            }, status_code=400)
-        
-        # Return result in MCP format with JSON stringified for consistency
-        result_str = json_module.dumps(result) if isinstance(result, (dict, list)) else str(result)
-        return JSONResponse({
-            "isError": False,
-            "content": [{"type": "text", "text": result_str}]
-        })
-        
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"Error calling tool: {error_details}")
-        return JSONResponse({
-            "isError": True,
-            "content": [{"type": "text", "text": f"Error calling tool: {str(e)}"}]
-        }, status_code=500)
-
-
 def main():
     """Run the MCP server with HTTP transport."""
     host = os.getenv("HOST", "0.0.0.0")
@@ -279,7 +211,7 @@ def main():
     print(f"RAG Service: {RAG_SERVICE_URL}")
     
     # Run with HTTP transport
-    mcp.run(transport="sse", host=host, port=port)
+    mcp.run(transport="streamable-http", host=host, port=port)
 
 
 if __name__ == "__main__":
