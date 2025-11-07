@@ -99,6 +99,7 @@ class Embedder:
         user_id: str, 
         chat_id: str,
         subject_id: str = None,
+        classroom_id: str = None,
         metadata: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
@@ -144,6 +145,9 @@ class Embedder:
                 # Add subject_id if provided
                 if subject_id:
                     payload["subject_id"] = subject_id
+
+                if classroom_id:
+                    payload["classroom_id"] = classroom_id
                 
                 # Add additional metadata if provided
                 if metadata:

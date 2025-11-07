@@ -99,6 +99,7 @@ class IngestResponse(BaseModel):
     job_id: str
     user_id: str
     chat_id: str
+    classroom_id: str
     subject_id: Optional[str] = None
     filename: str
 
@@ -108,6 +109,7 @@ class RetrievalRequest(BaseModel):
     user_id: str
     chat_id: str
     subject_id: Optional[str] = None
+    classroom_id: str
     top_k: int = 5
     filenames: Optional[List[str]] = None  # Optional list of filenames to filter by
 
@@ -118,6 +120,7 @@ class RetrievalResponse(BaseModel):
     user_id: str
     chat_id: str
     subject_id: Optional[str] = None
+    classroom_id: str
     results: List[dict]
     count: int
 
@@ -151,6 +154,7 @@ async def ingest_document(
     user_id: str = Form(...),
     chat_id: str = Form(...),
     subject_id: Optional[str] = Form(None),
+    classroom_id: str = Form(...),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -190,6 +194,7 @@ async def ingest_document(
             user_id=user_id,
             chat_id=chat_id,
             subject_id=subject_id,
+            classroom_id=classroom_id,
             content_type=file.content_type
         )
         
@@ -205,6 +210,7 @@ async def ingest_document(
             "user_id": user_id,
             "chat_id": chat_id,
             "subject_id": subject_id,
+            "classroom_id": classroom_id,
             "filename": filename,
             "minio_object_name": minio_result.get("object_name"),  # MinIO path
             "content_type": file.content_type,
@@ -221,6 +227,7 @@ async def ingest_document(
             "user_id": user_id,
             "chat_id": chat_id,
             "subject_id": subject_id,
+            "classroom_id": classroom_id,
             "filename": filename,
             "created_at": str(os.times()[4])  # Simple timestamp
         }))
@@ -232,6 +239,7 @@ async def ingest_document(
             user_id=user_id,
             chat_id=chat_id,
             subject_id=subject_id,
+            classroom_id=classroom_id,
             filename=filename
         )
     
@@ -308,6 +316,7 @@ async def retrieve_context(
             user_id=request.user_id,
             chat_id=request.chat_id,
             subject_id=request.subject_id,
+            classroom_id=request.classroom_id,
             top_k=request.top_k if request.top_k else 5,
             filenames=request.filenames
         )
@@ -318,6 +327,7 @@ async def retrieve_context(
             user_id=request.user_id,
             chat_id=request.chat_id,
             subject_id=request.subject_id,
+            classroom_id=request.classroom_id,
             results=results,
             count=len(results)
         )

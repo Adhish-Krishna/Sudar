@@ -212,7 +212,8 @@ export interface IngestResponse {
   job_id: string;
   user_id: string;
   chat_id: string;
-  classroom_id?: string | null;
+  classroom_id: string;
+  subject_id?: string | null;
   filename: string;
 }
 
@@ -221,6 +222,7 @@ export interface RetrievalRequest {
   user_id: string;
   chat_id: string;
   subject_id?: string | null;
+  classroom_id: string;
   top_k?: number;
   filenames?: string[] | null;
 }
@@ -230,7 +232,8 @@ export interface RetrievalResponse {
   query: string;
   user_id: string;
   chat_id: string;
-  classroom_id?: string | null;
+  subject_id?: string | null;
+  classroom_id: string;
   results: any[];
   count: number;
 }
@@ -239,7 +242,8 @@ export interface ListChunksResponse {
   status: string;
   user_id: string;
   chat_id: string;
-  classroom_id?: string | null;
+  subject_id?: string | null;
+  classroom_id: string;
   chunks: any[];
   count: number;
 }
@@ -821,12 +825,13 @@ export const activities = {
 export const documents = {
   getInputDocuments: async (
     userId: string,
+    classroom_id: string,
     subjectId: string,
     chatId: string
   ): Promise<DocumentListResponse | any> => {
     try {
       const response = await apiClient.get(
-        `${API_BASE_URL}/api/documents/input-documents/${userId}/${subjectId}/${chatId}`
+        `${API_BASE_URL}/api/documents/input-documents/${userId}/${classroom_id}/${subjectId}/${chatId}`
       );
       if (response.status == 200) {
         return response.data as DocumentListResponse;
@@ -847,12 +852,13 @@ export const documents = {
 
   getOutputDocuments: async (
     userId: string,
+    classroom_id: string,
     subjectId: string,
     chatId: string
   ): Promise<DocumentListResponse | any> => {
     try {
       const response = await apiClient.get(
-        `${API_BASE_URL}/api/documents/output-documents/${userId}/${subjectId}/${chatId}`
+        `${API_BASE_URL}/api/documents/output-documents/${userId}/${classroom_id}/${subjectId}/${chatId}`
       );
       if (response.status == 200) {
         return response.data as DocumentListResponse;
@@ -1085,6 +1091,7 @@ export const ragService = {
     file: File,
     userId: string,
     chatId: string,
+    classroomId: string,
     subjectId?: string | null
   ): Promise<IngestResponse | any> => {
     try {
@@ -1092,6 +1099,7 @@ export const ragService = {
       formData.append('file', file);
       formData.append('user_id', userId);
       formData.append('chat_id', chatId);
+      formData.append('classroom_id', classroomId);
       if (subjectId) formData.append('subject_id', subjectId);
       const response = await apiClient.post(`${RAG_BASE}/ingest`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -1126,7 +1134,7 @@ export const ragService = {
   deleteChatData: async (userId: string, chatId: string, subjectId?: string | null): Promise<any> => {
     try {
       const params: any = {};
-      if (subjectId) params.classroom_id = subjectId;
+      if (subjectId) params.subject_id = subjectId;
       const response = await apiClient.delete(`${RAG_BASE}/delete/${userId}/${chatId}`, { params });
       if (response.status === 200) return response.data;
       return { status: response.status, message: response.data };
@@ -1138,7 +1146,7 @@ export const ragService = {
   listChatChunks: async (userId: string, chatId: string, subjectId?: string | null, limit?: number): Promise<ListChunksResponse | any> => {
     try {
       const params: any = {};
-      if (subjectId) params.classroom_id = subjectId;
+      if (subjectId) params.subject_id = subjectId;
       if (limit) params.limit = limit;
       const response = await apiClient.get(`${RAG_BASE}/list/${userId}/${chatId}`, { params });
       if (response.status === 200) return response.data as ListChunksResponse;

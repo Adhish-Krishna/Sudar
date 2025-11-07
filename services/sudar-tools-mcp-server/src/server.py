@@ -117,13 +117,15 @@ def save_content(
     user_id = headers.get("x-user-id")
     chat_id = headers.get("x-chat-id")
     subject_id = headers.get("x-subject-id")
+    classroom_id = headers.get("x-classroom-id")
     
     return content_saver_tool.save_content(
         content=content,
         title=title,
         user_id=user_id,
         chat_id=chat_id,
-        subject_id=subject_id
+        subject_id=subject_id,
+        classroom_id=classroom_id
     )
 
 
@@ -170,6 +172,7 @@ def retrieve_content(
     user_id = headers.get("x-user-id")
     chat_id = headers.get("x-chat-id")
     subject_id = headers.get("x-subject-id")
+    classroom_id = headers.get("x-classroom-id")
     
     # Validate required context
     if not user_id or not chat_id:
@@ -183,6 +186,7 @@ def retrieve_content(
         user_id=user_id,
         chat_id=chat_id,
         subject_id=subject_id,
+        classroom_id=classroom_id,
         filenames=filenames,
         top_k=top_k
     )

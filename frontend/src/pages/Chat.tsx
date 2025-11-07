@@ -281,8 +281,8 @@ const Chat = ()=>{
         setLoadingFiles(true);
         try {
             const [inputResponse, outputResponse] = await Promise.all([
-                documents.getInputDocuments(user.teacher_id, subject_id, chatId),
-                documents.getOutputDocuments(user.teacher_id, subject_id, chatId)
+                documents.getInputDocuments(user.teacher_id, classroom_id! , subject_id, chatId),
+                documents.getOutputDocuments(user.teacher_id, classroom_id!, subject_id, chatId)
             ]);
 
             if (inputResponse.status && inputResponse.status !== 200) {
@@ -477,6 +477,7 @@ const Chat = ()=>{
                     file,
                     user.teacher_id,
                     chatId,
+                    classroom_id!,
                     subject_id
                 );
 

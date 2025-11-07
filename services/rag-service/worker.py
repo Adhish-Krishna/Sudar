@@ -79,6 +79,7 @@ def process_ingest_job(job_data):
     job_id = job_data["job_id"]
     user_id = job_data["user_id"]
     chat_id = job_data["chat_id"]
+    classroom_id = job_data["classroom_id"]
     subject_id = job_data.get("subject_id")  # Use get() for optional field
     filename = job_data["filename"]
     minio_object_name = job_data["minio_object_name"]
@@ -91,6 +92,7 @@ def process_ingest_job(job_data):
             "user_id": user_id,
             "chat_id": chat_id,
             "subject_id": subject_id,
+            "classroom_id": classroom_id,
             "filename": filename,
             "updated_at": str(os.times()[4])
         }))
@@ -114,7 +116,8 @@ def process_ingest_job(job_data):
             chunks=chunks,
             user_id=user_id,
             chat_id=chat_id,
-            subject_id=subject_id,  # Changed from subject_id to subject_id
+            subject_id=subject_id,
+            classroom_id=classroom_id,
             metadata={"filename": filename}
         )
         
@@ -124,6 +127,7 @@ def process_ingest_job(job_data):
             "user_id": user_id,
             "chat_id": chat_id,
             "subject_id": subject_id,
+            "classroom_id": classroom_id,
             "filename": filename,
             "minio_object_name": minio_object_name,
             "content_type": content_type,
@@ -138,7 +142,8 @@ def process_ingest_job(job_data):
             "status": "completed",
             "user_id": user_id,
             "chat_id": chat_id,
-            "subject_id": subject_id,  # Changed from subject_id to subject_id
+            "subject_id": subject_id,
+            "classroom_id": classroom_id,
             "filename": filename,
             "inserted_count": result["inserted_count"],
             "updated_at": str(os.times()[4])
@@ -152,7 +157,8 @@ def process_ingest_job(job_data):
             "status": "failed",
             "user_id": user_id,
             "chat_id": chat_id,
-            "subject_id": subject_id,  # Changed from subject_id to subject_id
+            "subject_id": subject_id,
+            "classroom_id": classroom_id,
             "filename": filename,
             "error": str(e),
             "updated_at": str(os.times()[4])

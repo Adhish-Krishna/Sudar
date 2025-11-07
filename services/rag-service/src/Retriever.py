@@ -90,6 +90,7 @@ class Retriever:
         query: str, 
         user_id: str, 
         chat_id: str, 
+        classroom_id: str,
         top_k: int = 5,
         subject_id: str = None,
         filenames: List[str] = None
@@ -114,7 +115,8 @@ class Retriever:
         # Build filter conditions
         must_conditions = [
             FieldCondition(key="user_id", match=MatchValue(value=user_id)),
-            FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
+            FieldCondition(key="chat_id", match=MatchValue(value=chat_id)),
+            FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
         ]
         
         # Add subject_id filter if provided
@@ -164,6 +166,7 @@ class Retriever:
                 'metadata': {
                     'user_id': result.payload.get('user_id'),
                     'chat_id': result.payload.get('chat_id'),
+                    'classroom_id': result.payload.get('classroom_id'),
                     'subject_id': result.payload.get('subject_id'),
                     'chunk_index': result.payload.get('chunk_index'),
                     'type': result.payload.get('type'),
@@ -180,6 +183,7 @@ class Retriever:
         self, 
         user_id: str, 
         chat_id: str, 
+        classroom_id: str, 
         subject_id: str = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
@@ -198,7 +202,9 @@ class Retriever:
         # Build filter conditions
         must_conditions = [
             FieldCondition(key="user_id", match=MatchValue(value=user_id)),
-            FieldCondition(key="chat_id", match=MatchValue(value=chat_id))
+            FieldCondition(key="chat_id", match=MatchValue(value=chat_id)),
+            FieldCondition(key="classroom_id", match=MatchValue(value=classroom_id))
+
         ]
         
         # Add subject_id filter if provided
@@ -223,6 +229,7 @@ class Retriever:
                     'user_id': result.payload.get('user_id'),
                     'chat_id': result.payload.get('chat_id'),
                     'subject_id': result.payload.get('subject_id'),
+                    'classroom_id': result.payload.get('classroom_id'),
                     'chunk_index': result.payload.get('chunk_index'),
                     'type': result.payload.get('type')
                 }

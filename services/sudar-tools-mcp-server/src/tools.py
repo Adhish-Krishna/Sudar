@@ -209,7 +209,8 @@ class ContentSaverTool:
         title: str,
         user_id: Optional[str] = None,
         chat_id: Optional[str] = None,
-        subject_id: Optional[str] = None
+        subject_id: Optional[str] = None,
+        classroom_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Save markdown content as PDF to MinIO.
         
@@ -232,8 +233,10 @@ class ContentSaverTool:
             pdf_filename = f"{safe_title}.pdf"
             
             # Build object name with optional user/chat/classroom context
-            if user_id and chat_id and subject_id:
-                object_name = f"{user_id}/{subject_id}/{chat_id}/{pdf_filename}"
+            if user_id and chat_id and subject_id and classroom_id:
+                object_name = f"{user_id}/{classroom_id}/{subject_id}/{chat_id}/{pdf_filename}"
+            elif user_id and chat_id and classroom_id:
+                object_name = f"{user_id}/{classroom_id}/{chat_id}/{pdf_filename}"
             elif user_id and chat_id:
                 object_name = f"{user_id}/{chat_id}/{pdf_filename}"
             elif user_id:
@@ -274,6 +277,8 @@ class ContentSaverTool:
                 tags["chat_id"] = chat_id
             if subject_id:
                 tags["subject_id"] = subject_id
+            if classroom_id:
+                tags[classroom_id] = classroom_id
             tags["type"] = "GeneratedPDFContent"
             tags["title"] = safe_title
             
@@ -355,6 +360,7 @@ class ContentRetrieverTool:
         user_id: str,
         chat_id: str,
         subject_id: Optional[str] = None,
+        classroom_id: Optional[str] = None,
         filenames: Optional[List[str]] = None,
         top_k: int = 5
     ) -> Dict[str, Any]:
@@ -380,6 +386,7 @@ class ContentRetrieverTool:
                 "query": query,
                 "user_id": user_id,
                 "chat_id": chat_id,
+                "classroom_id": classroom_id,
                 "top_k": top_k
             }
             
@@ -408,8 +415,9 @@ class ContentRetrieverTool:
                 "success": True,
                 "query": query,
                 "user_id": user_id,
-                "chat_id": chat_id,
+                "classroom_id": classroom_id,
                 "subject_id": subject_id,
+                "chat_id": chat_id,
                 "filenames": filenames,
                 "context": formatted_context,
                 "results": results,

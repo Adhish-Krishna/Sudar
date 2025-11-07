@@ -25,10 +25,11 @@ minio_client = Minio(
     secure=minio_secure
 )
 
-@router.get("/input-documents/{user_id}/{subject_id}/{chat_id}")
+@router.get("/input-documents/{user_id}/{classroom_id}/{subject_id}/{chat_id}")
 def get_input_documents(
     user_id: str = Path(..., description="User ID"),
-    subject_id: str = Path(..., description="Classroom ID"),
+    classroom_id: str = Path(..., description="Classroom ID"),
+    subject_id: str = Path(..., description="Subject ID"),
     chat_id: str = Path(..., description="Chat ID")
 ):
     """
@@ -36,16 +37,17 @@ def get_input_documents(
     
     Required parameters:
     - user_id: User ID
+    - classroom_id: Classroom ID
     - subject_id: Subject ID
     - chat_id: Chat ID
     
-    Path structure: bucket_name/user_id/subject_id/chat_id
+    Path structure: bucket_name/user_id//classroom_id/subject_id/chat_id
     """
     try:
         documents = []
         
         # Build the prefix from required parameters
-        prefix = f"{user_id}/{subject_id}/{chat_id}/"
+        prefix = f"{user_id}/{classroom_id}/{subject_id}/{chat_id}/"
         
         # List objects in the input bucket with the given prefix
         objects = minio_client.list_objects(
@@ -76,9 +78,10 @@ def get_input_documents(
         raise HTTPException(status_code=500, detail=f"Error retrieving documents: {str(e)}")
 
 
-@router.get("/output-documents/{user_id}/{subject_id}/{chat_id}")
+@router.get("/output-documents/{user_id}/{classroom_id}/{subject_id}/{chat_id}")
 def get_output_documents(
     user_id: str = Path(..., description="User ID"),
+    classroom_id: str = Path(..., description="Classroom ID"),
     subject_id: str = Path(..., description="Classroom ID"),
     chat_id: str = Path(..., description="Chat ID")
 ):
@@ -87,16 +90,17 @@ def get_output_documents(
     
     Required parameters:
     - user_id: User ID
+    - classroom_id: Classroom ID
     - subject_id: Classroom ID
     - chat_id: Chat ID
     
-    Path structure: bucket_name/user_id/subject_id/chat_id
+    Path structure: bucket_name/user_id//classroom_id/subject_id/chat_id
     """
     try:
         documents = []
         
         # Build the prefix from required parameters
-        prefix = f"{user_id}/{subject_id}/{chat_id}/"
+        prefix = f"{user_id}/{classroom_id}/{subject_id}/{chat_id}/"
         
         # List objects in the output bucket with the given prefix
         objects = minio_client.list_objects(

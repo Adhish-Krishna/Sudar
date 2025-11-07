@@ -56,6 +56,7 @@ class MinIOStorage:
         filename: str,
         user_id: str,
         chat_id: str,
+        classroom_id: str,
         subject_id: Optional[str] = None,
         content_type: Optional[str] = None
     ) -> dict:
@@ -75,7 +76,7 @@ class MinIOStorage:
         try:
             # Create object name with user/classroom/chat structure
             if subject_id:
-                object_name = f"{user_id}/{subject_id}/{chat_id}/{filename}"
+                object_name = f"{user_id}/{classroom_id}/{subject_id}/{chat_id}/{filename}"
             else:
                 object_name = f"{user_id}/{chat_id}/{filename}"
             
@@ -83,6 +84,7 @@ class MinIOStorage:
             tags = Tags(for_object=True)
             tags["user_id"] = user_id
             tags["chat_id"] = chat_id
+            tags["classroom_id"] = classroom_id
             if subject_id:
                 tags["subject_id"] = subject_id
             tags["type"] = "uploaded_document"
