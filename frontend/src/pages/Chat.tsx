@@ -130,6 +130,10 @@ const Chat = ()=>{
         };
 
         loadChatHistory();
+        
+        // Clear indexed files and selected context when chat changes
+        setIndexedFiles([]);
+        setSelectedContext(new Set());
     }, [chatId, user?.teacher_id, subject_id]);
 
     // Cleanup polling intervals on unmount
@@ -516,7 +520,7 @@ const Chat = ()=>{
             const response = await context.getContext(chatId);
             
             if (response.status && response.status !== 200) {
-                toast.error(response.message || "Failed to fetch indexed files");
+                // toast.error(response.message || "Failed to fetch indexed files");
             } else if (Array.isArray(response)) {
                 setIndexedFiles(response);
             }
