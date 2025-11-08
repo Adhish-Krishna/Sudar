@@ -137,7 +137,7 @@ export async function* worksheetFlow(
         step: ++flowState.totalSteps,
         phase: 'flow',
         type: 'status',
-        status: `📁 Detected ${fileExtraction.extractedFiles.length} file(s) for context: ${fileExtraction.extractedFiles.join(', ')}`
+        status: `Detected ${fileExtraction.extractedFiles.length} file(s) for context: ${fileExtraction.extractedFiles.join(', ')}`
       };
     }
 
@@ -147,7 +147,7 @@ export async function* worksheetFlow(
       type: 'phase_change',
       phaseInfo: {
         currentPhase: 'research',
-        message: `🔬 Starting Research Phase (Mode: ${research_mode.toUpperCase()})`
+        message: `Starting Research Phase (Mode: ${research_mode.toUpperCase()})`
       }
     };
 
@@ -216,7 +216,7 @@ export async function* worksheetFlow(
       step: ++flowState.totalSteps,
       phase: 'flow',
       type: 'status',
-      status: `✅ Research Complete! Gathered ${flowState.researchPhase.researchFindings.length} characters from ${flowState.researchPhase.websitesResearched.length} websites using ${flowState.researchPhase.searchQueries.length} search queries.`
+      status: `Research Complete! Gathered ${flowState.researchPhase.researchFindings.length} characters from ${flowState.researchPhase.websitesResearched.length} websites using ${flowState.researchPhase.searchQueries.length} search queries.`
     };
     
     flowState.currentPhase = 'generation';
@@ -228,7 +228,7 @@ export async function* worksheetFlow(
       phaseInfo: {
         previousPhase: 'research',
         currentPhase: 'generation',
-        message: `📝 Starting Worksheet Generation Phase (${flowState.researchPhase.researchFindings.length} chars of research)`
+        message: `Starting Worksheet Generation Phase (${flowState.researchPhase.researchFindings.length} chars of research)`
       }
     };
 
@@ -379,8 +379,8 @@ export async function* worksheetFlow(
       type: 'finish',
       finishReason: flowState.success ? 'success' : 'completed_with_warnings',
       status: flowState.success 
-        ? '✅ Worksheet flow completed successfully!' 
-        : '⚠️ Worksheet flow completed with warnings'
+        ? 'Worksheet flow completed successfully!' 
+        : 'Worksheet flow completed with warnings'
     };
 
   } catch (error) {
@@ -427,7 +427,7 @@ export async function* worksheetFlow(
       phase: 'flow',
       type: 'finish',
       finishReason: 'error',
-      status: `❌ Worksheet flow failed: ${flowState.errorMessage}`
+      status: `Worksheet flow failed: ${flowState.errorMessage}`
     };
   }
 }

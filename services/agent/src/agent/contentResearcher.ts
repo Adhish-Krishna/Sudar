@@ -136,18 +136,18 @@ These files should be your primary source of context for the research query.` : 
         
         let statusMessage = '';
         if (part.toolName === 'web_search') {
-          statusMessage = `🔍 Searching the web for: "${(toolArgs as any)?.query}"...`;
+          statusMessage = `Searching the web for: "${(toolArgs as any)?.query}"...`;
           researchState.searchQueries.push((toolArgs as any)?.query || 'unknown');
         } else if (part.toolName === 'scrape_websites') {
-          statusMessage = `📄 Scraping ${(toolArgs as any)?.urls?.length || 0} website(s) for detailed content...`;
+          statusMessage = `Scraping ${(toolArgs as any)?.urls?.length || 0} website(s) for detailed content...`;
           const urls = (toolArgs as any)?.urls;
           if (urls && Array.isArray(urls)) {
             urls.forEach((url: string) => researchState.websitesResearched.add(url));
           }
         } else if (part.toolName === 'retrieve_content') {
-          statusMessage = `📚 Checking existing knowledge base for: "${(toolArgs as any)?.query}"...`;
+          statusMessage = `Checking existing knowledge base for: "${(toolArgs as any)?.query}"...`;
         } else if (part.toolName === 'save_content') {
-          statusMessage = `💾 Saving content: "${(toolArgs as any)?.title}"...`;
+          statusMessage = `Saving content: "${(toolArgs as any)?.title}"...`;
         }
         
         if (statusMessage) {

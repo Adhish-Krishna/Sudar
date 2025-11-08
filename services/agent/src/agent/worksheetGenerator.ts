@@ -107,7 +107,7 @@ Based on the above research findings, create a comprehensive educational workshe
           const contentLen = (toolArgs as any)?.content?.length || 0;
           worksheetState.worksheetTitle = title || 'Untitled Worksheet';
           worksheetState.contentLength = contentLen;
-          statusMessage = `💾 Saving worksheet: "${title}" (${contentLen} characters) as PDF...`;
+          statusMessage = `Saving worksheet: "${title}" (${contentLen} characters) as PDF...`;
         }
         
         if (statusMessage) {

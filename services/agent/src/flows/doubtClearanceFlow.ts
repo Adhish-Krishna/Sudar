@@ -109,7 +109,7 @@ export async function* doubtClearanceFlow(
     yield {
       step: stepCount,
       type: 'status' as const,
-      status: `📁 Detected ${inputFiles.length} file(s): ${inputFiles.join(', ')}`
+      status: `Detected ${inputFiles.length} file(s): ${inputFiles.join(', ')}`
     };
   }
 
@@ -138,11 +138,11 @@ export async function* doubtClearanceFlow(
           doubtState.totalSearches++;
           const searchQuery = (toolArgs as any)?.query;
           doubtState.searchQueries.push(searchQuery || 'unknown');
-          statusMessage = `🔍 Searching for: "${searchQuery}"...`;
+          statusMessage = `Searching for: "${searchQuery}"...`;
         } else if (part.toolName === 'retrieve_content') {
           doubtState.fileRetrievals++;
           const filenames = (toolArgs as any)?.inputFiles || [];
-          statusMessage = `📄 Retrieving content from: ${Array.isArray(filenames) ? filenames.join(', ') : filenames}...`;
+          statusMessage = `Retrieving content from: ${Array.isArray(filenames) ? filenames.join(', ') : filenames}...`;
         }
         
         if (statusMessage) {
