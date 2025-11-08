@@ -24,13 +24,12 @@ import { extractFilesFromQuery, createFileContextPrompt } from '../utils/fileExt
 import { 
   addUserMessage, 
   initializeAgentMessage, 
-  updateAgentMessageStep, 
-  appendTextToAgentMessage,
   finalizeAgentMessage,
   convertDoubtClearanceStep,
   createInputFiles
 } from '../utils/chatUtils';
 import { type UserMessageInput } from '../models/chatSchema';
+import type { IAgentStep } from '../models/chatSchema';
 import { doubtClearanceFlowPrompt } from '../prompts';
 import dotenv from 'dotenv';
 
@@ -79,27 +78,6 @@ export async function* doubtClearanceFlow(
     ? systemPrompt + createFileContextPrompt(inputFiles)
     : systemPrompt;
 
-  // Add user message to database
-  try {
-    const userMessage: UserMessageInput = {
-      query,
-      inputFiles: createInputFiles(inputFiles)
-    };
-    await addUserMessage(userContext.chatId, userMessage, userContext);
-  } catch (error) {
-    console.error('Failed to add user message to database:', error);
-  }
-
-  // Initialize agent message in database
-  let messageId: string;
-  try {
-    messageId = await initializeAgentMessage(userContext.chatId, 'doubt_clearance', inputFiles);
-  } catch (error) {
-    console.error('Failed to initialize agent message in database:', error);
-    // Continue without database integration if initialization fails
-    messageId = '';
-  }
-
   const mcpClient = await createMCPClientWithContext(userContext);
   const tools = await mcpClient.tools();
 
@@ -113,6 +91,8 @@ export async function* doubtClearanceFlow(
 
   let stepCount = 0;
   let fullResponse = '';
+  const allSteps: IAgentStep[] = [];
+  const startTime = new Date();
   
   const doubtState = {
     searchQueries: [] as string[],
@@ -180,18 +160,8 @@ export async function* doubtClearanceFlow(
           toolArgs: toolArgs
         };
 
-        // Update database with step
-        if (messageId) {
-          try {
-            await updateAgentMessageStep(
-              userContext.chatId, 
-              messageId, 
-              convertDoubtClearanceStep(currentStep)
-            );
-          } catch (error) {
-            console.error('Failed to update step in database:', error);
-          }
-        }
+        // Store step for later database save
+        allSteps.push(convertDoubtClearanceStep(currentStep));
         
         yield currentStep;
       } else if (part.type === 'tool-result') {
@@ -200,9 +170,7 @@ export async function* doubtClearanceFlow(
         // Extract websites from search results
         if (part.toolName === 'web_search' && toolResult) {
           try {
-            // Parse search results to extract domains
             const resultText = JSON.stringify(toolResult);
-            // Extract URLs using regex
             const urlMatches = resultText.match(/https?:\/\/[^\s"'\]},]+/g) || [];
             const domains = urlMatches.map(url => {
               try {
@@ -212,7 +180,6 @@ export async function* doubtClearanceFlow(
               }
             }).filter((domain): domain is string => domain !== null);
             
-            // Add unique domains to websitesReferenced
             domains.forEach(domain => {
               if (!doubtState.websitesReferenced.includes(domain)) {
                 doubtState.websitesReferenced.push(domain);
@@ -230,33 +197,14 @@ export async function* doubtClearanceFlow(
           toolResult: toolResult
         };
 
-        // Update database with step
-        if (messageId) {
-          try {
-            await updateAgentMessageStep(
-              userContext.chatId, 
-              messageId, 
-              convertDoubtClearanceStep(currentStep)
-            );
-          } catch (error) {
-            console.error('Failed to update step in database:', error);
-          }
-        }
+        // Store step for later database save
+        allSteps.push(convertDoubtClearanceStep(currentStep));
         
         yield currentStep;
       } else if (part.type === 'text-delta') {
         if (part.text) {
           doubtState.responseLength += part.text.length;
           fullResponse += part.text;
-          
-          // Update accumulated response in database
-          if (messageId) {
-            try {
-              await appendTextToAgentMessage(userContext.chatId, messageId, fullResponse);
-            } catch (error) {
-              console.error('Failed to update response in database:', error);
-            }
-          }
         }
         
         yield {
@@ -266,40 +214,53 @@ export async function* doubtClearanceFlow(
         };
       } else if (part.type === 'finish') {
         doubtState.completed = true;
+        const endTime = new Date();
         
-        // Finalize agent message in database
-        if (messageId) {
-          try {
-            const executionSummary = {
-              success: part.finishReason !== 'error',
-              totalToolCalls: doubtState.totalSearches + doubtState.fileRetrievals,
-              totalTextLength: doubtState.responseLength,
-              duration: 0, // Will be calculated by the database
-              errorCount: part.finishReason === 'error' ? 1 : 0,
-              finalStatus: part.finishReason || 'completed'
-            };
+        // NOW save everything to database in one go
+        try {
+          // 1. Add user message
+          const userMessage: UserMessageInput = {
+            query,
+            inputFiles: createInputFiles(inputFiles)
+          };
+          await addUserMessage(userContext.chatId, userMessage, userContext);
 
-            const finalMetadata = {
-              doubtClearance: {
-                searchQueries: doubtState.searchQueries,
-                totalSearches: doubtState.totalSearches,
-                responseLength: doubtState.responseLength,
-                completed: doubtState.completed,
-                extractedFiles: doubtState.extractedFiles,
-                fileRetrievals: doubtState.fileRetrievals,
-                websitesReferenced: doubtState.websitesReferenced
-              }
-            };
+          // 2. Create complete agent message with all data
+          const messageId = await initializeAgentMessage(userContext.chatId, 'doubt_clearance', inputFiles);
 
-            await finalizeAgentMessage(
-              userContext.chatId, 
-              messageId, 
-              executionSummary,
-              finalMetadata
-            );
-          } catch (error) {
-            console.error('Failed to finalize message in database:', error);
-          }
+          const executionSummary = {
+            success: part.finishReason !== 'error',
+            totalToolCalls: doubtState.totalSearches + doubtState.fileRetrievals,
+            totalTextLength: doubtState.responseLength,
+            duration: endTime.getTime() - startTime.getTime(),
+            errorCount: part.finishReason === 'error' ? 1 : 0,
+            finalStatus: part.finishReason || 'completed'
+          };
+
+          const finalMetadata = {
+            doubtClearance: {
+              searchQueries: doubtState.searchQueries,
+              totalSearches: doubtState.totalSearches,
+              responseLength: doubtState.responseLength,
+              completed: doubtState.completed,
+              extractedFiles: doubtState.extractedFiles,
+              fileRetrievals: doubtState.fileRetrievals,
+              websitesReferenced: doubtState.websitesReferenced
+            }
+          };
+
+          // 3. Finalize with all steps, response, and metadata
+          await finalizeAgentMessage(
+            userContext.chatId, 
+            messageId, 
+            executionSummary,
+            finalMetadata,
+            allSteps,
+            fullResponse,
+            endTime
+          );
+        } catch (error) {
+          console.error('Failed to save conversation to database:', error);
         }
         
         yield {
@@ -326,27 +287,38 @@ export async function* doubtClearanceFlow(
 
   } catch (error) {
     console.error('Error in doubt clearance flow:', error);
+    const endTime = new Date();
     
-    // Finalize agent message with error in database
-    if (messageId) {
-      try {
-        const executionSummary = {
-          success: false,
-          totalToolCalls: doubtState.totalSearches + doubtState.fileRetrievals,
-          totalTextLength: doubtState.responseLength,
-          duration: 0,
-          errorCount: 1,
-          finalStatus: 'error'
-        };
+    // Save error state to database
+    try {
+      const userMessage: UserMessageInput = {
+        query,
+        inputFiles: createInputFiles(inputFiles)
+      };
+      await addUserMessage(userContext.chatId, userMessage, userContext);
 
-        await finalizeAgentMessage(
-          userContext.chatId, 
-          messageId, 
-          executionSummary
-        );
-      } catch (dbError) {
-        console.error('Failed to finalize error message in database:', dbError);
-      }
+      const messageId = await initializeAgentMessage(userContext.chatId, 'doubt_clearance', inputFiles);
+
+      const executionSummary = {
+        success: false,
+        totalToolCalls: doubtState.totalSearches + doubtState.fileRetrievals,
+        totalTextLength: doubtState.responseLength,
+        duration: endTime.getTime() - startTime.getTime(),
+        errorCount: 1,
+        finalStatus: 'error'
+      };
+
+      await finalizeAgentMessage(
+        userContext.chatId, 
+        messageId, 
+        executionSummary,
+        undefined,
+        allSteps,
+        fullResponse,
+        endTime
+      );
+    } catch (dbError) {
+      console.error('Failed to save error to database:', dbError);
     }
     
     yield {

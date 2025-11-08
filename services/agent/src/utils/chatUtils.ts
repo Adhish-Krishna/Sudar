@@ -410,11 +410,14 @@ export async function finalizeAgentMessage(
   chatId: string,
   messageId: string,
   executionSummary: IAgentMessage['executionSummary'],
-  finalMetadata?: IAgentMessage['finalMetadata']
+  finalMetadata?: IAgentMessage['finalMetadata'],
+  steps?: IAgentStep[],
+  fullResponse?: string,
+  endTime?: Date
 ): Promise<any> {
   const update: any = {
     $set: {
-      'messages.$[msg].agentMessage.endTime': new Date(),
+      'messages.$[msg].agentMessage.endTime': endTime || new Date(),
       'messages.$[msg].agentMessage.executionSummary': executionSummary,
       'conversationMetadata.lastActivityTime': new Date()
     }
@@ -422,6 +425,15 @@ export async function finalizeAgentMessage(
 
   if (finalMetadata) {
     update.$set['messages.$[msg].agentMessage.finalMetadata'] = finalMetadata;
+  }
+
+  if (steps && steps.length > 0) {
+    update.$set['messages.$[msg].agentMessage.steps'] = steps;
+    update.$set['messages.$[msg].agentMessage.totalSteps'] = steps.length;
+  }
+
+  if (fullResponse !== undefined) {
+    update.$set['messages.$[msg].agentMessage.fullResponse'] = fullResponse;
   }
 
   return await ChatConversation.findOneAndUpdate(

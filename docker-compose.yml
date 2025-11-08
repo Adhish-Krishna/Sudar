@@ -342,7 +342,7 @@ services:
       - BACKEND_URL=http://backend:3006
       - FRONTEND_URL=${FRONTEND_URL}
       - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_API_KEY}
-      - MCP_SERVER_URL=http://sudar-tools-mcp-server/mcp
+      - MCP_SERVER_URL=http://sudar-tools-mcp-server:3002/mcp
       - MONGODB_URI=mongodb://mongodb-server:27017/sudar_agent
     expose:
       - "3003"

@@ -25,13 +25,11 @@ import { extractFilesFromQuery } from '../utils/fileExtractor';
 import { 
   addUserMessage, 
   initializeAgentMessage, 
-  updateAgentMessageStep, 
-  appendTextToAgentMessage,
   finalizeAgentMessage,
   convertWorksheetFlowStep,
   createInputFiles
 } from '../utils/chatUtils';
-import { type UserMessageInput } from '../models/chatSchema';
+import { type UserMessageInput, type IAgentStep } from '../models/chatSchema';
 import type { UserContext } from '../mcpClient';
 
 export interface WorksheetFlowStep {
@@ -105,26 +103,7 @@ export async function* worksheetFlow(
   const fileExtraction = extractFilesFromQuery(query);
   const actualQuery = fileExtraction.hasFiles ? fileExtraction.cleanedQuery : query;
 
-  // Add user message to database
-  try {
-    const userMessage: UserMessageInput = {
-      query,
-      inputFiles: createInputFiles(fileExtraction.extractedFiles)
-    };
-    await addUserMessage(userContext.chatId, userMessage, userContext);
-  } catch (error) {
-    console.error('Failed to add user message to database:', error);
-  }
-
-  // Initialize agent message in database
-  let messageId: string;
-  try {
-    messageId = await initializeAgentMessage(userContext.chatId, 'worksheet_generation', fileExtraction.extractedFiles);
-  } catch (error) {
-    console.error('Failed to initialize agent message in database:', error);
-    // Continue without database integration if initialization fails
-    messageId = '';
-  }
+  const allSteps: IAgentStep[] = [];
 
   const flowState: WorksheetFlowState = {
     extractedFiles: fileExtraction.extractedFiles,
@@ -192,28 +171,8 @@ export async function* worksheetFlow(
         metadata: researchStep.metadata
       };
 
-      // Update database with step
-      if (messageId) {
-        try {
-          await updateAgentMessageStep(
-            userContext.chatId, 
-            messageId, 
-            convertWorksheetFlowStep(currentStep)
-          );
-        } catch (error) {
-          console.error('Failed to update research step in database:', error);
-        }
-      }
-
-      // Update accumulated response for text steps
-      if (researchStep.type === 'text' && researchStep.text && messageId) {
-        try {
-          flowState.researchPhase.researchFindings += researchStep.text;
-          await appendTextToAgentMessage(userContext.chatId, messageId, flowState.researchPhase.researchFindings);
-        } catch (error) {
-          console.error('Failed to update research text in database:', error);
-        }
-      }
+      // Store step for later database save
+      allSteps.push(convertWorksheetFlowStep(currentStep));
 
       yield currentStep;
 
@@ -292,18 +251,8 @@ export async function* worksheetFlow(
         metadata: worksheetStep.metadata
       };
 
-      // Update database with step
-      if (messageId) {
-        try {
-          await updateAgentMessageStep(
-            userContext.chatId, 
-            messageId, 
-            convertWorksheetFlowStep(currentStep)
-          );
-        } catch (error) {
-          console.error('Failed to update generation step in database:', error);
-        }
-      }
+      // Store step for later database save
+      allSteps.push(convertWorksheetFlowStep(currentStep));
 
       yield currentStep;
 
@@ -359,57 +308,69 @@ export async function* worksheetFlow(
       }
     };
 
-    // Finalize agent message in database
-    if (messageId) {
-      try {
-        const executionSummary = {
-          success: flowState.success,
-          totalToolCalls: flowState.researchPhase.totalToolCalls + flowState.generationPhase.totalToolCalls,
-          totalTextLength: flowState.researchPhase.researchFindings.length,
-          duration: flowState.endTime.getTime() - flowState.startTime.getTime(),
-          errorCount: flowState.success ? 0 : 1,
-          finalStatus: flowState.success ? 'completed' : 'completed_with_warnings'
-        };
+    // Save everything to database in one go
+    try {
+      // 1. Add user message
+      const userMessage: UserMessageInput = {
+        query,
+        inputFiles: createInputFiles(fileExtraction.extractedFiles)
+      };
+      await addUserMessage(userContext.chatId, userMessage, userContext);
 
-        const finalMetadata = {
-          worksheetFlow: {
-            flowSummary: {
-              success: flowState.success,
-              totalSteps: flowState.totalSteps,
-              duration: flowState.endTime.getTime() - flowState.startTime.getTime(),
-              startTime: flowState.startTime.toISOString(),
-              endTime: flowState.endTime.toISOString(),
-              extractedFiles: flowState.extractedFiles,
-              hasFiles: flowState.hasFiles
-            },
-            researchPhase: {
-              websitesResearched: flowState.researchPhase.websitesResearched,
-              searchQueries: flowState.researchPhase.searchQueries,
-              totalToolCalls: flowState.researchPhase.totalToolCalls,
-              researchMode: flowState.researchPhase.researchMode,
-              findingsLength: flowState.researchPhase.researchFindings.length,
-              completed: flowState.researchPhase.completed
-            },
-            generationPhase: {
-              worksheetTitle: flowState.generationPhase.worksheetTitle,
-              contentLength: flowState.generationPhase.contentLength,
-              savedSuccessfully: flowState.generationPhase.savedSuccessfully,
-              pdfLocation: flowState.generationPhase.pdfLocation,
-              totalToolCalls: flowState.generationPhase.totalToolCalls,
-              completed: flowState.generationPhase.completed
-            }
+      // 2. Create complete agent message with all data
+      const messageId = await initializeAgentMessage(userContext.chatId, 'worksheet_generation', fileExtraction.extractedFiles);
+
+      const executionSummary = {
+        success: flowState.success,
+        totalToolCalls: flowState.researchPhase.totalToolCalls + flowState.generationPhase.totalToolCalls,
+        totalTextLength: flowState.researchPhase.researchFindings.length,
+        duration: flowState.endTime.getTime() - flowState.startTime.getTime(),
+        errorCount: flowState.success ? 0 : 1,
+        finalStatus: flowState.success ? 'completed' : 'completed_with_warnings'
+      };
+
+      const finalMetadata = {
+        worksheetFlow: {
+          flowSummary: {
+            success: flowState.success,
+            totalSteps: flowState.totalSteps,
+            duration: flowState.endTime.getTime() - flowState.startTime.getTime(),
+            startTime: flowState.startTime.toISOString(),
+            endTime: flowState.endTime.toISOString(),
+            extractedFiles: flowState.extractedFiles,
+            hasFiles: flowState.hasFiles
+          },
+          researchPhase: {
+            websitesResearched: flowState.researchPhase.websitesResearched,
+            searchQueries: flowState.researchPhase.searchQueries,
+            totalToolCalls: flowState.researchPhase.totalToolCalls,
+            researchMode: flowState.researchPhase.researchMode,
+            findingsLength: flowState.researchPhase.researchFindings.length,
+            completed: flowState.researchPhase.completed
+          },
+          generationPhase: {
+            worksheetTitle: flowState.generationPhase.worksheetTitle,
+            contentLength: flowState.generationPhase.contentLength,
+            savedSuccessfully: flowState.generationPhase.savedSuccessfully,
+            pdfLocation: flowState.generationPhase.pdfLocation,
+            totalToolCalls: flowState.generationPhase.totalToolCalls,
+            completed: flowState.generationPhase.completed
           }
-        };
+        }
+      };
 
-        await finalizeAgentMessage(
-          userContext.chatId, 
-          messageId, 
-          executionSummary,
-          finalMetadata
-        );
-      } catch (error) {
-        console.error('Failed to finalize message in database:', error);
-      }
+      // 3. Finalize with all steps, response, and metadata
+      await finalizeAgentMessage(
+        userContext.chatId, 
+        messageId, 
+        executionSummary,
+        finalMetadata,
+        allSteps,
+        flowState.researchPhase.researchFindings,
+        flowState.endTime
+      );
+    } catch (error) {
+      console.error('Failed to save conversation to database:', error);
     }
 
     yield {
@@ -429,26 +390,36 @@ export async function* worksheetFlow(
 
     console.error('Error in worksheet flow:', error);
     
-    // Finalize agent message with error in database
-    if (messageId) {
-      try {
-        const executionSummary = {
-          success: false,
-          totalToolCalls: flowState.researchPhase.totalToolCalls + flowState.generationPhase.totalToolCalls,
-          totalTextLength: flowState.researchPhase.researchFindings.length,
-          duration: flowState.endTime.getTime() - flowState.startTime.getTime(),
-          errorCount: 1,
-          finalStatus: 'error'
-        };
+    // Save error state to database
+    try {
+      const userMessage: UserMessageInput = {
+        query,
+        inputFiles: createInputFiles(fileExtraction.extractedFiles)
+      };
+      await addUserMessage(userContext.chatId, userMessage, userContext);
 
-        await finalizeAgentMessage(
-          userContext.chatId, 
-          messageId, 
-          executionSummary
-        );
-      } catch (dbError) {
-        console.error('Failed to finalize error message in database:', dbError);
-      }
+      const messageId = await initializeAgentMessage(userContext.chatId, 'worksheet_generation', fileExtraction.extractedFiles);
+
+      const executionSummary = {
+        success: false,
+        totalToolCalls: flowState.researchPhase.totalToolCalls + flowState.generationPhase.totalToolCalls,
+        totalTextLength: flowState.researchPhase.researchFindings.length,
+        duration: flowState.endTime.getTime() - flowState.startTime.getTime(),
+        errorCount: 1,
+        finalStatus: 'error'
+      };
+
+      await finalizeAgentMessage(
+        userContext.chatId, 
+        messageId, 
+        executionSummary,
+        undefined,
+        allSteps,
+        flowState.researchPhase.researchFindings,
+        flowState.endTime
+      );
+    } catch (dbError) {
+      console.error('Failed to save error to database:', dbError);
     }
     
     yield {
