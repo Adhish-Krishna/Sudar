@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, ExternalLink, Search, Globe, Loader2, CheckCircle2, FileText } from "lucide-react";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import { Response } from "@/components/ai-elements/response";
 
 interface ResearchPhaseData {
   status: string[];
@@ -12,6 +13,7 @@ interface ResearchPhaseData {
   websitesResearched: string[];
   toolCalls: Array<{ toolName: string; timestamp: number }>;
   isComplete: boolean;
+  content?: string; // Research phase text content
 }
 
 interface GenerationPhaseData {
@@ -21,6 +23,7 @@ interface GenerationPhaseData {
   savedSuccessfully?: boolean;
   pdfLocation?: string;
   isComplete: boolean;
+  content?: string; // Generation phase text content
 }
 
 interface ResearchPhaseRendererProps {
@@ -70,6 +73,24 @@ export const ResearchPhaseRenderer = ({ data, isActive }: ResearchPhaseRendererP
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-3">
+            {/* Research Content */}
+            {data.content && (
+              <>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Research Findings:</p>
+                  <div className="rounded-md border bg-background/50 p-3">
+                    <Response
+                      className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                      parseIncompleteMarkdown={true}
+                    >
+                      {data.content}
+                    </Response>
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
+
             {/* Current Status */}
             {isActive && data.status.length > 0 && (
               <div className="space-y-1">
@@ -193,6 +214,24 @@ export const GenerationPhaseRenderer = ({ data, isActive }: GenerationPhaseRende
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-3">
+            {/* Generation Content */}
+            {data.content && (
+              <>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Generated Worksheet:</p>
+                  <div className="rounded-md border bg-background/50 p-3">
+                    <Response
+                      className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                      parseIncompleteMarkdown={true}
+                    >
+                      {data.content}
+                    </Response>
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
+
             {/* Current Status */}
             {isActive && data.status.length > 0 && (
               <div className="space-y-1">
