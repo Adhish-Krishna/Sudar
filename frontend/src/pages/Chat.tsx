@@ -208,10 +208,15 @@ const Chat = ()=>{
                                 const researchMetadata = msg.agentMessage.finalMetadata?.research || msg.agentMessage.finalMetadata?.worksheetFlow?.researchPhase;
                                 const generationMetadata = msg.agentMessage.finalMetadata?.generation || msg.agentMessage.finalMetadata?.worksheetFlow?.generationPhase;
                                 
+                                // Extract researched_websites from research_findings (primary source) or metadata (fallback)
+                                const researchedWebsites = msg.agentMessage.research_findings?.researched_websites || 
+                                                          researchMetadata?.websitesResearched || 
+                                                          [];
+                                
                                 setResearchPhaseData({
                                     status: [],
                                     searchQueries: researchMetadata?.searchQueries || [],
-                                    websitesResearched: researchMetadata?.websitesResearched || msg.agentMessage.research_findings?.researched_websites || [],
+                                    websitesResearched: researchedWebsites,
                                     toolCalls: [],
                                     isComplete: researchMetadata?.completed || true,
                                     content: researchContent
@@ -227,12 +232,21 @@ const Chat = ()=>{
                                     content: generationContent
                                 });
                                 
+                                // Store researched_websites in metadata for rendering
+                                const enhancedMetadata = {
+                                    ...msg.agentMessage.finalMetadata,
+                                    research_findings: {
+                                        ...msg.agentMessage.research_findings,
+                                        researched_websites: researchedWebsites
+                                    }
+                                };
+                                
                                 loadedMessages.push({
                                     role: 'assistant',
                                     content: generationContent || researchContent, // Fallback for backward compatibility
                                     researchContent: researchContent,
                                     generationContent: generationContent,
-                                    metadata: msg.agentMessage.finalMetadata
+                                    metadata: enhancedMetadata
                                 });
                             } else if (msg.agentMessage.flowType === 'doubt_clearance') {
                                 // For doubt clearance, use research_findings.content
@@ -1305,9 +1319,11 @@ const Chat = ()=>{
                                                             {msg.researchContent && (() => {
                                                                 // Extract metadata from message to populate phase data
                                                                 const researchMetadata = msg.metadata?.research || msg.metadata?.worksheetFlow?.researchPhase;
-                                                                // Also check if we have researched_websites from the message structure
-                                                                const websitesResearched = researchMetadata?.websitesResearched || 
-                                                                    (msg.metadata?.worksheetFlow?.researchPhase?.websitesResearched) || [];
+                                                                // Extract researched_websites from multiple possible locations
+                                                                const websitesResearched = msg.metadata?.research_findings?.researched_websites ||
+                                                                    researchMetadata?.websitesResearched || 
+                                                                    msg.metadata?.worksheetFlow?.researchPhase?.websitesResearched ||
+                                                                    [];
                                                                 
                                                                 const researchPhaseDataForRenderer: ResearchPhaseData = {
                                                                     status: [],

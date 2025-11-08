@@ -32,7 +32,7 @@ interface ResearchPhaseRendererProps {
 }
 
 export const ResearchPhaseRenderer = ({ data, isActive }: ResearchPhaseRendererProps) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
     <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
@@ -173,7 +173,7 @@ interface GenerationPhaseRendererProps {
 }
 
 export const GenerationPhaseRenderer = ({ data, isActive }: GenerationPhaseRendererProps) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
     <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
