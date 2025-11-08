@@ -86,10 +86,18 @@ export async function* worksheetGenerator(
 
     const prompt = `USER QUERY: ${query}
 
-RESEARCH CONTENT TO CREATE WORKSHEET FROM:
+RESEARCH CONTENT (FOR YOUR REFERENCE ONLY - DO NOT INCLUDE THIS IN THE WORKSHEET):
 ${content}
 
-Based on the above research findings, create a comprehensive educational worksheet that helps students learn about this topic. Structure the worksheet with clear sections, learning objectives, practice questions, and activities. After creating the worksheet content in Markdown format, save it as a PDF using the save_content tool.`;
+IMPORTANT: The research content above is provided to help you understand the topic and create relevant questions. DO NOT include this research content in the worksheet you save. 
+
+Your task:
+1. Use the research content to understand the topic thoroughly
+2. Create practice questions that test understanding of this material
+3. Include an answer key ONLY if the user's query explicitly asks for it (look for phrases like "with answer key", "include answers", "with solutions", etc.)
+4. Save ONLY the questions (and answer key if requested) using the save_content tool
+
+Generate a worksheet with diverse question types (MCQ, short answer, long answer, critical thinking) based on the research content. After creating the questions, save them as a PDF using the save_content tool.`;
 
     const result = await agent.stream({
       prompt: prompt

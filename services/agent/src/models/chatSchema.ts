@@ -139,10 +139,11 @@ export interface IAgentMessage {
   
   // Execution details
   steps: IAgentStep[];
-  
-  // Aggregated response content
-  fullResponse: string;
-  
+  research_findings: {
+    content: string;
+    researched_websites: string[];
+  }
+  worksheet_content: string;
   // Final metadata
   finalMetadata?: {
     doubtClearance?: IDoubtClearanceMetadata;
@@ -354,8 +355,13 @@ const AgentMessageSchema = new Schema<IAgentMessage>({
   totalSteps: { type: Number, default: 0 },
   
   steps: [AgentStepSchema],
-  fullResponse: { type: String, default: '' },
-  
+  research_findings: {
+    content: {type: String},
+    researched_websites: [{
+      type: String,
+    }]
+  },
+  worksheet_content: { type: String, default: '' },
   finalMetadata: {
     doubtClearance: DoubtClearanceMetadataSchema,
     worksheetFlow: WorksheetFlowMetadataSchema,

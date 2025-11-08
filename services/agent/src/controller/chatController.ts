@@ -344,12 +344,57 @@ const getChatMessages = async (req: Request, res: Response) => {
             });
         }
 
+        // Transform messages to plain structure without Mongoose internals
+        const transformedMessages = conversation.messages.map((msg: any) => {
+            if (msg.messageType === 'user') {
+                return {
+                    messageId: msg.messageId,
+                    messageType: msg.messageType,
+                    timestamp: msg.timestamp,
+                    userMessage: {
+                        query: msg.userMessage.query,
+                        inputFiles: msg.userMessage.inputFiles || [],
+                        timestamp: msg.userMessage.timestamp
+                    }
+                };
+            } else if (msg.messageType === 'agent') {
+                return {
+                    messageId: msg.messageId,
+                    messageType: msg.messageType,
+                    timestamp: msg.timestamp,
+                    agentMessage: {
+                        research_findings: msg.agentMessage.research_findings || {
+                            content: '',
+                            researched_websites: []
+                        },
+                        worksheet_content: msg.agentMessage.worksheet_content || '',
+                        flowType: msg.agentMessage.flowType,
+                        startTime: msg.agentMessage.startTime,
+                        endTime: msg.agentMessage.endTime,
+                        totalSteps: msg.agentMessage.totalSteps,
+                        steps: msg.agentMessage.steps || [],
+                        finalMetadata: msg.agentMessage.finalMetadata || {},
+                        executionSummary: msg.agentMessage.executionSummary || {},
+                        fileProcessing: msg.agentMessage.fileProcessing || {}
+                    }
+                };
+            }
+            return msg;
+        });
+
         return res.status(200).json({
             success: true,
             chatId: conversation.chatId,
+            userId: conversation.userId,
+            subjectId: conversation.subjectId,
+            classroomId: conversation.classroomId,
+            title: conversation.title,
+            description: conversation.description,
+            tags: conversation.tags || [],
             totalMessages: conversation.messages.length,
-            messages: conversation.messages,
-            metadata: conversation.conversationMetadata
+            messages: transformedMessages,
+            metadata: conversation.conversationMetadata,
+            status: conversation.status
         });
 
     } catch (error) {
@@ -389,18 +434,54 @@ const getChatsBySubject = async (req: Request, res: Response) => {
             totalChats,
             page,
             limit,
-            chats: conversations.map(conv => ({
-                chatId: conv.chatId,
-                title: conv.title,
-                description: conv.description,
-                tags: conv.tags,
-                totalMessages: conv.conversationMetadata.totalMessages,
-                totalUserQueries: conv.conversationMetadata.totalUserQueries,
-                totalAgentResponses: conv.conversationMetadata.totalAgentResponses,
-                conversationStartTime: conv.conversationMetadata.conversationStartTime,
-                lastActivityTime: conv.conversationMetadata.lastActivityTime,
-                status: conv.status
-            }))
+            chats: conversations.map(conv => {
+                // Get the last message for preview
+                const lastMessage = conv.messages[conv.messages.length - 1];
+                let lastMessagePreview = '';
+                let lastMessageType = '';
+                
+                if (lastMessage) {
+                    if (lastMessage.messageType === 'user' && lastMessage.userMessage) {
+                        lastMessagePreview = lastMessage.userMessage.query.substring(0, 100);
+                        lastMessageType = 'user';
+                    } else if (lastMessage.messageType === 'agent' && lastMessage.agentMessage) {
+                        // Get preview from appropriate field based on flow type
+                        const agentMsg = lastMessage.agentMessage;
+                        if (agentMsg.flowType === 'worksheet_generation') {
+                            lastMessagePreview = agentMsg.worksheet_content 
+                                ? `Worksheet: ${agentMsg.worksheet_content.substring(0, 100)}...`
+                                : 'Worksheet generated';
+                        } else if (agentMsg.flowType === 'doubt_clearance') {
+                            lastMessagePreview = agentMsg.research_findings?.content 
+                                ? agentMsg.research_findings.content.substring(0, 100)
+                                : 'Response provided';
+                        } else {
+                            lastMessagePreview = agentMsg.research_findings?.content 
+                                ? agentMsg.research_findings.content.substring(0, 100)
+                                : 'Agent response';
+                        }
+                        lastMessageType = 'agent';
+                    }
+                }
+                
+                return {
+                    chatId: conv.chatId,
+                    title: conv.title,
+                    description: conv.description,
+                    tags: conv.tags,
+                    totalMessages: conv.conversationMetadata.totalMessages,
+                    totalUserQueries: conv.conversationMetadata.totalUserQueries,
+                    totalAgentResponses: conv.conversationMetadata.totalAgentResponses,
+                    conversationStartTime: conv.conversationMetadata.conversationStartTime,
+                    lastActivityTime: conv.conversationMetadata.lastActivityTime,
+                    status: conv.status,
+                    lastMessage: {
+                        type: lastMessageType,
+                        preview: lastMessagePreview,
+                        timestamp: lastMessage?.timestamp
+                    }
+                };
+            })
         });
 
     } catch (error) {

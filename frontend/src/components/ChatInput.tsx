@@ -209,7 +209,7 @@ const ChatInput = ({
                                     size="sm"
                                     className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
                                 >
-                                    <Workflow className="size-3.5 md:size-4"/> <span className="hidden sm:inline">Flow</span>
+                                    <Workflow className="size-3.5 md:size-4"/> {!isMobile ? "Flow": ""}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-64 p-0" align="start">

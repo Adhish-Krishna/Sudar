@@ -312,7 +312,11 @@ export async function initializeAgentMessage(
     startTime: new Date(),
     totalSteps: 0,
     steps: [],
-    fullResponse: '',
+    research_findings:{
+      content: '',
+      researched_websites: []
+    },
+    worksheet_content: '',
     executionSummary: {
       success: false,
       totalToolCalls: 0,
@@ -404,6 +408,54 @@ export async function appendTextToAgentMessage(
 }
 
 /**
+ * Update research findings in agent message
+ */
+export async function updateResearchFindings(
+  chatId: string,
+  messageId: string,
+  content: string,
+  researchedWebsites: string[]
+): Promise<any> {
+  return await ChatConversation.findOneAndUpdate(
+    { chatId },
+    {
+      $set: {
+        'messages.$[msg].agentMessage.research_findings.content': content,
+        'messages.$[msg].agentMessage.research_findings.researched_websites': researchedWebsites,
+        'conversationMetadata.lastActivityTime': new Date()
+      }
+    },
+    {
+      new: true,
+      arrayFilters: [{ 'msg.messageId': messageId }]
+    }
+  ) as IChatConversationDocument | null;
+}
+
+/**
+ * Update worksheet content in agent message
+ */
+export async function updateWorksheetContent(
+  chatId: string,
+  messageId: string,
+  worksheetContent: string
+): Promise<any> {
+  return await ChatConversation.findOneAndUpdate(
+    { chatId },
+    {
+      $set: {
+        'messages.$[msg].agentMessage.worksheet_content': worksheetContent,
+        'conversationMetadata.lastActivityTime': new Date()
+      }
+    },
+    {
+      new: true,
+      arrayFilters: [{ 'msg.messageId': messageId }]
+    }
+  ) as IChatConversationDocument | null;
+}
+
+/**
  * Finalize agent message with execution summary
  */
 export async function finalizeAgentMessage(
@@ -412,7 +464,8 @@ export async function finalizeAgentMessage(
   executionSummary: IAgentMessage['executionSummary'],
   finalMetadata?: IAgentMessage['finalMetadata'],
   steps?: IAgentStep[],
-  fullResponse?: string,
+  researchFindings?: { content: string; researched_websites: string[] },
+  worksheetContent?: string,
   endTime?: Date
 ): Promise<any> {
   const update: any = {
@@ -432,8 +485,12 @@ export async function finalizeAgentMessage(
     update.$set['messages.$[msg].agentMessage.totalSteps'] = steps.length;
   }
 
-  if (fullResponse !== undefined) {
-    update.$set['messages.$[msg].agentMessage.fullResponse'] = fullResponse;
+  if (researchFindings) {
+    update.$set['messages.$[msg].agentMessage.research_findings'] = researchFindings;
+  }
+
+  if (worksheetContent !== undefined) {
+    update.$set['messages.$[msg].agentMessage.worksheet_content'] = worksheetContent;
   }
 
   return await ChatConversation.findOneAndUpdate(
@@ -450,7 +507,7 @@ export async function finalizeAgentMessage(
  * Get conversation by chatId
  */
 export async function getConversation(chatId: string): Promise<any> {
-  return await ChatConversation.findOne({ chatId });
+  return await ChatConversation.findOne({ chatId }).lean(); // Convert to plain JavaScript object
 }
 
 /**
@@ -466,7 +523,8 @@ export async function getUserConversations(
   return await ChatConversation.find({ userId, status: 'active' })
     .sort({ 'conversationMetadata.lastActivityTime': -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean(); // Convert to plain JavaScript objects
 }
 
 /**
@@ -487,7 +545,8 @@ export async function getChatsBySubject(
   })
     .sort({ 'conversationMetadata.lastActivityTime': -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean(); // Convert to plain JavaScript objects
 }
 
 /**

@@ -73,6 +73,7 @@ interface WorksheetFlowState {
   
   generationPhase: {
     worksheetTitle: string;
+    worksheetContent: string;
     contentLength: number;
     savedSuccessfully: boolean;
     pdfLocation: string;
@@ -119,6 +120,7 @@ export async function* worksheetFlow(
     },
     generationPhase: {
       worksheetTitle: '',
+      worksheetContent: '',
       contentLength: 0,
       savedSuccessfully: false,
       pdfLocation: '',
@@ -256,6 +258,19 @@ export async function* worksheetFlow(
 
       yield currentStep;
 
+      // Accumulate worksheet content from text chunks
+      if (worksheetStep.type === 'text' && worksheetStep.text) {
+        flowState.generationPhase.worksheetContent += worksheetStep.text;
+      }
+
+      // Capture worksheet content from tool arguments when saving
+      if (worksheetStep.type === 'tool_call' && worksheetStep.toolName === 'save_content' && worksheetStep.toolArgs) {
+        const content = (worksheetStep.toolArgs as any)?.content;
+        if (content) {
+          flowState.generationPhase.worksheetContent = content;
+        }
+      }
+
       if (worksheetStep.type === 'metadata' && worksheetStep.metadata) {
         flowState.generationPhase.worksheetTitle = worksheetStep.metadata.worksheetTitle || '';
         flowState.generationPhase.contentLength = worksheetStep.metadata.contentLength || 0;
@@ -359,14 +374,18 @@ export async function* worksheetFlow(
         }
       };
 
-      // 3. Finalize with all steps, response, and metadata
+      // 3. Finalize with all steps, research findings, worksheet content, and metadata
       await finalizeAgentMessage(
         userContext.chatId, 
         messageId, 
         executionSummary,
         finalMetadata,
         allSteps,
-        flowState.researchPhase.researchFindings,
+        {
+          content: flowState.researchPhase.researchFindings,
+          researched_websites: flowState.researchPhase.websitesResearched
+        },
+        flowState.generationPhase.worksheetContent,
         flowState.endTime
       );
     } catch (error) {
@@ -415,7 +434,11 @@ export async function* worksheetFlow(
         executionSummary,
         undefined,
         allSteps,
-        flowState.researchPhase.researchFindings,
+        {
+          content: flowState.researchPhase.researchFindings,
+          researched_websites: flowState.researchPhase.websitesResearched
+        },
+        flowState.generationPhase.worksheetContent,
         flowState.endTime
       );
     } catch (dbError) {

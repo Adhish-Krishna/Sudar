@@ -249,14 +249,18 @@ export async function* doubtClearanceFlow(
             }
           };
 
-          // 3. Finalize with all steps, response, and metadata
+          // 3. Finalize with all steps, response (stored in research_findings.content for doubt clearance), and metadata
           await finalizeAgentMessage(
             userContext.chatId, 
             messageId, 
             executionSummary,
             finalMetadata,
             allSteps,
-            fullResponse,
+            {
+              content: fullResponse,
+              researched_websites: doubtState.websitesReferenced
+            },
+            undefined, // No worksheet content for doubt clearance
             endTime
           );
         } catch (error) {
@@ -314,7 +318,11 @@ export async function* doubtClearanceFlow(
         executionSummary,
         undefined,
         allSteps,
-        fullResponse,
+        {
+          content: fullResponse,
+          researched_websites: doubtState.websitesReferenced
+        },
+        undefined, // No worksheet content for doubt clearance
         endTime
       );
     } catch (dbError) {

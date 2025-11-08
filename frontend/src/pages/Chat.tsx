@@ -47,6 +47,7 @@ const Chat = ()=>{
         metadata?: any;
     }
     const [messages, setMessages] = useState<Message[]>([]);
+    const [loadingMessages, setLoadingMessages] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
     const [currentResponse, setCurrentResponse] = useState("");
     const [streamingMetadata, setStreamingMetadata] = useState<any>(null);
@@ -132,14 +133,19 @@ const Chat = ()=>{
         const loadChatHistory = async () => {
             if (!chatId || !user?.teacher_id || !subject_id) return;
             
+            setLoadingMessages(true);
             try {
                 const response = await sudarAgent.getChatMessages(chatId);
                 
-                if (response.status && response.status !== 200) {
-                    // New chat, no history
+                console.log('Chat Messages Response:', response);
+                
+                if (response.success && response.success !== true) {
+                    // Error response from API
+                    console.log('Error fetching chat:', response.message);
                     setMessages([]);
                 } else if (response.messages && Array.isArray(response.messages)) {
-                    // Convert chat messages to display messages
+                    // Success: response has messages array directly
+                    console.log('Loading messages:', response.messages.length);
                     const loadedMessages: Message[] = [];
                     
                     for (const msg of response.messages) {
@@ -149,9 +155,22 @@ const Chat = ()=>{
                                 content: msg.userMessage.query
                             });
                         } else if (msg.messageType === 'agent' && msg.agentMessage) {
+                            // Extract content based on flow type
+                            let content = '';
+                            if (msg.agentMessage.flowType === 'worksheet_generation') {
+                                // For worksheet generation, use worksheet_content
+                                content = msg.agentMessage.worksheet_content || msg.agentMessage.research_findings?.content || '';
+                            } else if (msg.agentMessage.flowType === 'doubt_clearance') {
+                                // For doubt clearance, use research_findings.content
+                                content = msg.agentMessage.research_findings?.content || '';
+                            } else {
+                                // Fallback for other flow types
+                                content = msg.agentMessage.research_findings?.content || msg.agentMessage.worksheet_content || '';
+                            }
+                            
                             loadedMessages.push({
                                 role: 'assistant',
-                                content: msg.agentMessage.fullResponse,
+                                content: content,
                                 metadata: msg.agentMessage.finalMetadata
                             });
                         }
@@ -161,6 +180,8 @@ const Chat = ()=>{
             } catch (error: any) {
                 console.error("Failed to load chat history:", error);
                 setMessages([]);
+            } finally {
+                setLoadingMessages(false);
             }
         };
 
@@ -553,6 +574,7 @@ const Chat = ()=>{
     const handleNewChat = () => {
         const newChatId = generateUUID();
         setChatId(newChatId);
+        setMessages([]);
         toast.success("New chat created");
     };
 
@@ -933,7 +955,14 @@ const Chat = ()=>{
                                                     className="flex items-center gap-2 px-3 py-3 rounded-md hover:bg-accent transition-colors group border border-transparent hover:border-border"
                                                 >
                                                     <button
-                                                        onClick={() => setChatId(chat.chatId)}
+                                                        onClick={() => {
+                                                            if (chat.chatId !== chatId) {
+                                                                setChatId(chat.chatId);
+                                                                setHistoryOpen(false);
+                                                            } else {
+                                                                setHistoryOpen(false);
+                                                            }
+                                                        }}
                                                         className="flex items-start gap-3 flex-1 text-left min-w-0"
                                                     >
                                                         <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
@@ -998,7 +1027,14 @@ const Chat = ()=>{
                 </div>
 
                 {/*Scrollable area for chat messages*/}
-                    {messages.length == 0 ? (
+                    {loadingMessages ? (
+                        <div className="w-full h-[60%] flex flex-col items-center justify-center">
+                            <div className="text-center space-y-4 px-4">
+                                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                                <p className="text-muted-foreground">Loading chat messages...</p>
+                            </div>
+                        </div>
+                    ) : messages.length == 0 ? (
                         <div className="w-full h-[60%] flex flex-col items-center justify-center">
                             <div className="text-center space-y-4 px-4">
                                     <h2 className="text-3xl font-bold">

@@ -180,7 +180,11 @@ export interface ChatMessage {
     endTime?: Date;
     totalSteps: number;
     steps: any[];
-    fullResponse: string;
+    research_findings: {
+      content: string;
+      researched_websites: string[];
+    };
+    worksheet_content: string;
     finalMetadata?: any;
     executionSummary: {
       success: boolean;
@@ -1060,8 +1064,10 @@ export const sudarAgent = {
   getChatMessages: async (chatId: string): Promise<GetChatMessagesResponse | any> => {
     try {
       const response = await apiClient.get(`${AGENT_BASE}/${chatId}/messages`);
-      if (response.status === 200) return response.data as GetChatMessagesResponse;
-      return { status: response.status, message: response.data };
+      if (response.status === 200){
+        console.log('API Response:', response.data);
+        return response.data; // Return the data directly instead of wrapping it
+      }
     } catch (error: any) {
       return { 
         status: error.response?.status || 500, 
