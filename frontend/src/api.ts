@@ -263,11 +263,41 @@ export interface DeleteChatResponse {
 
 export type SSEEventType = 'start' | 'token' | 'done' | 'error' | 'status' | 'phase_change' | 'tool_call' | 'tool_result' | 'metadata' | 'phase_complete' | string;
 
+export interface SSEEventMetadata {
+  phase?: 'research' | 'generation' | 'flow';
+  summaryType?: 'research' | 'flow' | 'research_phase' | 'generation_phase';
+  currentPhase?: string;
+  previousPhase?: string;
+  toolName?: string;
+  toolArgs?: any;
+  toolResult?: any;
+  finishReason?: string;
+  
+  // Research phase metadata
+  researchMode?: string;
+  searchQueries?: string[];
+  websitesResearched?: string[];
+  findingsLength?: number;
+  totalToolCalls?: number;
+  completed?: boolean;
+  
+  // Generation phase metadata
+  worksheetTitle?: string;
+  contentLength?: number;
+  savedSuccessfully?: boolean;
+  pdfLocation?: string;
+  
+  // Flow summary metadata
+  flowSummary?: any;
+  researchPhase?: any;
+  generationPhase?: any;
+}
+
 export interface SSEEvent {
   type: SSEEventType;
   flowType?: 'doubt_clearance' | 'worksheet_generation';
   content: string;
-  metadata?: any;
+  metadata?: SSEEventMetadata;
 }
 
 export interface IngestResponse {

@@ -25,6 +25,7 @@ import { Response } from "@/components/ai-elements/response";
 import FilesAndChat from "@/components/FilesAndChat";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import type { Section } from "@/components/FilesAndChat";
+import { ResearchPhaseRenderer, GenerationPhaseRenderer } from "@/components/WorksheetPhaseRenderers";
 
 const Chat = ()=>{
     // Generate UUID v4
@@ -85,6 +86,39 @@ const Chat = ()=>{
 
     //Flow state
     const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance">("doubt_clearance");
+
+    // Worksheet phase tracking state
+    interface ResearchPhaseData {
+        status: string[];
+        searchQueries: string[];
+        websitesResearched: string[];
+        toolCalls: Array<{ toolName: string; timestamp: number }>;
+        isComplete: boolean;
+    }
+    
+    interface GenerationPhaseData {
+        status: string[];
+        worksheetTitle?: string;
+        contentLength?: number;
+        savedSuccessfully?: boolean;
+        pdfLocation?: string;
+        isComplete: boolean;
+    }
+    
+    const [researchPhaseData, setResearchPhaseData] = useState<ResearchPhaseData>({
+        status: [],
+        searchQueries: [],
+        websitesResearched: [],
+        toolCalls: [],
+        isComplete: false
+    });
+    
+    const [generationPhaseData, setGenerationPhaseData] = useState<GenerationPhaseData>({
+        status: [],
+        isComplete: false
+    });
+    
+    const [activePhase, setActivePhase] = useState<'research' | 'generation' | null>(null);
 
     // Ref for scroll area
     const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -289,6 +323,22 @@ const Chat = ()=>{
         setStreamingMetadata(null);
         setCurrentPhase('');
         setStreamingStatus('');
+        
+        // Reset phase data for worksheet generation
+        if (flowType === 'worksheet_generation') {
+            setResearchPhaseData({
+                status: [],
+                searchQueries: [],
+                websitesResearched: [],
+                toolCalls: [],
+                isComplete: false
+            });
+            setGenerationPhaseData({
+                status: [],
+                isComplete: false
+            });
+            setActivePhase(null);
+        }
 
         let accumulatedResponse = "";
         let metadata: any = {};
@@ -311,9 +361,21 @@ const Chat = ()=>{
                             setCurrentFlowType(event.flowType);
                         }
                         
+                        // Track active phase
+                        if (event.metadata?.phase) {
+                            if (event.metadata.phase === 'research') {
+                                setActivePhase('research');
+                            } else if (event.metadata.phase === 'generation') {
+                                setActivePhase('generation');
+                            }
+                        }
+                        
                         switch (event.type) {
                             case 'start':
                                 setStreamingStatus(`Starting ${event.flowType || 'chat'}...`);
+                                if (event.flowType === 'worksheet_generation') {
+                                    setActivePhase('research');
+                                }
                                 break;
                                 
                             case 'token':
@@ -322,9 +384,22 @@ const Chat = ()=>{
                                 break;
                                 
                             case 'status':
-                                // Show status messages
+                                // Show status messages and track by phase
                                 if (event.content) {
                                     setStreamingStatus(event.content);
+                                    
+                                    // Add status to appropriate phase
+                                    if (event.metadata?.phase === 'research') {
+                                        setResearchPhaseData(prev => ({
+                                            ...prev,
+                                            status: [...prev.status, event.content]
+                                        }));
+                                    } else if (event.metadata?.phase === 'generation') {
+                                        setGenerationPhaseData(prev => ({
+                                            ...prev,
+                                            status: [...prev.status, event.content]
+                                        }));
+                                    }
                                 }
                                 break;
                                 
@@ -333,14 +408,31 @@ const Chat = ()=>{
                                 if (event.metadata?.currentPhase) {
                                     setCurrentPhase(event.metadata.currentPhase);
                                     setStreamingStatus(event.content || `Entering ${event.metadata.currentPhase} phase`);
+                                    
+                                    // Update active phase
+                                    if (event.metadata.currentPhase === 'generation') {
+                                        setActivePhase('generation');
+                                        setResearchPhaseData(prev => ({ ...prev, isComplete: true }));
+                                    }
                                 }
                                 break;
                                 
                             case 'tool_call':
-                                // Show tool call information
+                                // Show tool call information and track
                                 if (event.metadata?.toolName) {
                                     setStreamingStatus(`Calling tool: ${event.metadata.toolName}`);
                                     console.log(`Tool called: ${event.metadata.toolName}`);
+                                    
+                                    // Track tool call by phase
+                                    if (event.metadata.phase === 'research') {
+                                        setResearchPhaseData(prev => ({
+                                            ...prev,
+                                            toolCalls: [...prev.toolCalls, { 
+                                                toolName: event.metadata!.toolName!, 
+                                                timestamp: Date.now() 
+                                            }]
+                                        }));
+                                    }
                                 }
                                 break;
                                 
@@ -357,17 +449,44 @@ const Chat = ()=>{
                                 metadata = { ...metadata, ...event.metadata };
                                 setStreamingMetadata(event.metadata);
                                 
-                                // Show completion messages based on metadata type
-                                if (event.metadata?.summaryType === 'research') {
-                                    setStreamingStatus(`Research complete: ${event.metadata.findingsLength} characters of findings`);
+                                // Handle different metadata types
+                                if (event.metadata?.summaryType === 'research' || event.metadata?.summaryType === 'research_phase') {
+                                    // Research phase metadata
+                                    setResearchPhaseData(prev => ({
+                                        ...prev,
+                                        searchQueries: event.metadata?.searchQueries || prev.searchQueries,
+                                        websitesResearched: event.metadata?.websitesResearched || prev.websitesResearched,
+                                        isComplete: event.metadata?.completed || false
+                                    }));
+                                    
+                                    if (event.metadata?.findingsLength) {
+                                        setStreamingStatus(`Research complete: ${event.metadata.findingsLength} characters of findings`);
+                                    }
                                 } else if (event.metadata?.summaryType === 'generation_phase') {
-                                    setStreamingStatus(`Worksheet generated: ${event.metadata.worksheetTitle}`);
+                                    // Generation phase metadata
+                                    setGenerationPhaseData(prev => ({
+                                        ...prev,
+                                        worksheetTitle: event.metadata?.worksheetTitle,
+                                        contentLength: event.metadata?.contentLength,
+                                        savedSuccessfully: event.metadata?.savedSuccessfully,
+                                        pdfLocation: event.metadata?.pdfLocation
+                                    }));
+                                    
+                                    if (event.metadata?.worksheetTitle) {
+                                        setStreamingStatus(`Worksheet generated: ${event.metadata.worksheetTitle}`);
+                                    }
                                 }
                                 break;
                                 
                             case 'phase_complete':
                                 // Phase completed
                                 setStreamingStatus(event.content || `${event.metadata?.phase} phase completed`);
+                                
+                                if (event.metadata?.phase === 'research') {
+                                    setResearchPhaseData(prev => ({ ...prev, isComplete: true }));
+                                } else if (event.metadata?.phase === 'generation') {
+                                    setGenerationPhaseData(prev => ({ ...prev, isComplete: true }));
+                                }
                                 break;
                                 
                             case 'done':
@@ -382,6 +501,7 @@ const Chat = ()=>{
                                 setCurrentPhase('');
                                 setStreamingMetadata(null);
                                 setStreamingStatus('');
+                                setActivePhase(null);
                                 break;
                                 
                             case 'error':
@@ -392,6 +512,7 @@ const Chat = ()=>{
                                 setCurrentPhase('');
                                 setStreamingMetadata(null);
                                 setStreamingStatus('');
+                                setActivePhase(null);
                                 break;
                                 
                             default:
@@ -1067,12 +1188,14 @@ const Chat = ()=>{
                                                     {msg.role === 'user' ? (
                                                         <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                                                     ) : (
-                                                        <Response
-                                                         className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                         parseIncompleteMarkdown={true}
-                                                         >
-                                                            {msg.content}
-                                                        </Response>
+                                                    
+                                                            <Response
+                                                                className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                                                                parseIncompleteMarkdown={true}
+                                                            >
+                                                                {msg.content}
+                                                            </Response>
+                                                        
                                                     )}
                                                 </div>
                                                 {msg.role === 'user' && (
@@ -1105,6 +1228,32 @@ const Chat = ()=>{
                                                         {currentResponse}
                                                     </Response>
                                                 </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Worksheet Generation Phase Renderers - Shown after streaming content */}
+                                        {flowType === 'worksheet_generation' && (
+                                            <div className="space-y-4 mt-6">
+                                                {/* Research Phase */}
+                                                {(researchPhaseData.status.length > 0 || 
+                                                  researchPhaseData.searchQueries.length > 0 || 
+                                                  researchPhaseData.websitesResearched.length > 0 || 
+                                                  researchPhaseData.isComplete) && (
+                                                    <ResearchPhaseRenderer 
+                                                        data={researchPhaseData} 
+                                                        isActive={activePhase === 'research'} 
+                                                    />
+                                                )}
+                                                
+                                                {/* Generation Phase */}
+                                                {(generationPhaseData.status.length > 0 || 
+                                                  generationPhaseData.worksheetTitle || 
+                                                  generationPhaseData.isComplete) && (
+                                                    <GenerationPhaseRenderer 
+                                                        data={generationPhaseData} 
+                                                        isActive={activePhase === 'generation'} 
+                                                    />
+                                                )}
                                             </div>
                                         )}
                                         
