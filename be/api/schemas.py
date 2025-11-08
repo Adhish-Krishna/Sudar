@@ -60,7 +60,6 @@ class VerifyTokenResponse(BaseModel):
     valid: bool = True
     teacher_id: str
     exp: int
-    iat: int
     type: str
     message: str = "Token is valid"
 

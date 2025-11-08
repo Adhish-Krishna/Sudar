@@ -458,6 +458,41 @@ export async function getUserConversations(
 }
 
 /**
+ * Get conversations by subject with pagination (direct Mongoose query)
+ */
+export async function getChatsBySubject(
+  userId: string,
+  subjectId: string,
+  page: number = 1,
+  limit: number = 20
+): Promise<any[]> {
+  const skip = (page - 1) * limit;
+  
+  return await ChatConversation.find({ 
+    userId, 
+    subjectId,
+    status: 'active' 
+  })
+    .sort({ 'conversationMetadata.lastActivityTime': -1 })
+    .skip(skip)
+    .limit(limit);
+}
+
+/**
+ * Count conversations by subject
+ */
+export async function countChatsBySubject(
+  userId: string,
+  subjectId: string
+): Promise<number> {
+  return await ChatConversation.countDocuments({ 
+    userId, 
+    subjectId,
+    status: 'active' 
+  });
+}
+
+/**
  * Archive a conversation
  */
 export async function archiveConversation(chatId: string): Promise<any> {
@@ -471,6 +506,13 @@ export async function archiveConversation(chatId: string): Promise<any> {
     },
     { new: true }
   );
+}
+
+/**
+ * Permanently delete a conversation (hard delete)
+ */
+export async function deleteConversation(chatId: string): Promise<any> {
+  return await ChatConversation.deleteOne({ chatId });
 }
 
 export {

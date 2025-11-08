@@ -357,7 +357,6 @@ def verify_token(data: VerifyTokenRequest):
             valid=True,
             teacher_id=payload.get("sub"),
             exp=payload.get("exp"),
-            iat=payload.get("iat"),
             type=payload.get("type", "access"),
             message="Token is valid"
         )

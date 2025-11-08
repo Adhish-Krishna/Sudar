@@ -14,7 +14,6 @@ interface VerifyTokenResponse {
   valid: boolean;
   teacher_id: string;
   exp: number;
-  iat: number;
   type: string;
   message: string;
 }
@@ -32,10 +31,10 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     }
 
     // Get backend URL from environment
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3006';
 
     // Verify token with backend
-    const verifyResponse = await axios.post<VerifyTokenResponse>(`${backendUrl}/api/auth/verify-token`, {
+    const verifyResponse = await axios.post<VerifyTokenResponse>(`${backendUrl}/auth/verify-token`, {
       access_token: accessToken
     });
 

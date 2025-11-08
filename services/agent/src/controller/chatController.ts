@@ -3,6 +3,12 @@ import { waitForConnection } from '../config/db';
 import type { UserContext } from '../mcpClient';
 import { worksheetFlow } from '../flows/worksheetFlow';
 import { doubtClearanceFlow } from '../flows/doubtClearanceFlow';
+import { 
+  getConversation, 
+  getChatsBySubject as getChatsBySubjectUtil,
+  countChatsBySubject,
+  deleteConversation 
+} from '../utils/chatUtils';
 
 interface ChatRequest {
   chat_id: string;
@@ -310,4 +316,136 @@ const streamChat = async (req: Request, res: Response) => {
     }
 }
 
-export {streamChat};
+/**
+ * Get all messages for a specific chat
+ * GET /api/chat/:chat_id/messages
+ */
+const getChatMessages = async (req: Request, res: Response) => {
+    try {
+        await waitForConnection();
+        
+        const { chat_id } = req.params;
+        
+        if (!chat_id) {
+            return res.status(400).json({
+                error: 'Missing required parameter: chat_id'
+            });
+        }
+
+        const conversation = await getConversation(chat_id);
+        
+        if (!conversation) {
+            return res.status(404).json({
+                error: 'Chat conversation not found'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            chatId: conversation.chatId,
+            totalMessages: conversation.messages.length,
+            messages: conversation.messages,
+            metadata: conversation.conversationMetadata
+        });
+
+    } catch (error) {
+        console.error('Error fetching chat messages:', error);
+        return res.status(500).json({
+            error: error instanceof Error ? error.message : 'Internal server error'
+        });
+    }
+}
+
+/**
+ * Get all chats for a specific subject
+ * GET /api/chat/subject/:subject_id
+ */
+const getChatsBySubject = async (req: Request, res: Response) => {
+    try {
+        await waitForConnection();
+        
+        const user_id = req.user_id!;
+        const { subject_id } = req.params;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        
+        if (!subject_id) {
+            return res.status(400).json({
+                error: 'Missing required parameter: subject_id'
+            });
+        }
+
+        // Get chats filtered by subject_id directly from Mongoose
+        const conversations = await getChatsBySubjectUtil(user_id, subject_id, page, limit);
+        const totalChats = await countChatsBySubject(user_id, subject_id);
+        
+        return res.status(200).json({
+            success: true,
+            subject_id,
+            totalChats,
+            page,
+            limit,
+            chats: conversations.map(conv => ({
+                chatId: conv.chatId,
+                title: conv.title,
+                description: conv.description,
+                tags: conv.tags,
+                totalMessages: conv.conversationMetadata.totalMessages,
+                totalUserQueries: conv.conversationMetadata.totalUserQueries,
+                totalAgentResponses: conv.conversationMetadata.totalAgentResponses,
+                conversationStartTime: conv.conversationMetadata.conversationStartTime,
+                lastActivityTime: conv.conversationMetadata.lastActivityTime,
+                status: conv.status
+            }))
+        });
+
+    } catch (error) {
+        console.error('Error fetching chats by subject:', error);
+        return res.status(500).json({
+            error: error instanceof Error ? error.message : 'Internal server error'
+        });
+    }
+}
+
+/**
+ * Delete a chat conversation
+ * DELETE /api/chat/:chat_id
+ */
+const deleteChat = async (req: Request, res: Response) => {
+    try {
+        await waitForConnection();
+        
+        const { chat_id } = req.params;
+        
+        if (!chat_id) {
+            return res.status(400).json({
+                error: 'Missing required parameter: chat_id'
+            });
+        }
+
+        const conversation = await getConversation(chat_id);
+        
+        if (!conversation) {
+            return res.status(404).json({
+                error: 'Chat conversation not found'
+            });
+        }
+
+        // Permanently delete the conversation (hard delete)
+        await deleteConversation(chat_id);
+        
+        return res.status(200).json({
+            success: true,
+            message: 'Chat conversation deleted permanently',
+            chatId: chat_id
+        });
+
+    } catch (error) {
+        console.error('Error deleting chat:', error);
+        return res.status(500).json({
+            error: error instanceof Error ? error.message : 'Internal server error'
+        });
+    }
+}
+
+export { streamChat, getChatMessages, getChatsBySubject, deleteChat };

@@ -5,6 +5,8 @@ import cors from 'cors';
 import { initializeDatabase, healthCheck, waitForConnection } from './config/db';
 import chatRouter from "./routes/chatRoutes";
 import { authMiddleware } from "./middlewares/authMiddleWare";
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
@@ -19,7 +21,11 @@ const corsOptions = {
 
 const app = express();
 
+app.use(morgan('common'));
+
 app.use(cors(corsOptions));
+
+app.use(cookieParser());
 
 app.use(express.json());
 
