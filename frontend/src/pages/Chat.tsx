@@ -10,7 +10,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Home as HomeIcon, Users, MessageSquare, Bot, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
+import { BookOpen, Home as HomeIcon, Users, MessageSquare, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
 import { useState, useEffect, useRef} from "react";
 import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type SSEEvent, type IndexedFileResponse, type ChatSummary} from "@/api";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ import { AuroraText } from "@/components/ui/aurora-text";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Response } from "@/components/ai-elements/response";
 import FilesAndChat from "@/components/FilesAndChat";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import type { Section } from "@/components/FilesAndChat";
 
 const Chat = ()=>{
@@ -51,6 +52,7 @@ const Chat = ()=>{
     const [streamingMetadata, setStreamingMetadata] = useState<any>(null);
     const [currentPhase, setCurrentPhase] = useState<string>('');
     const [currentFlowType, setCurrentFlowType] = useState<string>('');
+    const [streamingStatus, setStreamingStatus] = useState<string>('');
     const abortControllerRef = useRef<(() => void) | null>(null);
     
     // Files state
@@ -82,6 +84,19 @@ const Chat = ()=>{
 
     //Flow state
     const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance">("doubt_clearance");
+
+    // Ref for scroll area
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollContainer) {
+                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
+        }
+    }, [messages, currentResponse, streamingStatus]);
 
 
     useEffect(()=>{
@@ -252,6 +267,7 @@ const Chat = ()=>{
         setCurrentResponse("");
         setStreamingMetadata(null);
         setCurrentPhase('');
+        setStreamingStatus('');
 
         let accumulatedResponse = "";
         let metadata: any = {};
@@ -263,7 +279,7 @@ const Chat = ()=>{
                     classroom_id: classroom_id,
                     subject_id: subject_id,
                     query: message,
-                    flow_type: 'doubt_clearance' // or 'worksheet_generation' based on user selection
+                    flow_type: flowType
                 },
                 {
                     onEvent: (event: SSEEvent) => {
@@ -276,7 +292,7 @@ const Chat = ()=>{
                         
                         switch (event.type) {
                             case 'start':
-                                toast.info(`Starting ${event.flowType || 'chat'}...`);
+                                setStreamingStatus(`Starting ${event.flowType || 'chat'}...`);
                                 break;
                                 
                             case 'token':
@@ -285,9 +301,9 @@ const Chat = ()=>{
                                 break;
                                 
                             case 'status':
-                                // Show status messages (e.g., "Processing your request...")
+                                // Show status messages
                                 if (event.content) {
-                                    toast.info(event.content);
+                                    setStreamingStatus(event.content);
                                 }
                                 break;
                                 
@@ -295,19 +311,23 @@ const Chat = ()=>{
                                 // Handle phase changes (worksheet flow)
                                 if (event.metadata?.currentPhase) {
                                     setCurrentPhase(event.metadata.currentPhase);
-                                    toast.info(event.content || `Entering ${event.metadata.currentPhase} phase`);
+                                    setStreamingStatus(event.content || `Entering ${event.metadata.currentPhase} phase`);
                                 }
                                 break;
                                 
                             case 'tool_call':
                                 // Show tool call information
                                 if (event.metadata?.toolName) {
+                                    setStreamingStatus(`Calling tool: ${event.metadata.toolName}`);
                                     console.log(`Tool called: ${event.metadata.toolName}`);
                                 }
                                 break;
                                 
                             case 'tool_result':
                                 // Tool result received
+                                if (event.metadata?.toolName) {
+                                    setStreamingStatus(`Completed: ${event.metadata.toolName}`);
+                                }
                                 console.log(`Tool result from: ${event.metadata?.toolName}`);
                                 break;
                                 
@@ -318,15 +338,15 @@ const Chat = ()=>{
                                 
                                 // Show completion messages based on metadata type
                                 if (event.metadata?.summaryType === 'research') {
-                                    toast.success(`Research complete: ${event.metadata.findingsLength} characters of findings`);
+                                    setStreamingStatus(`Research complete: ${event.metadata.findingsLength} characters of findings`);
                                 } else if (event.metadata?.summaryType === 'generation_phase') {
-                                    toast.success(`Worksheet generated: ${event.metadata.worksheetTitle}`);
+                                    setStreamingStatus(`Worksheet generated: ${event.metadata.worksheetTitle}`);
                                 }
                                 break;
                                 
                             case 'phase_complete':
                                 // Phase completed
-                                toast.info(event.content || `${event.metadata?.phase} phase completed`);
+                                setStreamingStatus(event.content || `${event.metadata?.phase} phase completed`);
                                 break;
                                 
                             case 'done':
@@ -340,15 +360,17 @@ const Chat = ()=>{
                                 setIsStreaming(false);
                                 setCurrentPhase('');
                                 setStreamingMetadata(null);
-                                toast.success('Response complete!');
+                                setStreamingStatus('');
                                 break;
                                 
                             case 'error':
+                                setStreamingStatus(event.content || "Error during streaming");
                                 toast.error(event.content || "Error during streaming");
                                 setIsStreaming(false);
                                 setCurrentResponse("");
                                 setCurrentPhase('');
                                 setStreamingMetadata(null);
+                                setStreamingStatus('');
                                 break;
                                 
                             default:
@@ -362,6 +384,7 @@ const Chat = ()=>{
                         setCurrentResponse("");
                         setCurrentPhase('');
                         setStreamingMetadata(null);
+                        setStreamingStatus('');
                     }
                 }
             );
@@ -987,27 +1010,22 @@ const Chat = ()=>{
                             </div>
                         </div>
                     ) : (
-                        <ScrollArea className="w-full h-[60%]">
-                            <Conversation>
-                                <ConversationContent>
-                                    <div className="space-y-6">
-                                        {messages.map((msg, idx) => (
+                        <ScrollArea ref={scrollAreaRef} className="w-full h-[60%]">
+                            <div className="w-full flex justify-center">
+                                <div className="w-full max-w-5xl">
+                                    <Conversation>
+                                        <ConversationContent>
+                                            <div className="space-y-6">
+                                                {messages.map((msg, idx) => (
                                             <div
                                                 key={idx}
                                                 className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                             >
-                                                {msg.role === 'assistant' && (
-                                                    <div className="shrink-0">
-                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                            <Bot className="w-5 h-5 text-primary" />
-                                                        </div>
-                                                    </div>
-                                                )}
                                                 <div
                                                     className={`rounded-lg px-4 py-3 max-w-[80%] ${
                                                         msg.role === 'user'
-                                                            ? 'bg-primary text-primary-foreground'
-                                                            : 'bg-muted'
+                                                            ? 'bg-muted text-primary'
+                                                            : ''
                                                     }`}
                                                 >
                                                     {msg.role === 'user' ? (
@@ -1031,15 +1049,21 @@ const Chat = ()=>{
                                             </div>
                                         ))}
                                         
+                                        {/* Streaming status with Shimmer effect */}
+                                        {isStreaming && streamingStatus && (
+                                            <div className="flex gap-3 justify-start">
+                                                <div className="rounded-lg px-4 py-3 max-w-[80%]">
+                                                    <Shimmer className="text-sm" duration={2}>
+                                                        {streamingStatus}
+                                                    </Shimmer>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
                                         {/* Streaming response */}
                                         {isStreaming && currentResponse && (
                                             <div className="flex gap-3 justify-start">
-                                                <div className="shrink-0">
-                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                        <Bot className="w-5 h-5 text-primary animate-pulse" />
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-lg px-4 py-3 max-w-[80%] bg-muted">
+                                                <div className="rounded-lg px-4 py-3 max-w-[80%]">
                                                     <Response className="text-sm prose prose-sm dark:prose-invert max-w-none"
                                                     parseIncompleteMarkdown={true}>
                                                         {currentResponse}
@@ -1051,11 +1075,6 @@ const Chat = ()=>{
                                         {/* Loading indicator */}
                                         {isStreaming && !currentResponse && (
                                             <div className="flex gap-3 justify-start">
-                                                <div className="shrink-0">
-                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                        <Bot className="w-5 h-5 text-primary animate-pulse" />
-                                                    </div>
-                                                </div>
                                                 <div className="rounded-lg px-4 py-3 bg-muted">
                                                     <div className="flex gap-1">
                                                         <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]"></div>
@@ -1069,6 +1088,8 @@ const Chat = ()=>{
                                 </ConversationContent>
                                 <ConversationScrollButton />
                             </Conversation>
+                                </div>
+                            </div>
                         </ScrollArea>
                     )}
                 {/* Div for chat input box */}
@@ -1084,6 +1105,8 @@ const Chat = ()=>{
                         loadingContext={loadingContext}
                         selectedContext={selectedContext}
                         onToggleContext={toggleContextSelection}
+                        flowType={flowType}
+                        onFlowTypeChange={setFlowType}
                     />
                 </div>
             </div>

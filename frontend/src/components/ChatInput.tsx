@@ -1,10 +1,11 @@
 import { Button } from "./ui/button";
-import { ArrowUp, Plus, Paperclip } from "lucide-react";
+import { ArrowUp, Plus, Paperclip, Workflow } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { useState, useRef} from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
 import { Checkbox } from "./ui/checkbox";
 import { Loader2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface IndexedFileResponse {
     file_id: string;
@@ -23,6 +24,8 @@ interface ChatInputProps{
     loadingContext?: boolean;
     selectedContext?: Set<string>;
     onToggleContext?: (filename: string) => void;
+    flowType?: "worksheet_generation" | "doubt_clearance";
+    onFlowTypeChange?: (flowType: "worksheet_generation" | "doubt_clearance") => void;
 }
 
 const ChatInput = ({
@@ -35,10 +38,15 @@ const ChatInput = ({
     indexedFiles = [],
     loadingContext = false,
     selectedContext = new Set(),
-    onToggleContext
+    onToggleContext,
+    flowType = "doubt_clearance",
+    onFlowTypeChange
 }:ChatInputProps)=>{
     const [message, setMessage] = useState("");
     const inputRef = useRef<HTMLDivElement>(null);
+    const [flowOpen, setFlowOpen] = useState(false);
+
+    const isMobile = useIsMobile();
 
     const handleSend = () => {
         if (message.trim()) {
@@ -138,7 +146,7 @@ const ChatInput = ({
                             onClick={onAddFiles}
                             disabled={isUploadingFiles}
                         >
-                            <Plus className="size-3.5 md:size-4"/> <span className="hidden sm:inline">Add Files</span><span className="sm:hidden">Files</span>
+                            <Plus className="size-3.5 md:size-4"/> <span className="hidden sm:inline">{!isMobile? "Add Files": ""}</span>
                         </Button>
                         
                         <Popover open={contextOpen} onOpenChange={onAddContext}>
@@ -148,7 +156,7 @@ const ChatInput = ({
                                     size="sm"
                                     className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
                                 >
-                                    <Paperclip className="size-3.5 md:size-4"/> <span className="hidden sm:inline">Add Context</span><span className="sm:hidden">Context</span>
+                                    <Paperclip className="size-3.5 md:size-4"/> <span className="hidden sm:inline">{!isMobile?"Add Context":""}</span>
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80 p-0" align="start">
@@ -190,6 +198,53 @@ const ChatInput = ({
                                             </p>
                                         </div>
                                     )}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
+                        <Popover open={flowOpen} onOpenChange={setFlowOpen}>
+                            <PopoverTrigger asChild>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
+                                >
+                                    <Workflow className="size-3.5 md:size-4"/> <span className="hidden sm:inline">Flow</span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-0" align="start">
+                                <div className="p-4">
+                                    <h4 className="font-semibold text-sm mb-3">Select Flow Type</h4>
+                                    <div className="space-y-2">
+                                        <button
+                                            onClick={() => {
+                                                onFlowTypeChange?.("doubt_clearance");
+                                                setFlowOpen(false);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-md transition-colors ${
+                                                flowType === "doubt_clearance" 
+                                                    ? "bg-primary text-primary-foreground" 
+                                                    : "hover:bg-accent"
+                                            }`}
+                                        >
+                                            <div className="font-medium text-sm">Doubt Clearance</div>
+                                            <div className="text-xs opacity-80 mt-1">Get answers to your questions</div>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                onFlowTypeChange?.("worksheet_generation");
+                                                setFlowOpen(false);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-md transition-colors ${
+                                                flowType === "worksheet_generation" 
+                                                    ? "bg-primary text-primary-foreground" 
+                                                    : "hover:bg-accent"
+                                            }`}
+                                        >
+                                            <div className="font-medium text-sm">Worksheet Generation</div>
+                                            <div className="text-xs opacity-80 mt-1">Create custom worksheets</div>
+                                        </button>
+                                    </div>
                                 </div>
                             </PopoverContent>
                         </Popover>
