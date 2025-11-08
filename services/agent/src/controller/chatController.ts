@@ -34,11 +34,15 @@ const streamChat = async (req: Request, res: Response) => {
         }
 
         // Set up SSE headers
+        // Use the origin from the request, or fall back to FRONTEND_URL env variable
+        const allowedOrigin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+        
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': allowedOrigin,
+            'Access-Control-Allow-Credentials': 'true',
             'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE'
         });

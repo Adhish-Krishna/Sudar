@@ -12,7 +12,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Home as HomeIcon, Users, MessageSquare, Bot, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
 import { useState, useEffect, useRef} from "react";
-import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type ChatMetadata, type SSEEvent, type IndexedFileResponse} from "@/api";
+import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type SSEEvent, type IndexedFileResponse, type ChatSummary} from "@/api";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -43,10 +43,14 @@ const Chat = ()=>{
     interface Message {
         role: 'user' | 'assistant';
         content: string;
+        metadata?: any;
     }
     const [messages, setMessages] = useState<Message[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [currentResponse, setCurrentResponse] = useState("");
+    const [streamingMetadata, setStreamingMetadata] = useState<any>(null);
+    const [currentPhase, setCurrentPhase] = useState<string>('');
+    const [currentFlowType, setCurrentFlowType] = useState<string>('');
     const abortControllerRef = useRef<(() => void) | null>(null);
     
     // Files state
@@ -59,7 +63,7 @@ const Chat = ()=>{
     
     // Chat History state
     const [historyOpen, setHistoryOpen] = useState(false);
-    const [chatHistory, setChatHistory] = useState<ChatMetadata[]>([]);
+    const [chatHistory, setChatHistory] = useState<ChatSummary[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
     // const [input, setInput] = useState<string>("");
@@ -75,6 +79,10 @@ const Chat = ()=>{
     const [indexedFiles, setIndexedFiles] = useState<IndexedFileResponse[]>([]);
     const [loadingContext, setLoadingContext] = useState(false);
     const [selectedContext, setSelectedContext] = useState<Set<string>>(new Set());
+
+    //Flow state
+    const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance">("doubt_clearance");
+
 
     useEffect(()=>{
         const fetchClassroomAndSubject = async ()=>{
@@ -110,17 +118,29 @@ const Chat = ()=>{
             if (!chatId || !user?.teacher_id || !subject_id) return;
             
             try {
-                const history = await sudarAgent.getChatHistory(chatId, user.teacher_id, subject_id, 50);
+                const response = await sudarAgent.getChatMessages(chatId);
                 
-                if (history.status && history.status !== 200) {
+                if (response.status && response.status !== 200) {
                     // New chat, no history
                     setMessages([]);
-                } else if (Array.isArray(history)) {
-                    // Convert chat history to messages
-                    const loadedMessages: Message[] = history.map((msg: any) => ({
-                        role: msg.role === 'user' ? 'user' : 'assistant',
-                        content: msg.content
-                    }));
+                } else if (response.messages && Array.isArray(response.messages)) {
+                    // Convert chat messages to display messages
+                    const loadedMessages: Message[] = [];
+                    
+                    for (const msg of response.messages) {
+                        if (msg.messageType === 'user' && msg.userMessage) {
+                            loadedMessages.push({
+                                role: 'user',
+                                content: msg.userMessage.query
+                            });
+                        } else if (msg.messageType === 'agent' && msg.agentMessage) {
+                            loadedMessages.push({
+                                role: 'assistant',
+                                content: msg.agentMessage.fullResponse,
+                                metadata: msg.agentMessage.finalMetadata
+                            });
+                        }
+                    }
                     setMessages(loadedMessages);
                 }
             } catch (error: any) {
@@ -220,7 +240,7 @@ const Chat = ()=>{
 
     const sendMessage = async (message: string) => {
         
-        if (!chatId || !user?.teacher_id || !subject_id || !message.trim()) {
+        if (!chatId || !classroom_id || !message.trim()) {
             toast.error("Cannot send message. Please start a new chat.");
             return;
         }
@@ -230,37 +250,118 @@ const Chat = ()=>{
         setMessages(prev => [...prev, userMessage]);
         setIsStreaming(true);
         setCurrentResponse("");
+        setStreamingMetadata(null);
+        setCurrentPhase('');
 
         let accumulatedResponse = "";
+        let metadata: any = {};
 
         try {
             const abortFn = await sudarAgent.streamChat(
                 {
-                    user_id: user.teacher_id,
                     chat_id: chatId,
+                    classroom_id: classroom_id,
                     subject_id: subject_id,
-                    query: message
+                    query: message,
+                    flow_type: 'doubt_clearance' // or 'worksheet_generation' based on user selection
                 },
                 {
                     onEvent: (event: SSEEvent) => {
-                        if (event.type === 'token') {
-                            accumulatedResponse += event.content;
-                            setCurrentResponse(accumulatedResponse);
-                        } else if (event.type === 'done') {
-                            // Finalize the assistant message
-                            setMessages(prev => [...prev, { role: 'assistant', content: accumulatedResponse }]);
-                            setCurrentResponse("");
-                            setIsStreaming(false);
-                        } else if (event.type === 'error') {
-                            toast.error(event.content || "Error during streaming");
-                            setIsStreaming(false);
-                            setCurrentResponse("");
+                        console.log('SSE Event:', event); // Debug log
+                        
+                        // Set flow type and phase from event
+                        if (event.flowType) {
+                            setCurrentFlowType(event.flowType);
+                        }
+                        
+                        switch (event.type) {
+                            case 'start':
+                                toast.info(`Starting ${event.flowType || 'chat'}...`);
+                                break;
+                                
+                            case 'token':
+                                accumulatedResponse += event.content;
+                                setCurrentResponse(accumulatedResponse);
+                                break;
+                                
+                            case 'status':
+                                // Show status messages (e.g., "Processing your request...")
+                                if (event.content) {
+                                    toast.info(event.content);
+                                }
+                                break;
+                                
+                            case 'phase_change':
+                                // Handle phase changes (worksheet flow)
+                                if (event.metadata?.currentPhase) {
+                                    setCurrentPhase(event.metadata.currentPhase);
+                                    toast.info(event.content || `Entering ${event.metadata.currentPhase} phase`);
+                                }
+                                break;
+                                
+                            case 'tool_call':
+                                // Show tool call information
+                                if (event.metadata?.toolName) {
+                                    console.log(`Tool called: ${event.metadata.toolName}`);
+                                }
+                                break;
+                                
+                            case 'tool_result':
+                                // Tool result received
+                                console.log(`Tool result from: ${event.metadata?.toolName}`);
+                                break;
+                                
+                            case 'metadata':
+                                // Store metadata for final message
+                                metadata = { ...metadata, ...event.metadata };
+                                setStreamingMetadata(event.metadata);
+                                
+                                // Show completion messages based on metadata type
+                                if (event.metadata?.summaryType === 'research') {
+                                    toast.success(`Research complete: ${event.metadata.findingsLength} characters of findings`);
+                                } else if (event.metadata?.summaryType === 'generation_phase') {
+                                    toast.success(`Worksheet generated: ${event.metadata.worksheetTitle}`);
+                                }
+                                break;
+                                
+                            case 'phase_complete':
+                                // Phase completed
+                                toast.info(event.content || `${event.metadata?.phase} phase completed`);
+                                break;
+                                
+                            case 'done':
+                                // Finalize the assistant message
+                                setMessages(prev => [...prev, { 
+                                    role: 'assistant', 
+                                    content: accumulatedResponse,
+                                    metadata: metadata
+                                }]);
+                                setCurrentResponse("");
+                                setIsStreaming(false);
+                                setCurrentPhase('');
+                                setStreamingMetadata(null);
+                                toast.success('Response complete!');
+                                break;
+                                
+                            case 'error':
+                                toast.error(event.content || "Error during streaming");
+                                setIsStreaming(false);
+                                setCurrentResponse("");
+                                setCurrentPhase('');
+                                setStreamingMetadata(null);
+                                break;
+                                
+                            default:
+                                // Handle any other event types
+                                console.log('Unknown event type:', event.type, event);
                         }
                     },
                     onError: (error: any) => {
                         toast.error(error.message || "Failed to send message");
                         setIsStreaming(false);
                         setCurrentResponse("");
+                        setCurrentPhase('');
+                        setStreamingMetadata(null);
                     }
                 }
             );
@@ -355,11 +456,11 @@ const Chat = ()=>{
 
     // Fetch chat history when popover opens
     const fetchChatHistory = async () => {
-        if (!subject_id || !user?.teacher_id) return;
+        if (!subject_id) return;
         
         setLoadingHistory(true);
         try {
-            const response = await sudarAgent.getChats(user.teacher_id, subject_id);
+            const response = await sudarAgent.getChatsBySubject(subject_id, 1, 50);
             
             if (response.status && response.status !== 200) {
                 toast.error("Failed to fetch chat history");
@@ -375,11 +476,9 @@ const Chat = ()=>{
 
     // Handle chat deletion
     const handleDeleteChat = async (chatIdToDelete: string) => {
-        if (!user?.teacher_id || !subject_id) return;
-        
         setDeletingChatId(chatIdToDelete);
         try {
-            const response = await sudarAgent.deleteChat(chatIdToDelete, user.teacher_id, subject_id);
+            const response = await sudarAgent.deleteChat(chatIdToDelete);
             
             if (response.status && response.status !== 200) {
                 toast.error(response.message || "Failed to delete chat");
@@ -388,11 +487,11 @@ const Chat = ()=>{
             
             toast.success("Chat deleted successfully");
             // Remove the deleted chat from the list
-            setChatHistory(prev => prev.filter(chat => chat.chat_id !== chatIdToDelete));
+            setChatHistory(prev => prev.filter(chat => chat.chatId !== chatIdToDelete));
             
             // If the deleted chat was the current chat, reset chatId
             if (chatIdToDelete === chatId) {
-                setChatId("default_chat");
+                setChatId(generateUUID());
             }
         } catch (error: any) {
             toast.error(error.message || "Failed to delete chat");
@@ -801,45 +900,45 @@ const Chat = ()=>{
                                 }] : chatHistory.length > 0 ? [{
                                     id: "chats",
                                     searchableText: chatHistory.map(chat => 
-                                        `Chat ${chat.chat_id.slice(0, 8)} ${chat.message_count} messages ${formatTimestamp(chat.latest_timestamp)}`
+                                        `Chat ${chat.chatId.slice(0, 8)} ${chat.totalMessages} messages ${formatTimestamp(chat.lastActivityTime.toString())}`
                                     ).join(' '),
                                     content: (
                                         <div className="space-y-1">
                                             {chatHistory.map((chat) => (
                                                 <div
-                                                    key={chat.chat_id}
+                                                    key={chat.chatId}
                                                     className="flex items-center gap-2 px-3 py-3 rounded-md hover:bg-accent transition-colors group border border-transparent hover:border-border"
                                                 >
                                                     <button
-                                                        onClick={() => setChatId(chat.chat_id)}
+                                                        onClick={() => setChatId(chat.chatId)}
                                                         className="flex items-start gap-3 flex-1 text-left min-w-0"
                                                     >
                                                         <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2 mb-1">
                                                                 <p className="text-sm font-medium truncate">
-                                                                    Chat {chat.chat_id.slice(0, 8)}
+                                                                    {chat.title || `Chat ${chat.chatId.slice(0, 8)}`}
                                                                 </p>
-                                                                {chat.chat_id === chatId && (
+                                                                {chat.chatId === chatId && (
                                                                     <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
                                                                         Active
                                                                     </span>
                                                                 )}
                                                             </div>
                                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                <span>{chat.message_count} message{chat.message_count !== 1 ? 's' : ''}</span>
+                                                                <span>{chat.totalMessages} message{chat.totalMessages !== 1 ? 's' : ''}</span>
                                                                 <span>•</span>
-                                                                <span>{formatTimestamp(chat.latest_timestamp)}</span>
+                                                                <span>{formatTimestamp(chat.lastActivityTime.toString())}</span>
                                                             </div>
                                                         </div>
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDeleteChat(chat.chat_id)}
-                                                        disabled={deletingChatId === chat.chat_id}
+                                                        onClick={() => handleDeleteChat(chat.chatId)}
+                                                        disabled={deletingChatId === chat.chatId}
                                                         className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 shrink-0"
                                                         title="Delete chat"
                                                     >
-                                                        {deletingChatId === chat.chat_id ? (
+                                                        {deletingChatId === chat.chatId ? (
                                                             <Loader2 className="h-4 w-4 animate-spin" />
                                                         ) : (
                                                             <Trash2 className="h-4 w-4" />

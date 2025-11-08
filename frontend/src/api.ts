@@ -155,55 +155,115 @@ export interface DocumentListResponse {
 }
 
 export interface ChatRequest {
-  user_id: string;
   chat_id: string;
-  subject_id?: string | null;
+  subject_id?: string;
+  classroom_id: string;
   query: string;
-}
-
-export interface ChatResponse {
-  user_id: string;
-  chat_id: string;
-  subject_id?: string | null;
-  response: string;
-}
-
-export interface ChatMetadata {
-  chat_id: string;
-  subject_id?: string | null;
-  latest_timestamp: string;
-  message_count: number;
-}
-
-export interface ListChatsResponse {
-  user_id: string;
-  subject_id?: string | null;
-  chats: ChatMetadata[];
-  total_chats: number;
-}
-
-export interface DeleteChatResponse {
-  user_id: string;
-  chat_id: string;
-  subject_id?: string | null;
-  deleted_count: number;
-  message: string;
+  flow_type: 'doubt_clearance' | 'worksheet_generation';
 }
 
 export interface ChatMessage {
-  _id: string;
-  user_id: string;
-  chat_id: string;
-  subject_id?: string | null;
-  role: string;
-  content: string;
-  timestamp: string;
+  messageId: string;
+  messageType: 'user' | 'agent';
+  userMessage?: {
+    query: string;
+    inputFiles: Array<{
+      filepath: string;
+      filename?: string;
+      uploadedAt: Date;
+    }>;
+    timestamp: Date;
+  };
+  agentMessage?: {
+    flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat';
+    startTime: Date;
+    endTime?: Date;
+    totalSteps: number;
+    steps: any[];
+    fullResponse: string;
+    finalMetadata?: any;
+    executionSummary: {
+      success: boolean;
+      totalToolCalls: number;
+      totalTextLength: number;
+      duration: number;
+      errorCount: number;
+      finalStatus: string;
+    };
+    fileProcessing?: {
+      extractedFiles: string[];
+      fileRetrievals: number;
+      hasFiles: boolean;
+    };
+  };
+  timestamp: Date;
 }
 
-export type SSEEventType = 'start' | 'token' | 'done' | 'error' | string;
+export interface ChatConversation {
+  chatId: string;
+  userId: string;
+  subjectId: string;
+  classroomId: string;
+  title?: string;
+  description?: string;
+  tags?: string[];
+  messages: ChatMessage[];
+  conversationMetadata: {
+    totalMessages: number;
+    totalUserQueries: number;
+    totalAgentResponses: number;
+    totalFilesProcessed: number;
+    conversationStartTime: Date;
+    lastActivityTime: Date;
+    averageResponseTime?: number;
+  };
+  status: 'active' | 'archived' | 'deleted';
+  isPublic: boolean;
+}
+
+export interface GetChatMessagesResponse {
+  success: boolean;
+  chatId: string;
+  totalMessages: number;
+  messages: ChatMessage[];
+  metadata: ChatConversation['conversationMetadata'];
+}
+
+export interface ChatSummary {
+  chatId: string;
+  title?: string;
+  description?: string;
+  tags?: string[];
+  totalMessages: number;
+  totalUserQueries: number;
+  totalAgentResponses: number;
+  conversationStartTime: Date;
+  lastActivityTime: Date;
+  status: 'active' | 'archived' | 'deleted';
+}
+
+export interface GetChatsBySubjectResponse {
+  success: boolean;
+  subject_id: string;
+  totalChats: number;
+  page: number;
+  limit: number;
+  chats: ChatSummary[];
+}
+
+export interface DeleteChatResponse {
+  success: boolean;
+  message: string;
+  chatId: string;
+}
+
+export type SSEEventType = 'start' | 'token' | 'done' | 'error' | 'status' | 'phase_change' | 'tool_call' | 'tool_result' | 'metadata' | 'phase_complete' | string;
+
 export interface SSEEvent {
   type: SSEEventType;
+  flowType?: 'doubt_clearance' | 'worksheet_generation';
   content: string;
+  metadata?: any;
 }
 
 export interface IngestResponse {
@@ -911,14 +971,15 @@ export const documents = {
   },
 };
 
-const AGENT_BASE = `${API_BASE_URL}/agent/api`;
+const AGENT_BASE = `${API_BASE_URL}/agent/api/chat`;
 async function streamSSEPost(
   url: string,
   body: unknown,
-  onEvent: (ev: SSEEvent) => void,
+  onEvent: (ev: any) => void,
   onError?: (err: any) => void
 ): Promise<() => void> {
   const controller = new AbortController();
+  
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -935,65 +996,35 @@ async function streamSSEPost(
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
-    let buf = '';
+    let buffer = '';
 
-    const processBuffer = () => {
-      let boundary = buf.indexOf('\n\n');
-      while (boundary === -1 && buf.indexOf('\r\n\r\n') !== -1) {
-        boundary = buf.indexOf('\r\n\r\n');
-      }
-      while (boundary !== -1) {
-        const rawEvent = buf.slice(0, boundary);
-        buf = buf.slice(boundary + (buf[boundary] === '\r' ? 4 : 2));
-
-        const lines = rawEvent.split(/\r?\n/);
-        const dataLines: string[] = [];
-        for (const l of lines) {
-          const idx = l.indexOf('data:');
-          if (idx !== -1) dataLines.push(l.slice(idx + 5).trim());
-        }
-        if (dataLines.length === 0) {
-          boundary = buf.indexOf('\n\n');
-          continue;
-        }
-        const dataStr = dataLines.join('\n');
-        let parsed: any = null;
-        try {
-          parsed = JSON.parse(dataStr);
-        } catch (e) {
-          try {
-            let s = dataStr;
-            s = s.replace(/\bNone\b/g, 'null');
-            s = s.replace(/\bTrue\b/g, 'true');
-            s = s.replace(/\bFalse\b/g, 'false');
-            s = s.replace(/([\{,\s])'([^']+?)'\s*:/g, '$1"$2":');
-            s = s.replace(/:\s*'([^']*?)'(?=[,}])/g, ': "$1"');
-            parsed = JSON.parse(s);
-          } catch (e2) {
-            parsed = null;
-          }
-        }
-
-        if (parsed && typeof parsed === 'object' && 'type' in parsed) {
-          onEvent({ type: parsed.type, content: parsed.content ?? '' });
-        } else {
-          onEvent({ type: 'message', content: dataStr });
-        }
-
-        boundary = buf.indexOf('\n\n');
-      }
-    };
     (async () => {
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          processBuffer();
+
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete SSE events (separated by double newlines)
+          const events = buffer.split(/\n\n|\r\n\r\n/);
+          buffer = events.pop() || ''; // Keep incomplete event in buffer
+
+          for (const event of events) {
+            if (!event.trim()) continue;
+
+            // Extract data from SSE format
+            const dataMatch = event.match(/^data:\s*(.+)$/m);
+            if (dataMatch) {
+              try {
+                const parsed = JSON.parse(dataMatch[1]);
+                onEvent(parsed);
+              } catch (e) {
+                console.error('Failed to parse SSE data:', dataMatch[1]);
+              }
+            }
+          }
         }
-        // final
-        buf += decoder.decode();
-        processBuffer();
       } catch (err) {
         if (onError) onError(err);
       }
@@ -1007,6 +1038,10 @@ async function streamSSEPost(
 }
 
 export const sudarAgent = {
+  /**
+   * Stream chat with Server-Sent Events (SSE)
+   * POST /agent/api/chat/sse
+   */
   streamChat: async (
     request: ChatRequest,
     handlers: {
@@ -1014,72 +1049,81 @@ export const sudarAgent = {
       onError?: (err: any) => void;
     }
   ): Promise<() => void> => {
-    const url = `${AGENT_BASE}/chat`;
+    const url = `${AGENT_BASE}/sse`;
     return streamSSEPost(url, request, handlers.onEvent, handlers.onError);
   },
 
-  chatSync: async (request: ChatRequest): Promise<ChatResponse | any> => {
+  /**
+   * Get all messages for a specific chat
+   * GET /agent/api/chat/:chat_id/messages
+   */
+  getChatMessages: async (chatId: string): Promise<GetChatMessagesResponse | any> => {
     try {
-      const response = await apiClient.post(`${AGENT_BASE}/chat/sync`, request);
-      if (response.status === 200) return response.data as ChatResponse;
+      const response = await apiClient.get(`${AGENT_BASE}/${chatId}/messages`);
+      if (response.status === 200) return response.data as GetChatMessagesResponse;
       return { status: response.status, message: response.data };
     } catch (error: any) {
-      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Chat sync failed' };
+      return { 
+        status: error.response?.status || 500, 
+        message: error.response?.data?.message || error.message || 'Failed to get chat messages' 
+      };
     }
   },
 
-  getChats: async (userId: string, subjectId?: string | null): Promise<ListChatsResponse | any> => {
+  /**
+   * Get all chats for a specific subject
+   * GET /agent/api/chat/subject/:subject_id
+   */
+  getChatsBySubject: async (
+    subjectId: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<GetChatsBySubjectResponse | any> => {
     try {
-      let url = `${AGENT_BASE}/chat/list/${userId}`;
-      const params: any = {};
-      if (subjectId) params.subject_id = subjectId;
-      const response = await apiClient.get(url, { params });
-      if (response.status === 200) return response.data as ListChatsResponse;
+      const response = await apiClient.get(`${AGENT_BASE}/subject/${subjectId}`, {
+        params: { page, limit }
+      });
+      if (response.status === 200) return response.data as GetChatsBySubjectResponse;
       return { status: response.status, message: response.data };
     } catch (error: any) {
-      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Get chats failed' };
+      return { 
+        status: error.response?.status || 500, 
+        message: error.response?.data?.message || error.message || 'Failed to get chats by subject' 
+      };
     }
   },
 
-  getChatHistory: async (
-    chatId: string,
-    userId: string,
-    subjectId?: string | null,
-    limit?: number
-  ): Promise<ChatMessage[] | any> => {
+  /**
+   * Delete a chat conversation (hard delete)
+   * DELETE /agent/api/chat/:chat_id
+   */
+  deleteChat: async (chatId: string): Promise<DeleteChatResponse | any> => {
     try {
-      let url = `${AGENT_BASE}/chat/history/${userId}/${chatId}`;
-      const params: any = {};
-      if (subjectId) params.subject_id = subjectId;
-      if (limit) params.limit = limit;
-      const response = await apiClient.get(url, { params });
-      if (response.status === 200) return response.data.messages as ChatMessage[];
-      return { status: response.status, message: response.data };
-    } catch (error: any) {
-      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Get chat history failed' };
-    }
-  },
-
-  deleteChat: async (chatId: string, userId: string, subjectId?: string | null): Promise<DeleteChatResponse | any> => {
-    try {
-      let url = `${AGENT_BASE}/chat/${userId}/${chatId}`;
-      const params: any = {};
-      if (subjectId) params.subject_id = subjectId;
-      const response = await apiClient.delete(url, { params });
+      const response = await apiClient.delete(`${AGENT_BASE}/${chatId}`);
       if (response.status === 200) return response.data as DeleteChatResponse;
       return { status: response.status, message: response.data };
     } catch (error: any) {
-      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Delete chat failed' };
+      return { 
+        status: error.response?.status || 500, 
+        message: error.response?.data?.message || error.message || 'Failed to delete chat' 
+      };
     }
   },
 
+  /**
+   * Health check for agent service
+   * GET /agent/health
+   */
   health: async (): Promise<any> => {
     try {
       const response = await apiClient.get(`${API_BASE_URL}/agent/health`);
       if (response.status === 200) return response.data;
       return { status: response.status, message: response.data };
     } catch (error: any) {
-      return { status: error.response?.status || 500, message: error.response?.data?.message || error.message || 'Agent health check failed' };
+      return { 
+        status: error.response?.status || 500, 
+        message: error.response?.data?.message || error.message || 'Agent health check failed' 
+      };
     }
   }
 };
