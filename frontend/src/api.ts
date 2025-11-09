@@ -160,6 +160,7 @@ export interface ChatRequest {
   classroom_id: string;
   query: string;
   flow_type: 'doubt_clearance' | 'worksheet_generation';
+  research_mode: 'simple' | 'moderate' | 'deep';
 }
 
 export interface ChatMessage {
