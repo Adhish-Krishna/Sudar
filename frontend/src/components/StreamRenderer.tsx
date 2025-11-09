@@ -310,14 +310,14 @@ export const DoubtClearanceRenderer = ({ data, isActive }: DoubtClearanceRendere
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
+    <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             {data.isComplete ? (
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             ) : (
-              <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+              <Loader2 className="h-4 w-4 animate-spin text-green-500" />
             )}
             Research Details
             {isActive && !data.isComplete && (
@@ -388,7 +388,7 @@ export const DoubtClearanceRenderer = ({ data, isActive }: DoubtClearanceRendere
                   <ScrollArea className="h-[100px] rounded-md border p-2 bg-background/50">
                     <ul className="space-y-1">
                       {data.searchQueries.map((query, idx) => (
-                        <li key={idx} className="text-xs text-muted-foreground pl-4 border-l-2 border-purple-300 dark:border-purple-700">
+                        <li key={idx} className="text-xs text-muted-foreground pl-4 border-l-2  border-blue-300 dark:border-blue-700">
                           {query}
                         </li>
                       ))}
@@ -415,7 +415,7 @@ export const DoubtClearanceRenderer = ({ data, isActive }: DoubtClearanceRendere
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 flex items-start gap-1 group"
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-start gap-1 group"
                           >
                             <ExternalLink className="h-3 w-3 mt-0.5 shrink-0" />
                             <span className="break-all group-hover:underline">{url}</span>

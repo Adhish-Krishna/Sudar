@@ -4,7 +4,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { useState, useRef} from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
 import { Checkbox } from "./ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Loader2, Globe } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface IndexedFileResponse {
@@ -261,13 +261,7 @@ const ChatInput = ({
                                     size="sm"
                                     className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
                                 >
-                                    {researchMode === "simple" ? (
-                                        <Zap className="size-3.5 md:size-4" />
-                                    ) : researchMode === "moderate" ? (
-                                        <Scale className="size-3.5 md:size-4" />
-                                    ) : (
-                                        <Brain className="size-3.5 md:size-4" />
-                                    )}
+                                    <Globe/>
                                     {!isMobile ? researchMode.charAt(0).toUpperCase() + researchMode.slice(1) : ""}
                                 </Button>
                             </PopoverTrigger>
@@ -287,7 +281,7 @@ const ChatInput = ({
                                             }`}
                                         >
                                             <div className="font-medium text-sm flex items-center gap-2">
-                                                <Zap className="size-4" /> Simple
+                                                Simple
                                             </div>
                                             <div className="text-xs opacity-80 mt-1">Quick, focused research (2-3 tool calls)</div>
                                         </button>
@@ -303,7 +297,7 @@ const ChatInput = ({
                                             }`}
                                         >
                                             <div className="font-medium text-sm flex items-center gap-2">
-                                                <Scale className="size-4" /> Moderate
+                                                Moderate
                                             </div>
                                             <div className="text-xs opacity-80 mt-1">Balanced research (5-7 tool calls)</div>
                                         </button>
@@ -319,7 +313,7 @@ const ChatInput = ({
                                             }`}
                                         >
                                             <div className="font-medium text-sm flex items-center gap-2">
-                                                <Brain className="size-4" /> Deep
+                                                Deep
                                             </div>
                                             <div className="text-xs opacity-80 mt-1">Exhaustive research (8-10 tool calls)</div>
                                         </button>
