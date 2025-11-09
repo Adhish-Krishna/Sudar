@@ -91,6 +91,7 @@ const Chat = ()=>{
 
     //Flow state
     const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance">("doubt_clearance");
+    const [researchMode, setResearchMode] = useState<"simple" | "moderate" | "deep">("moderate");
 
     // Worksheet phase tracking state
     type ResearchPhaseData = {
@@ -414,7 +415,8 @@ const Chat = ()=>{
                     classroom_id: classroom_id,
                     subject_id: subject_id,
                     query: message,
-                    flow_type: flowType
+                    flow_type: flowType,
+                    research_mode: researchMode
                 },
                 {
                     onEvent: (event: SSEEvent) => {
@@ -1523,6 +1525,8 @@ const Chat = ()=>{
                         onToggleContext={toggleContextSelection}
                         flowType={flowType}
                         onFlowTypeChange={setFlowType}
+                        researchMode={researchMode}
+                        onResearchModeChange={setResearchMode}
                     />
                 </div>
             </div>

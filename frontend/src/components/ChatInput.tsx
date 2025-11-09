@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { ArrowUp, Plus, Paperclip, Workflow } from "lucide-react";
+import { ArrowUp, Plus, Paperclip, Workflow, Zap, Scale, Brain } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { useState, useRef} from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
@@ -26,6 +26,8 @@ interface ChatInputProps{
     onToggleContext?: (filename: string) => void;
     flowType?: "worksheet_generation" | "doubt_clearance";
     onFlowTypeChange?: (flowType: "worksheet_generation" | "doubt_clearance") => void;
+    researchMode?: "simple" | "moderate" | "deep";
+    onResearchModeChange?: (researchMode: "simple" | "moderate" | "deep") => void;
 }
 
 const ChatInput = ({
@@ -40,11 +42,14 @@ const ChatInput = ({
     selectedContext = new Set(),
     onToggleContext,
     flowType = "doubt_clearance",
-    onFlowTypeChange
+    onFlowTypeChange,
+    researchMode = "moderate",
+    onResearchModeChange
 }:ChatInputProps)=>{
     const [message, setMessage] = useState("");
     const inputRef = useRef<HTMLDivElement>(null);
     const [flowOpen, setFlowOpen] = useState(false);
+    const [researchModeOpen, setResearchModeOpen] = useState(false);
 
     const isMobile = useIsMobile();
 
@@ -209,7 +214,7 @@ const ChatInput = ({
                                     size="sm"
                                     className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
                                 >
-                                    <Workflow className="size-3.5 md:size-4"/> {!isMobile ? "Flow": ""}
+                                    <Workflow className="size-3.5 md:size-4"/> {!isMobile ? flowType === "doubt_clearance" ? "Doubt Clearance" : "Worksheet Generation" : ""}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-64 p-0" align="start">
@@ -243,6 +248,80 @@ const ChatInput = ({
                                         >
                                             <div className="font-medium text-sm">Worksheet Generation</div>
                                             <div className="text-xs opacity-80 mt-1">Create custom worksheets</div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
+                        <Popover open={researchModeOpen} onOpenChange={setResearchModeOpen}>
+                            <PopoverTrigger asChild>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
+                                >
+                                    {researchMode === "simple" ? (
+                                        <Zap className="size-3.5 md:size-4" />
+                                    ) : researchMode === "moderate" ? (
+                                        <Scale className="size-3.5 md:size-4" />
+                                    ) : (
+                                        <Brain className="size-3.5 md:size-4" />
+                                    )}
+                                    {!isMobile ? researchMode.charAt(0).toUpperCase() + researchMode.slice(1) : ""}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-0" align="start">
+                                <div className="p-4">
+                                    <h4 className="font-semibold text-sm mb-3">Research Mode</h4>
+                                    <div className="space-y-2">
+                                        <button
+                                            onClick={() => {
+                                                onResearchModeChange?.("simple");
+                                                setResearchModeOpen(false);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-md transition-colors ${
+                                                researchMode === "simple" 
+                                                    ? "bg-primary text-primary-foreground" 
+                                                    : "hover:bg-accent"
+                                            }`}
+                                        >
+                                            <div className="font-medium text-sm flex items-center gap-2">
+                                                <Zap className="size-4" /> Simple
+                                            </div>
+                                            <div className="text-xs opacity-80 mt-1">Quick, focused research (2-3 tool calls)</div>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                onResearchModeChange?.("moderate");
+                                                setResearchModeOpen(false);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-md transition-colors ${
+                                                researchMode === "moderate" 
+                                                    ? "bg-primary text-primary-foreground" 
+                                                    : "hover:bg-accent"
+                                            }`}
+                                        >
+                                            <div className="font-medium text-sm flex items-center gap-2">
+                                                <Scale className="size-4" /> Moderate
+                                            </div>
+                                            <div className="text-xs opacity-80 mt-1">Balanced research (5-7 tool calls)</div>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                onResearchModeChange?.("deep");
+                                                setResearchModeOpen(false);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-md transition-colors ${
+                                                researchMode === "deep" 
+                                                    ? "bg-primary text-primary-foreground" 
+                                                    : "hover:bg-accent"
+                                            }`}
+                                        >
+                                            <div className="font-medium text-sm flex items-center gap-2">
+                                                <Brain className="size-4" /> Deep
+                                            </div>
+                                            <div className="text-xs opacity-80 mt-1">Exhaustive research (8-10 tool calls)</div>
                                         </button>
                                     </div>
                                 </div>

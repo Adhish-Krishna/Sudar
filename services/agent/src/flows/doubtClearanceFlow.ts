@@ -20,7 +20,8 @@
 import { Experimental_Agent as Agent, stepCountIs } from 'ai';
 import { google } from '@ai-sdk/google';
 import { createMCPClientWithContext, type UserContext } from '../mcpClient';
-import { extractFilesFromQuery, createFileContextPrompt } from '../utils/fileExtractor';
+import { extractFilesFromQuery } from '../utils/fileExtractor';
+import { contentResearcher } from '../agent/contentResearcher';
 import { 
   addUserMessage, 
   initializeAgentMessage, 
@@ -59,6 +60,7 @@ export interface DoubtClearanceOptions {
   query: string;
   userContext: UserContext;
   systemPrompt?: string;
+  research_mode?: 'simple' | 'moderate' | 'deep';
 }
 
 export async function* doubtClearanceFlow(
@@ -67,27 +69,13 @@ export async function* doubtClearanceFlow(
   const {
     query,
     userContext,
-    systemPrompt = doubtClearanceFlowPrompt
+    systemPrompt = doubtClearanceFlowPrompt,
+    research_mode = 'moderate'
   } = options;
 
   const fileExtraction = extractFilesFromQuery(query);
   const actualQuery = fileExtraction.hasFiles ? fileExtraction.cleanedQuery : query;
   const inputFiles = fileExtraction.extractedFiles;
-
-  const enhancedSystemPrompt = fileExtraction.hasFiles 
-    ? systemPrompt + createFileContextPrompt(inputFiles)
-    : systemPrompt;
-
-  const mcpClient = await createMCPClientWithContext(userContext);
-  const tools = await mcpClient.tools();
-
-  const allowedTools = ['web_search', 'retrieve_content'];
-  const filteredTools = Object.keys(tools)
-    .filter(key => allowedTools.includes(key))
-    .reduce((obj, key) => {
-      obj[key] = tools[key];
-      return obj;
-    }, {} as typeof tools);
 
   let stepCount = 0;
   let fullResponse = '';
@@ -101,7 +89,8 @@ export async function* doubtClearanceFlow(
     completed: false,
     extractedFiles: inputFiles,
     fileRetrievals: 0,
-    websitesReferenced: [] as string[]
+    websitesReferenced: [] as string[],
+    researchFindings: ''
   };
 
   if (fileExtraction.hasFiles) {
@@ -114,18 +103,108 @@ export async function* doubtClearanceFlow(
   }
 
   try {
+    // Step 1: Use contentResearcher to gather research findings
+    stepCount++;
+    yield {
+      step: stepCount,
+      type: 'status' as const,
+      status: `Starting research (Mode: ${research_mode.toUpperCase()})...`
+    };
+
+    let researchFindings = '';
+    for await (const researchStep of contentResearcher({
+      query: actualQuery,
+      userContext,
+      research_mode,
+      inputFiles: fileExtraction.extractedFiles
+    })) {
+      if (researchStep.type === 'status') {
+        yield {
+          step: stepCount,
+          type: 'status' as const,
+          status: researchStep.status || ''
+        };
+      } else if (researchStep.type === 'tool_call') {
+        stepCount++;
+        yield {
+          step: stepCount,
+          type: 'tool_call' as const,
+          toolName: researchStep.toolName,
+          toolArgs: researchStep.toolArgs
+        };
+        allSteps.push(convertDoubtClearanceStep({
+          step: stepCount,
+          type: 'tool_call',
+          toolName: researchStep.toolName,
+          toolArgs: researchStep.toolArgs
+        }));
+      } else if (researchStep.type === 'tool_result') {
+        stepCount++;
+        yield {
+          step: stepCount,
+          type: 'tool_result' as const,
+          toolName: researchStep.toolName,
+          toolResult: researchStep.toolResult
+        };
+        allSteps.push(convertDoubtClearanceStep({
+          step: stepCount,
+          type: 'tool_result',
+          toolName: researchStep.toolName,
+          toolResult: researchStep.toolResult
+        }));
+      } else if (researchStep.type === 'text' && researchStep.text) {
+        researchFindings += researchStep.text;
+        yield {
+          step: stepCount,
+          type: 'text' as const,
+          text: researchStep.text
+        };
+      } else if (researchStep.type === 'metadata' && researchStep.metadata) {
+        doubtState.searchQueries = researchStep.metadata.searchQueries || [];
+        doubtState.websitesReferenced = researchStep.metadata.websitesResearched || [];
+        doubtState.totalSearches = researchStep.metadata.totalToolCalls || 0;
+      }
+    }
+
+    doubtState.researchFindings = researchFindings;
+
+    // Step 2: Use a simple agent to answer based on research findings
+    const enhancedSystemPrompt = `${systemPrompt}
+
+IMPORTANT: You have been provided with research findings below. Use these findings to answer the user's query clearly and concisely. Do not repeat the research findings verbatim - synthesize them into a helpful answer.
+
+RESEARCH FINDINGS:
+${researchFindings}`;
+
+    const mcpClient = await createMCPClientWithContext(userContext);
+    const tools = await mcpClient.tools();
+
+    // Only allow retrieve_content for file access, no web_search needed as research is done
+    const allowedTools = ['retrieve_content'];
+    const filteredTools = Object.keys(tools)
+      .filter(key => allowedTools.includes(key))
+      .reduce((obj, key) => {
+        obj[key] = tools[key];
+        return obj;
+      }, {} as typeof tools);
+
+    stepCount++;
+    yield {
+      step: stepCount,
+      type: 'status' as const,
+      status: 'Generating answer based on research findings...'
+    };
+
     const agent = new Agent({
       model: google('gemini-2.5-flash'),
       system: enhancedSystemPrompt,
       tools: filteredTools,
-      stopWhen: stepCountIs(10),
+      stopWhen: stepCountIs(5),
       temperature: 0.7
     });
 
     const result = await agent.stream({
-      prompt: fileExtraction.hasFiles ? 
-        `${actualQuery}\n\nNote: Please retrieve and analyze the following files first: ${inputFiles.join(', ')}` : 
-        actualQuery
+      prompt: actualQuery
     });
 
     for await (const part of result.fullStream) {
@@ -133,23 +212,13 @@ export async function* doubtClearanceFlow(
         stepCount++;
         const toolArgs = 'args' in part ? part.args : part.input;
         
-        let statusMessage = '';
-        if (part.toolName === 'web_search') {
-          doubtState.totalSearches++;
-          const searchQuery = (toolArgs as any)?.query;
-          doubtState.searchQueries.push(searchQuery || 'unknown');
-          statusMessage = `Searching for: "${searchQuery}"...`;
-        } else if (part.toolName === 'retrieve_content') {
+        if (part.toolName === 'retrieve_content') {
           doubtState.fileRetrievals++;
           const filenames = (toolArgs as any)?.inputFiles || [];
-          statusMessage = `Retrieving content from: ${Array.isArray(filenames) ? filenames.join(', ') : filenames}...`;
-        }
-        
-        if (statusMessage) {
           yield {
             step: stepCount,
             type: 'status' as const,
-            status: statusMessage
+            status: `Retrieving content from: ${Array.isArray(filenames) ? filenames.join(', ') : filenames}...`
           };
         }
         
@@ -160,35 +229,11 @@ export async function* doubtClearanceFlow(
           toolArgs: toolArgs
         };
 
-        // Store step for later database save
         allSteps.push(convertDoubtClearanceStep(currentStep));
-        
         yield currentStep;
       } else if (part.type === 'tool-result') {
+        stepCount++;
         const toolResult = 'result' in part ? part.result : part.output;
-        
-        // Extract websites from search results
-        if (part.toolName === 'web_search' && toolResult) {
-          try {
-            const resultText = JSON.stringify(toolResult);
-            const urlMatches = resultText.match(/https?:\/\/[^\s"'\]},]+/g) || [];
-            const domains = urlMatches.map(url => {
-              try {
-                return new URL(url).hostname;
-              } catch {
-                return null;
-              }
-            }).filter((domain): domain is string => domain !== null);
-            
-            domains.forEach(domain => {
-              if (!doubtState.websitesReferenced.includes(domain)) {
-                doubtState.websitesReferenced.push(domain);
-              }
-            });
-          } catch (error) {
-            // Ignore errors in parsing search results
-          }
-        }
         
         const currentStep: DoubtClearanceStep = {
           step: stepCount,
@@ -197,9 +242,7 @@ export async function* doubtClearanceFlow(
           toolResult: toolResult
         };
 
-        // Store step for later database save
         allSteps.push(convertDoubtClearanceStep(currentStep));
-        
         yield currentStep;
       } else if (part.type === 'text-delta') {
         if (part.text) {
@@ -258,7 +301,9 @@ export async function* doubtClearanceFlow(
             allSteps,
             {
               content: fullResponse,
-              researched_websites: doubtState.websitesReferenced
+              researched_websites: doubtState.websitesReferenced.length > 0 
+                ? doubtState.websitesReferenced 
+                : []
             },
             undefined, // No worksheet content for doubt clearance
             endTime
@@ -320,7 +365,9 @@ export async function* doubtClearanceFlow(
         allSteps,
         {
           content: fullResponse,
-          researched_websites: doubtState.websitesReferenced
+          researched_websites: doubtState.websitesReferenced.length > 0 
+            ? doubtState.websitesReferenced 
+            : []
         },
         undefined, // No worksheet content for doubt clearance
         endTime

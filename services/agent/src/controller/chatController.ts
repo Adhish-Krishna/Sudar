@@ -16,6 +16,7 @@ interface ChatRequest {
   classroom_id: string;
   query: string;
   flow_type?: 'doubt_clearance' | 'worksheet_generation';
+  research_mode?: 'simple' | 'moderate' | 'deep';
 }
 
 const streamChat = async (req: Request, res: Response) => {
@@ -25,7 +26,7 @@ const streamChat = async (req: Request, res: Response) => {
 
         const user_id = req.user_id!;
         
-        const { chat_id, subject_id, classroom_id, query, flow_type }: ChatRequest = req.body;
+        const { chat_id, subject_id, classroom_id, query, flow_type, research_mode = 'moderate' }: ChatRequest = req.body;
 
         if (!chat_id || !classroom_id || !query) {
             return res.status(400).json({
@@ -70,7 +71,8 @@ const streamChat = async (req: Request, res: Response) => {
                 // Use worksheet flow
                 for await (const step of worksheetFlow({
                     query,
-                    userContext
+                    userContext,
+                    research_mode
                 })) {
                     // Phase change events (flow level)
                     if (step.type === 'phase_change') {
@@ -234,7 +236,8 @@ const streamChat = async (req: Request, res: Response) => {
                 
                 for await (const step of doubtClearanceFlow({
                     query,
-                    userContext
+                    userContext,
+                    research_mode
                 })) {
                     // Status messages
                     if (step.type === 'status') {
