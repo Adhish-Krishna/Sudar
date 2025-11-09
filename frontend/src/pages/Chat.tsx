@@ -33,6 +33,11 @@ const Chat = ()=>{
         return crypto.randomUUID();
     };
 
+    // Clean filename by replacing spaces with underscores
+    const cleanFileName = (filename: string): string => {
+        return filename.replace(/\s+/g, '_');
+    };
+
     const {classroom_id, subject_id, color} = useParams<{classroom_id: string, subject_id: string, color: string}>();
     const navigate = useNavigate();
     const [classroomName, setClassroomName] = useState<string>("");
@@ -963,13 +968,17 @@ const Chat = ()=>{
 
         // Upload files one by one
         for (const file of filesToUpload) {
-            setUploadingFiles(prev => [...prev, file.name]);
+            const cleanedFileName = cleanFileName(file.name);
+            setUploadingFiles(prev => [...prev, cleanedFileName]);
             
-            const uploadToast = toast.loading(`Uploading ${file.name}...`);
+            const uploadToast = toast.loading(`Uploading ${cleanedFileName}...`);
             
             try {
+                // Create a new File object with cleaned filename
+                const cleanedFile = new File([file], cleanedFileName, { type: file.type });
+                
                 const response = await ragService.ingestDocument(
-                    file,
+                    cleanedFile,
                     user.teacher_id,
                     chatId,
                     classroom_id!,
@@ -978,26 +987,26 @@ const Chat = ()=>{
 
                 // Check if response is an error (has numeric status code)
                 if (typeof response.status === 'number' && response.status !== 200) {
-                    toast.error(response.message || `Failed to upload ${file.name}`, { id: uploadToast });
+                    toast.error(response.message || `Failed to upload ${cleanedFileName}`, { id: uploadToast });
                 }
                 // Success response has string status and job_id
                 else if (response.job_id) {
-                    toast.success(`${file.name} uploaded successfully. Processing...`, { id: uploadToast });
+                    toast.success(`${cleanedFileName} uploaded successfully. Processing...`, { id: uploadToast });
                     
                     // Add to processing files and start polling
                     setProcessingFiles(prev => {
                         const newMap = new Map(prev);
-                        newMap.set(file.name, response.job_id);
+                        newMap.set(cleanedFileName, response.job_id);
                         return newMap;
                     });
                     
                     // Start polling for job status
-                    pollJobStatus(response.job_id, file.name);
+                    pollJobStatus(response.job_id, cleanedFileName);
                 }
             } catch (error: any) {
-                toast.error(error.message || `Failed to upload ${file.name}`, { id: uploadToast });
+                toast.error(error.message || `Failed to upload ${cleanedFileName}`, { id: uploadToast });
             } finally {
-                setUploadingFiles(prev => prev.filter(name => name !== file.name));
+                setUploadingFiles(prev => prev.filter(name => name !== cleanedFileName));
             }
         }
 
@@ -1491,6 +1500,10 @@ const Chat = ()=>{
                                                                     totalToolCalls: doubtMetadata?.totalToolCalls || 0
                                                                 };
                                                                 
+                                                                // Check if there are researched websites or search queries
+                                                                const hasResearchDetails = doubtClearanceDataForRenderer.websitesResearched.length > 0 || 
+                                                                                          doubtClearanceDataForRenderer.searchQueries.length > 0;
+                                                                
                                                                 return (
                                                                     <div className="space-y-4">
                                                                         {/* Display the answer outside the card */}
@@ -1507,11 +1520,13 @@ const Chat = ()=>{
                                                                             </div>
                                                                         )}
                                                                         
-                                                                        {/* Display research details in card */}
-                                                                        <DoubtClearanceRenderer 
-                                                                            data={doubtClearanceDataForRenderer} 
-                                                                            isActive={false}
-                                                                        />
+                                                                        {/* Display research details in card only if there are researched websites or search queries */}
+                                                                        {hasResearchDetails && (
+                                                                            <DoubtClearanceRenderer 
+                                                                                data={doubtClearanceDataForRenderer} 
+                                                                                isActive={false}
+                                                                            />
+                                                                        )}
                                                                     </div>
                                                                 );
                                                             })()

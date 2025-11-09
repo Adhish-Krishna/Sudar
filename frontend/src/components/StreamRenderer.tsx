@@ -78,14 +78,14 @@ export const ResearchPhaseRenderer = ({ data, isActive }: ResearchPhaseRendererP
               <>
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Research Findings:</p>
-                  <div className="rounded-md border bg-background/50 p-3">
+                  <ScrollArea className="h-[300px] rounded-md border bg-background/50 p-3">
                     <Response
                       className="text-sm prose prose-sm dark:prose-invert max-w-none"
                       parseIncompleteMarkdown={true}
                     >
                       {data.content}
                     </Response>
-                  </div>
+                  </ScrollArea>
                 </div>
                 <Separator />
               </>
@@ -110,13 +110,15 @@ export const ResearchPhaseRenderer = ({ data, isActive }: ResearchPhaseRendererP
                     <Search className="h-3 w-3" />
                     Search Queries ({data.searchQueries.length})
                   </p>
-                  <ul className="space-y-1">
-                    {data.searchQueries.map((query, idx) => (
-                      <li key={idx} className="text-xs text-muted-foreground pl-4 border-l-2 border-blue-300 dark:border-blue-700">
-                        {query}
-                      </li>
-                    ))}
-                  </ul>
+                  <ScrollArea className="h-[100px] rounded-md border p-2 bg-background/50">
+                    <ul className="space-y-1">
+                      {data.searchQueries.map((query, idx) => (
+                        <li key={idx} className="text-xs text-muted-foreground pl-4 border-l-2 border-blue-300 dark:border-blue-700">
+                          {query}
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
                 </div>
               </>
             )}
@@ -219,14 +221,14 @@ export const GenerationPhaseRenderer = ({ data, isActive }: GenerationPhaseRende
               <>
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Generated Worksheet:</p>
-                  <div className="rounded-md border bg-background/50 p-3">
+                  <ScrollArea className="h-[300px] rounded-md border bg-background/50 p-3">
                     <Response
                       className="text-sm prose prose-sm dark:prose-invert max-w-none"
                       parseIncompleteMarkdown={true}
                     >
                       {data.content}
                     </Response>
-                  </div>
+                  </ScrollArea>
                 </div>
                 <Separator />
               </>
@@ -351,14 +353,14 @@ export const DoubtClearanceRenderer = ({ data, isActive }: DoubtClearanceRendere
               <>
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Research Findings:</p>
-                  <div className="rounded-md border bg-background/50 p-3 max-h-[300px] overflow-y-auto">
+                  <ScrollArea className="h-[300px] rounded-md border bg-background/50 p-3">
                     <Response
                       className="text-sm prose prose-sm dark:prose-invert max-w-none"
                       parseIncompleteMarkdown={true}
                     >
                       {data.researchFindings}
                     </Response>
-                  </div>
+                  </ScrollArea>
                 </div>
                 <Separator />
               </>
@@ -383,13 +385,15 @@ export const DoubtClearanceRenderer = ({ data, isActive }: DoubtClearanceRendere
                     <Search className="h-3 w-3" />
                     Search Queries ({data.searchQueries.length})
                   </p>
-                  <ul className="space-y-1">
-                    {data.searchQueries.map((query, idx) => (
-                      <li key={idx} className="text-xs text-muted-foreground pl-4 border-l-2 border-purple-300 dark:border-purple-700">
-                        {query}
-                      </li>
-                    ))}
-                  </ul>
+                  <ScrollArea className="h-[100px] rounded-md border p-2 bg-background/50">
+                    <ul className="space-y-1">
+                      {data.searchQueries.map((query, idx) => (
+                        <li key={idx} className="text-xs text-muted-foreground pl-4 border-l-2 border-purple-300 dark:border-purple-700">
+                          {query}
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
                 </div>
               </>
             )}
