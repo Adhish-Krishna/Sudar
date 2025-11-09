@@ -25,7 +25,7 @@ import { Response } from "@/components/ai-elements/response";
 import FilesAndChat from "@/components/FilesAndChat";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import type { Section } from "@/components/FilesAndChat";
-import { ResearchPhaseRenderer, GenerationPhaseRenderer } from "@/components/WorksheetPhaseRenderers";
+import { ResearchPhaseRenderer, GenerationPhaseRenderer, DoubtClearanceRenderer } from "@/components/StreamRenderer";
 
 const Chat = ()=>{
     // Generate UUID v4
@@ -56,9 +56,6 @@ const Chat = ()=>{
     const [currentResponse, setCurrentResponse] = useState("");
     const [currentResearchResponse, setCurrentResearchResponse] = useState("");
     const [currentGenerationResponse, setCurrentGenerationResponse] = useState("");
-    const [streamingMetadata, setStreamingMetadata] = useState<any>(null);
-    const [currentPhase, setCurrentPhase] = useState<string>('');
-    const [currentFlowType, setCurrentFlowType] = useState<string>('');
     const [streamingStatus, setStreamingStatus] = useState<string>('');
     const abortControllerRef = useRef<(() => void) | null>(null);
     
@@ -129,6 +126,27 @@ const Chat = ()=>{
     });
     
     const [activePhase, setActivePhase] = useState<'research' | 'generation' | null>(null);
+    
+    // Doubt clearance phase tracking state
+    type DoubtClearanceData = {
+        status: string[];
+        searchQueries: string[];
+        websitesResearched: string[];
+        researchFindings?: string; // Research findings from contentResearcher
+        finalAnswer?: string; // Final synthesized answer
+        isComplete: boolean;
+        totalToolCalls?: number;
+    };
+    
+    const [doubtClearanceData, setDoubtClearanceData] = useState<DoubtClearanceData>({
+        status: [],
+        searchQueries: [],
+        websitesResearched: [],
+        researchFindings: '',
+        finalAnswer: '',
+        isComplete: false,
+        totalToolCalls: 0
+    });
 
     // Ref for scroll area
     const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -250,12 +268,32 @@ const Chat = ()=>{
                                     metadata: enhancedMetadata
                                 });
                             } else if (msg.agentMessage.flowType === 'doubt_clearance') {
-                                // For doubt clearance, use research_findings.content
-                                const content = msg.agentMessage.research_findings?.content || '';
+                                // For doubt clearance, extract research findings and final answer
+                                const doubtMetadata = msg.agentMessage.finalMetadata?.doubtClearance;
+                                const researchedWebsites = msg.agentMessage.research_findings?.researched_websites || 
+                                                          doubtMetadata?.websitesReferenced || 
+                                                          [];
+                                
+                                // The content is the final answer, research findings might be embedded or separate
+                                const finalAnswer = msg.agentMessage.research_findings?.content || '';
+                                const researchFindings = ''; // Research findings not stored separately in DB, only final answer
+                                
+                                // Store in enhanced metadata
+                                const enhancedMetadata = {
+                                    ...msg.agentMessage.finalMetadata,
+                                    researchFindings: researchFindings,
+                                    finalAnswer: finalAnswer,
+                                    research_findings: {
+                                        ...msg.agentMessage.research_findings,
+                                        researched_websites: researchedWebsites
+                                    }
+                                };
+                                
                                 loadedMessages.push({
                                     role: 'assistant',
-                                    content: content,
-                                    metadata: msg.agentMessage.finalMetadata
+                                    content: finalAnswer,
+                                    researchContent: researchFindings, // Empty for now, as research findings aren't stored separately
+                                    metadata: enhancedMetadata
                                 });
                             } else {
                                 // Fallback for other flow types
@@ -381,8 +419,6 @@ const Chat = ()=>{
         setCurrentResponse("");
         setCurrentResearchResponse("");
         setCurrentGenerationResponse("");
-        setStreamingMetadata(null);
-        setCurrentPhase('');
         setStreamingStatus('');
         
         // Reset phase data for worksheet generation
@@ -401,11 +437,25 @@ const Chat = ()=>{
                 content: ''
             });
             setActivePhase(null);
+        } else if (flowType === 'doubt_clearance') {
+            // Reset doubt clearance data
+            setDoubtClearanceData({
+                status: [],
+                searchQueries: [],
+                websitesResearched: [],
+                researchFindings: '',
+                finalAnswer: '',
+                isComplete: false,
+                totalToolCalls: 0
+            });
         }
 
         let accumulatedResponse = "";
         let accumulatedResearchResponse = "";
         let accumulatedGenerationResponse = "";
+        let accumulatedResearchFindings = ""; // For doubt clearance research findings
+        let accumulatedFinalAnswer = ""; // For doubt clearance final answer
+        let isInResearchPhase = true; // Track if we're in research phase for doubt clearance
         let metadata: any = {};
 
         try {
@@ -421,11 +471,6 @@ const Chat = ()=>{
                 {
                     onEvent: (event: SSEEvent) => {
                         console.log('SSE Event:', event); // Debug log
-                        
-                        // Set flow type and phase from event
-                        if (event.flowType) {
-                            setCurrentFlowType(event.flowType);
-                        }
                         
                         // Track active phase
                         if (event.metadata?.phase) {
@@ -462,8 +507,28 @@ const Chat = ()=>{
                                             content: accumulatedGenerationResponse
                                         }));
                                     }
+                                } else if (event.flowType === 'doubt_clearance') {
+                                    // For doubt clearance, track research findings vs final answer
+                                    if (isInResearchPhase) {
+                                        // Still in research phase - accumulate research findings
+                                        accumulatedResearchFindings += event.content;
+                                        setDoubtClearanceData(prev => ({
+                                            ...prev,
+                                            researchFindings: accumulatedResearchFindings
+                                        }));
+                                    } else {
+                                        // In answer generation phase - accumulate final answer
+                                        accumulatedFinalAnswer += event.content;
+                                        setDoubtClearanceData(prev => ({
+                                            ...prev,
+                                            finalAnswer: accumulatedFinalAnswer
+                                        }));
+                                    }
+                                    // Also update currentResponse for backward compatibility
+                                    accumulatedResponse += event.content;
+                                    setCurrentResponse(accumulatedResponse);
                                 } else {
-                                    // For doubt clearance or other flows, use single response
+                                    // For other flows, use single response
                                     accumulatedResponse += event.content;
                                     setCurrentResponse(accumulatedResponse);
                                 }
@@ -485,6 +550,21 @@ const Chat = ()=>{
                                             ...prev,
                                             status: [...prev.status, event.content]
                                         }));
+                                    } else if (event.flowType === 'doubt_clearance') {
+                                        // Track status for doubt clearance
+                                        setDoubtClearanceData(prev => ({
+                                            ...prev,
+                                            status: [...prev.status, event.content]
+                                        }));
+                                        
+                                        // Check if we're transitioning from research to answer generation
+                                        if (event.content.toLowerCase().includes('generating answer') || 
+                                            event.content.toLowerCase().includes('answer based')) {
+                                            isInResearchPhase = false;
+                                        } else if (event.content.toLowerCase().includes('research') || 
+                                                   event.content.toLowerCase().includes('searching')) {
+                                            isInResearchPhase = true;
+                                        }
                                     }
                                 }
                                 break;
@@ -492,7 +572,6 @@ const Chat = ()=>{
                             case 'phase_change':
                                 // Handle phase changes (worksheet flow)
                                 if (event.metadata?.currentPhase) {
-                                    setCurrentPhase(event.metadata.currentPhase);
                                     setStreamingStatus(event.content || `Entering ${event.metadata.currentPhase} phase`);
                                     
                                     // Update active phase
@@ -533,7 +612,6 @@ const Chat = ()=>{
                             case 'metadata':
                                 // Store metadata for final message
                                 metadata = { ...metadata, ...event.metadata };
-                                setStreamingMetadata(event.metadata);
                                 
                                 // Handle different metadata types
                                 if (event.metadata?.summaryType === 'research' || event.metadata?.summaryType === 'research_phase') {
@@ -561,6 +639,15 @@ const Chat = ()=>{
                                     if (event.metadata?.worksheetTitle) {
                                         setStreamingStatus(`Worksheet generated: ${event.metadata.worksheetTitle}`);
                                     }
+                                } else if (event.metadata?.summaryType === 'flow') {
+                                    // Doubt clearance metadata (flow type)
+                                    setDoubtClearanceData(prev => ({
+                                        ...prev,
+                                        searchQueries: event.metadata?.searchQueries || prev.searchQueries,
+                                        websitesResearched: event.metadata?.websitesResearched || prev.websitesResearched,
+                                        totalToolCalls: event.metadata?.totalToolCalls || prev.totalToolCalls,
+                                        isComplete: event.metadata?.completed || false
+                                    }));
                                 }
                                 break;
                                 
@@ -589,8 +676,21 @@ const Chat = ()=>{
                                     // Mark phases as complete and clear streaming state
                                     setResearchPhaseData(prev => ({ ...prev, isComplete: true }));
                                     setGenerationPhaseData(prev => ({ ...prev, isComplete: true }));
+                                } else if (event.flowType === 'doubt_clearance') {
+                                    // For doubt clearance, save research findings and final answer
+                                    setDoubtClearanceData(prev => ({ ...prev, isComplete: true }));
+                                    setMessages(prev => [...prev, { 
+                                        role: 'assistant', 
+                                        content: accumulatedFinalAnswer || accumulatedResponse, // Final answer as main content
+                                        researchContent: accumulatedResearchFindings, // Research findings
+                                        metadata: {
+                                            ...metadata,
+                                            researchFindings: accumulatedResearchFindings,
+                                            finalAnswer: accumulatedFinalAnswer || accumulatedResponse
+                                        }
+                                    }]);
                                 } else {
-                                    // For doubt clearance, use single response
+                                    // For other flows, use single response
                                     setMessages(prev => [...prev, { 
                                         role: 'assistant', 
                                         content: accumulatedResponse,
@@ -602,8 +702,6 @@ const Chat = ()=>{
                                 setCurrentResearchResponse("");
                                 setCurrentGenerationResponse("");
                                 setIsStreaming(false);
-                                setCurrentPhase('');
-                                setStreamingMetadata(null);
                                 setStreamingStatus('');
                                 setActivePhase(null);
                                 // Clear phase data to prevent duplicate renderers
@@ -621,6 +719,16 @@ const Chat = ()=>{
                                         isComplete: false,
                                         content: ''
                                     });
+                                } else if (event.flowType === 'doubt_clearance') {
+                                    setDoubtClearanceData({
+                                        status: [],
+                                        searchQueries: [],
+                                        websitesResearched: [],
+                                        researchFindings: '',
+                                        finalAnswer: '',
+                                        isComplete: false,
+                                        totalToolCalls: 0
+                                    });
                                 }
                                 break;
                                 
@@ -631,8 +739,6 @@ const Chat = ()=>{
                                 setCurrentResponse("");
                                 setCurrentResearchResponse("");
                                 setCurrentGenerationResponse("");
-                                setCurrentPhase('');
-                                setStreamingMetadata(null);
                                 setStreamingStatus('');
                                 setActivePhase(null);
                                 break;
@@ -648,8 +754,6 @@ const Chat = ()=>{
                         setCurrentResponse("");
                         setCurrentResearchResponse("");
                         setCurrentGenerationResponse("");
-                        setCurrentPhase('');
-                        setStreamingMetadata(null);
                         setStreamingStatus('');
                     }
                 }
@@ -1315,59 +1419,105 @@ const Chat = ()=>{
                                                 ) : (
                                                     // Assistant message
                                                     msg.researchContent !== undefined || msg.generationContent !== undefined ? (
-                                                        // Worksheet generation: use phase renderers for consistency
-                                                        <div className="space-y-4">
-                                                            {/* Research Phase - using ResearchPhaseRenderer */}
-                                                            {msg.researchContent && (() => {
-                                                                // Extract metadata from message to populate phase data
-                                                                const researchMetadata = msg.metadata?.research || msg.metadata?.worksheetFlow?.researchPhase;
-                                                                // Extract researched_websites from multiple possible locations
+                                                        // Check if this is worksheet generation or doubt clearance
+                                                        msg.generationContent !== undefined ? (
+                                                            // Worksheet generation: use phase renderers for consistency
+                                                            <div className="space-y-4">
+                                                                {/* Research Phase - using ResearchPhaseRenderer */}
+                                                                {msg.researchContent && (() => {
+                                                                    // Extract metadata from message to populate phase data
+                                                                    const researchMetadata = msg.metadata?.research || msg.metadata?.worksheetFlow?.researchPhase;
+                                                                    // Extract researched_websites from multiple possible locations
+                                                                    const websitesResearched = msg.metadata?.research_findings?.researched_websites ||
+                                                                        researchMetadata?.websitesResearched || 
+                                                                        msg.metadata?.worksheetFlow?.researchPhase?.websitesResearched ||
+                                                                        [];
+                                                                    
+                                                                    const researchPhaseDataForRenderer: ResearchPhaseData = {
+                                                                        status: [],
+                                                                        searchQueries: researchMetadata?.searchQueries || [],
+                                                                        websitesResearched: websitesResearched,
+                                                                        toolCalls: [],
+                                                                        isComplete: researchMetadata?.completed !== undefined ? researchMetadata.completed : true,
+                                                                        content: msg.researchContent
+                                                                    };
+                                                                    
+                                                                    return (
+                                                                        <ResearchPhaseRenderer 
+                                                                            data={researchPhaseDataForRenderer} 
+                                                                            isActive={false}
+                                                                        />
+                                                                    );
+                                                                })()}
+                                                                
+                                                                {/* Generation Phase - using GenerationPhaseRenderer */}
+                                                                {msg.generationContent && (() => {
+                                                                    // Extract metadata from message to populate phase data
+                                                                    const generationMetadata = msg.metadata?.generation || msg.metadata?.worksheetFlow?.generationPhase;
+                                                                    const generationPhaseDataForRenderer: GenerationPhaseData = {
+                                                                        status: [],
+                                                                        worksheetTitle: generationMetadata?.worksheetTitle || '',
+                                                                        contentLength: generationMetadata?.contentLength || 0,
+                                                                        savedSuccessfully: generationMetadata?.savedSuccessfully || false,
+                                                                        pdfLocation: generationMetadata?.pdfLocation || '',
+                                                                        isComplete: generationMetadata?.completed !== undefined ? generationMetadata.completed : true,
+                                                                        content: msg.generationContent
+                                                                    };
+                                                                    
+                                                                    return (
+                                                                        <GenerationPhaseRenderer 
+                                                                            data={generationPhaseDataForRenderer} 
+                                                                            isActive={false}
+                                                                        />
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                        ) : (
+                                                            // Doubt clearance: Show answer outside, research details in card
+                                                            (() => {
+                                                                // Extract metadata for doubt clearance
+                                                                const doubtMetadata = msg.metadata?.doubtClearance || msg.metadata?.finalMetadata?.doubtClearance;
                                                                 const websitesResearched = msg.metadata?.research_findings?.researched_websites ||
-                                                                    researchMetadata?.websitesResearched || 
-                                                                    msg.metadata?.worksheetFlow?.researchPhase?.websitesResearched ||
+                                                                    doubtMetadata?.websitesReferenced ||
                                                                     [];
                                                                 
-                                                                const researchPhaseDataForRenderer: ResearchPhaseData = {
+                                                                const doubtClearanceDataForRenderer: DoubtClearanceData = {
                                                                     status: [],
-                                                                    searchQueries: researchMetadata?.searchQueries || [],
+                                                                    searchQueries: doubtMetadata?.searchQueries || [],
                                                                     websitesResearched: websitesResearched,
-                                                                    toolCalls: [],
-                                                                    isComplete: researchMetadata?.completed !== undefined ? researchMetadata.completed : true,
-                                                                    content: msg.researchContent
+                                                                    researchFindings: msg.metadata?.researchFindings || msg.researchContent || '',
+                                                                    finalAnswer: msg.metadata?.finalAnswer || msg.content || '',
+                                                                    isComplete: doubtMetadata?.completed !== undefined ? doubtMetadata.completed : true,
+                                                                    totalToolCalls: doubtMetadata?.totalToolCalls || 0
                                                                 };
                                                                 
                                                                 return (
-                                                                    <ResearchPhaseRenderer 
-                                                                        data={researchPhaseDataForRenderer} 
-                                                                        isActive={false}
-                                                                    />
+                                                                    <div className="space-y-4">
+                                                                        {/* Display the answer outside the card */}
+                                                                        {doubtClearanceDataForRenderer.finalAnswer && (
+                                                                            <div className="flex gap-3 justify-start">
+                                                                                <div className="rounded-lg px-4 py-3 max-w-[80%]">
+                                                                                    <Response
+                                                                                        className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                                                                                        parseIncompleteMarkdown={true}
+                                                                                    >
+                                                                                        {doubtClearanceDataForRenderer.finalAnswer}
+                                                                                    </Response>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        
+                                                                        {/* Display research details in card */}
+                                                                        <DoubtClearanceRenderer 
+                                                                            data={doubtClearanceDataForRenderer} 
+                                                                            isActive={false}
+                                                                        />
+                                                                    </div>
                                                                 );
-                                                            })()}
-                                                            
-                                                            {/* Generation Phase - using GenerationPhaseRenderer */}
-                                                            {msg.generationContent && (() => {
-                                                                // Extract metadata from message to populate phase data
-                                                                const generationMetadata = msg.metadata?.generation || msg.metadata?.worksheetFlow?.generationPhase;
-                                                                const generationPhaseDataForRenderer: GenerationPhaseData = {
-                                                                    status: [],
-                                                                    worksheetTitle: generationMetadata?.worksheetTitle || '',
-                                                                    contentLength: generationMetadata?.contentLength || 0,
-                                                                    savedSuccessfully: generationMetadata?.savedSuccessfully || false,
-                                                                    pdfLocation: generationMetadata?.pdfLocation || '',
-                                                                    isComplete: generationMetadata?.completed !== undefined ? generationMetadata.completed : true,
-                                                                    content: msg.generationContent
-                                                                };
-                                                                
-                                                                return (
-                                                                    <GenerationPhaseRenderer 
-                                                                        data={generationPhaseDataForRenderer} 
-                                                                        isActive={false}
-                                                                    />
-                                                                );
-                                                            })()}
-                                                        </div>
+                                                            })()
+                                                        )
                                                     ) : (
-                                                        // Doubt clearance or other flows: show single content
+                                                        // Other flows: show single content
                                                         <div className="flex gap-3 justify-start">
                                                             <div className="rounded-lg px-4 py-3 max-w-[80%]">
                                                                 <Response
@@ -1439,18 +1589,31 @@ const Chat = ()=>{
                                             </div>
                                         )}
                                         
-                                        {/* Streaming response - single for doubt clearance */}
-                                        {isStreaming && flowType === 'doubt_clearance' && currentResponse && (
-                                            <div className="flex gap-3 justify-start">
-                                                <div className="rounded-lg px-4 py-3 max-w-[80%]">
-                                                    <Response 
-                                                        className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                        parseIncompleteMarkdown={true}
-                                                    >
-                                                        {currentResponse}
-                                                    </Response>
+                                        {/* Streaming response - Doubt Clearance */}
+                                        {isStreaming && flowType === 'doubt_clearance' && (
+                                            (doubtClearanceData.researchFindings || doubtClearanceData.finalAnswer || doubtClearanceData.status.length > 0) && (
+                                                <div className="space-y-4">
+                                                    {/* Display streaming answer outside the card */}
+                                                    {doubtClearanceData.finalAnswer && (
+                                                        <div className="flex gap-3 justify-start">
+                                                            <div className="rounded-lg px-4 py-3 max-w-[80%]">
+                                                                <Response 
+                                                                    className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                                                                    parseIncompleteMarkdown={true}
+                                                                >
+                                                                    {doubtClearanceData.finalAnswer}
+                                                                </Response>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Display research details in card */}
+                                                    <DoubtClearanceRenderer 
+                                                        data={doubtClearanceData} 
+                                                        isActive={true} 
+                                                    />
                                                 </div>
-                                            </div>
+                                            )
                                         )}
                                         
                                         {/* Worksheet Generation Phase Renderers - Only show during streaming, not after message is saved */}
