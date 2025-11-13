@@ -23,7 +23,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { VerificationDialog } from "@/components/VerificationDialog"
 import { toast } from "sonner"
-import LightRays from "@/components/LightRays"
+// import LightRays from "@/components/LightRays"
 
 
 export function Auth() {
@@ -148,7 +148,7 @@ export function Auth() {
 	};
   return (
     <>
-    {theme === "dark" && 
+    {/* {theme === "dark" && 
         <div className="fixed inset-0 z-0">
             <LightRays
                 raysOrigin="top-center"
@@ -165,7 +165,7 @@ export function Auth() {
                 distortion={0}
             />
         </div>
-    }
+    } */}
     <div className="fixed top-4 right-4 z-50">
         <AnimatedThemeToggler/>
     </div>

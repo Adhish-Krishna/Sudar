@@ -1,7 +1,7 @@
 import { TextHoverEffect } from "@/components/ui/animated-border-text"
 import { useTheme } from "@/contexts/ThemeProvider"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
-import LightRays from "@/components/LightRays"
+// import LightRays from "@/components/LightRays"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -115,7 +115,7 @@ const ForgotPassword = ()=>{
 
     return(
         <>
-            {theme === "dark" && 
+            {/* {theme === "dark" && 
                 <div className="fixed inset-0 z-0">
                     <LightRays
                         raysOrigin="top-center"
@@ -132,7 +132,7 @@ const ForgotPassword = ()=>{
                         distortion={0}
                     />
                 </div>
-            }
+            } */}
             
             <div className="fixed top-4 right-4 z-50">
                 <AnimatedThemeToggler/>

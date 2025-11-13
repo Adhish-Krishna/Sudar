@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { ArrowUp, Plus, Paperclip, Workflow, Zap, Scale, Brain } from "lucide-react";
+import { ArrowUp, Plus, Paperclip, Workflow} from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { useState, useRef} from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
@@ -327,7 +327,7 @@ const ChatInput = ({
                         onClick={handleSend}
                         disabled={!message.trim()}
                     >
-                        <ArrowUp className="size-3.5 md:size-4"/> Send
+                        <ArrowUp className="size-3.5 md:size-4"/>
                     </Button>
                 </div>
             </div>
