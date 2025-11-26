@@ -63,7 +63,6 @@ export async function doubtClearanceFlow(
   let researchFindings = '';
   let finalAnswer = '';
   const researchedWebsites = new Set<string>();
-  const toolCallMap = new Map<string, string>(); // Maps toolCallId -> toolName
 
   try {
     // Add user message to database
@@ -91,20 +90,9 @@ export async function doubtClearanceFlow(
       const chunk = { phase: 'research', ...result.chunk };
       res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       
-      // Track tool calls and map toolCallId to toolName
+      // Track tool calls
       if (result.chunk.type === 'tool-input-available') {
         toolCallCount++;
-        if (result.chunk.toolCallId && result.chunk.toolName) {
-          toolCallMap.set(result.chunk.toolCallId, result.chunk.toolName);
-        }
-      }
-      
-      // For tool outputs, add the toolName from the map
-      if (result.chunk.type === 'tool-output-available' && result.chunk.toolCallId) {
-        const toolName = toolCallMap.get(result.chunk.toolCallId);
-        if (toolName) {
-          result.chunk.toolName = toolName;
-        }
       }
       
       // Store step in database (skip if convertChunkToStep returns null)

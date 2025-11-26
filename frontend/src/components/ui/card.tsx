@@ -95,22 +95,6 @@ function Card({
       onPointerEnter={!isLightTheme ? reset : undefined}
       {...props}
     >
-      {/* Animated gradient border layer - hidden in light mode */}
-      <motion.div
-        className={cn(
-          "pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-300 group-hover:opacity-100",
-          isLightTheme && "hidden"
-        )}
-        style={{
-          background: useMotionTemplate`
-            radial-gradient(${gradientSize}px circle at ${mouseX}px ${mouseY}px,
-            ${gradientFrom}, 
-            ${gradientTo}, 
-            transparent 100%
-            )
-          `,
-        }}
-      />
       
       {/* Card background - inset by 1px to reveal border */}
       <div className="bg-card absolute inset-px rounded-[inherit]" />

@@ -28,44 +28,14 @@ export interface IUserMessage {
   timestamp: Date;
 }
 
-export interface IToolCall {
-  step: number;
-  toolName: string;
-  toolArgs: any;
-  timestamp: Date;
-}
-
-export interface IToolResult {
-  step: number;
-  toolName: string;
-  toolResult: any;
-  timestamp: Date;
-  executionTime?: number;
-}
-
-export interface ITextChunk {
-  step: number;
-  text: string;
-  timestamp: Date;
-  isStreaming?: boolean;
-}
-
 export interface IAgentStep {
   step: number;
   phase?: 'research' | 'generation' | 'answer' | 'chat';
-  type: 'tool_call' | 'tool_result' | 'text' | 'finish';
+  type: string; // Store the original chunk type from AI SDK
   timestamp: Date;
   
-  // Tool-related fields
-  toolCall?: IToolCall;
-  toolResult?: IToolResult;
-  
-  // Text field
-  textChunk?: ITextChunk;
-  
-  // Finish information
-  finishReason?: string;
-  errorMessage?: string;
+  // Store the raw chunk data as-is from the stream
+  chunkData: any;
 }
 
 export interface IAgentMessage {
@@ -158,50 +128,18 @@ const UserMessageSchema = new Schema<IUserMessage>({
   timestamp: { type: Date, default: Date.now }
 });
 
-// Tool Call Schema
-const ToolCallSchema = new Schema<IToolCall>({
-  step: { type: Number, required: true },
-  toolName: { type: String, required: true },
-  toolArgs: { type: Schema.Types.Mixed, required: true },
-  timestamp: { type: Date, default: Date.now }
-});
-
-// Tool Result Schema
-const ToolResultSchema = new Schema<IToolResult>({
-  step: { type: Number, required: true },
-  toolName: { type: String, required: true },
-  toolResult: { type: Schema.Types.Mixed, required: true },
-  timestamp: { type: Date, default: Date.now },
-  executionTime: { type: Number }
-});
-
-// Text Chunk Schema
-const TextChunkSchema = new Schema<ITextChunk>({
-  step: { type: Number, required: true },
-  text: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
-  isStreaming: { type: Boolean, default: false }
-});
-
 // Agent Step Schema
 const AgentStepSchema = new Schema<IAgentStep>({
   step: { type: Number, required: true },
   phase: { type: String, enum: ['research', 'generation', 'answer', 'chat'] },
   type: { 
-    type: String, 
-    enum: ['tool_call', 'tool_result', 'text', 'finish'],
+    type: String,
     required: true 
   },
   timestamp: { type: Date, default: Date.now },
   
-  // Embedded sub-documents for different step types
-  toolCall: ToolCallSchema,
-  toolResult: ToolResultSchema,
-  textChunk: TextChunkSchema,
-  
-  // Finish fields
-  finishReason: { type: String },
-  errorMessage: { type: String }
+  // Store raw chunk data as-is from the stream
+  chunkData: { type: Schema.Types.Mixed, required: true }
 });
 
 // Agent Message Schema

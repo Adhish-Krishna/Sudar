@@ -197,8 +197,8 @@ class ContentSaverTool:
     def _ensure_bucket_exists(self):
         """Ensure the MinIO bucket exists, create if it doesn't."""
         try:
-            if not self.minio_client.bucket_exists(self.minio_bucket_name):
-                self.minio_client.make_bucket(self.minio_bucket_name)
+            if not self.minio_client.bucket_exists(bucket_name=self.minio_bucket_name):
+                self.minio_client.make_bucket(bucket_name=self.minio_bucket_name)
                 print(f"Created bucket: {self.minio_bucket_name}")
         except Exception as e:
             print(f"Error checking/creating bucket: {e}")

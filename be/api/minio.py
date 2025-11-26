@@ -51,7 +51,7 @@ def get_input_documents(
         
         # List objects in the input bucket with the given prefix
         objects = minio_client.list_objects(
-            MINIO_INPUT_BUCKET_NAME,
+            bucket_name=MINIO_INPUT_BUCKET_NAME,
             prefix=prefix,
             recursive=True
         )
@@ -104,7 +104,7 @@ def get_output_documents(
         
         # List objects in the output bucket with the given prefix
         objects = minio_client.list_objects(
-            MINIO_OUTPUT_BUCKET_NAME,
+            bucket_name=MINIO_OUTPUT_BUCKET_NAME,
             prefix=prefix,
             recursive=True
         )
@@ -153,7 +153,7 @@ def download_document(
             raise HTTPException(status_code=400, detail="bucket_type must be 'input' or 'output'")
         
         # Get the object from MinIO
-        response = minio_client.get_object(bucket_name, document_name)
+        response = minio_client.get_object(bucket_name=bucket_name, object_name=document_name)
         
         return StreamingResponse(
             iter([response.read()]),

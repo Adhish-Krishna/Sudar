@@ -44,8 +44,8 @@ class MinIOStorage:
     def _ensure_bucket_exists(self):
         """Create bucket if it doesn't exist."""
         try:
-            if not self.client.bucket_exists(self.bucket_name):
-                self.client.make_bucket(self.bucket_name)
+            if not self.client.bucket_exists(bucket_name=self.bucket_name):
+                self.client.make_bucket(bucket_name=self.bucket_name)
                 print(f"Created MinIO bucket: {self.bucket_name}")
         except S3Error as e:
             print(f"Error checking/creating bucket: {e}")

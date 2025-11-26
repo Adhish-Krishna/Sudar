@@ -28,6 +28,7 @@ export function createInputFiles(extractedFiles: string[]): IInputFile[] {
 
 /**
  * Convert streaming chunk to IAgentStep format
+ * Stores the raw chunk data as-is for consistency with streaming
  * Returns null for chunk types we don't want to store
  */
 export function convertChunkToStep(chunk: any, phase: string, stepNumber: number): IAgentStep | null {
@@ -45,71 +46,14 @@ export function convertChunkToStep(chunk: any, phase: string, stepNumber: number
     return null;
   }
 
+  // Store the chunk as-is with minimal wrapping
   const agentStep: IAgentStep = {
     step: stepNumber,
     phase: phase as any,
-    type: 'text', // default type
-    timestamp: new Date()
+    type: chunk.type, // Store the original chunk type
+    timestamp: new Date(),
+    chunkData: chunk // Store the entire chunk data
   };
-
-  // Handle different chunk types from AI SDK
-  switch (chunk.type) {
-    case 'tool-input-available':
-      agentStep.type = 'tool_call';
-      agentStep.toolCall = {
-        step: stepNumber,
-        toolName: chunk.toolName || 'unknown',
-        toolArgs: chunk.input,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'tool-output-available':
-      // Tool output chunks should have toolName added by the flow
-      if (!chunk.toolName) {
-        // Skip if toolName wasn't mapped (shouldn't happen if flow is working correctly)
-        return null;
-      }
-      agentStep.type = 'tool_result';
-      agentStep.toolResult = {
-        step: stepNumber,
-        toolName: chunk.toolName,
-        toolResult: chunk.output,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'text-delta':
-      agentStep.type = 'text';
-      agentStep.textChunk = {
-        step: stepNumber,
-        text: chunk.textDelta || chunk.delta || '',
-        timestamp: new Date(),
-        isStreaming: true
-      };
-      break;
-
-    case 'finish':
-      agentStep.type = 'finish';
-      agentStep.finishReason = chunk.finishReason;
-      break;
-
-    default:
-      // Handle any other types as text if they have text content
-      if (chunk.text) {
-        agentStep.type = 'text';
-        agentStep.textChunk = {
-          step: stepNumber,
-          text: chunk.text,
-          timestamp: new Date(),
-          isStreaming: true
-        };
-      } else {
-        // Skip unknown types without text
-        return null;
-      }
-      break;
-  }
 
   return agentStep;
 }

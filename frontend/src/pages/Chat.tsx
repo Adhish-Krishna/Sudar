@@ -12,7 +12,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Home as HomeIcon, Users, MessageSquare, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
 import { useState, useEffect, useRef} from "react";
-import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type SSEEvent, type IndexedFileResponse, type ChatSummary} from "@/api";
+import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type IndexedFileResponse, type ChatSummary} from "@/api";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -21,11 +21,11 @@ import ChatInput from "@/components/ChatInput";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuroraText } from "@/components/ui/aurora-text";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { Response } from "@/components/ai-elements/response";
 import FilesAndChat from "@/components/FilesAndChat";
-import { Shimmer } from "@/components/ai-elements/shimmer";
 import type { Section } from "@/components/FilesAndChat";
-import { ResearchPhaseRenderer, GenerationPhaseRenderer, DoubtClearanceRenderer } from "@/components/StreamRenderer";
+import { useLoadChatHistory } from '../hooks/useLoadChatHistory';
+import { StreamingMessageRenderer } from '../components/chat/StreamingMessageRenderer';
+import { useStreamingChat, type ProcessedMessage } from '../hooks/useStreamingChat';
 
 const Chat = ()=>{
     // Generate UUID v4
@@ -45,24 +45,38 @@ const Chat = ()=>{
     const isMobile = useIsMobile();
     const [chatId, setChatId] = useState<string | null>(generateUUID());
     const {user} = useAuth();
-    
-    // Chat messages state
-    interface Message {
-        role: 'user' | 'assistant';
-        content: string;
-        metadata?: any;
-        // For worksheet generation: separate research and generation content
-        researchContent?: string;
-        generationContent?: string;
-    }
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [loadingMessages, setLoadingMessages] = useState(false);
-    const [isStreaming, setIsStreaming] = useState(false);
-    const [currentResponse, setCurrentResponse] = useState("");
-    const [currentResearchResponse, setCurrentResearchResponse] = useState("");
-    const [currentGenerationResponse, setCurrentGenerationResponse] = useState("");
-    const [streamingStatus, setStreamingStatus] = useState<string>('');
-    const abortControllerRef = useRef<(() => void) | null>(null);
+    const [chatHistoryLoading, setChatHistoryLoading] = useState<boolean>(false);
+
+    const { messages: historyMessages, loading: loadingHistory, setMessages } = useLoadChatHistory({
+            chatId: chatId,
+            subjectId: subject_id,
+            userId: user?.teacher_id,
+        });
+
+        const { streamingState, sendMessage, stopStreaming } = useStreamingChat({
+                chatId: chatId!,
+                classroomId: classroom_id!,
+                subjectId: subject_id!,
+                onMessageComplete: (message) => {
+                    // Add completed message to history
+                    setMessages(prev => [...prev, message]);
+                },
+                onError: (error) => {
+                    console.error('Stream error:', error);
+                }
+            });
+        
+            const handleSendMessage = async (messageText: string) => {
+                // Add user message immediately
+                const userMessage: ProcessedMessage = {
+                    role: 'user',
+                    content: messageText
+                };
+                setMessages(prev => [...prev, userMessage]);
+        
+                // Start streaming
+                await sendMessage(messageText, flowType, researchMode);
+            };
     
     // Files state
     const [filesOpen, setFilesOpen] = useState(false);
@@ -75,7 +89,6 @@ const Chat = ()=>{
     // Chat History state
     const [historyOpen, setHistoryOpen] = useState(false);
     const [chatHistory, setChatHistory] = useState<ChatSummary[]>([]);
-    const [loadingHistory, setLoadingHistory] = useState(false);
     const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
     // const [input, setInput] = useState<string>("");
 
@@ -94,77 +107,10 @@ const Chat = ()=>{
     //Flow state
     const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance">("doubt_clearance");
     const [researchMode, setResearchMode] = useState<"simple" | "moderate" | "deep">("moderate");
-
-    // Worksheet phase tracking state
-    type ResearchPhaseData = {
-        status: string[];
-        searchQueries: string[];
-        websitesResearched: string[];
-        toolCalls: Array<{ toolName: string; timestamp: number }>;
-        isComplete: boolean;
-        content?: string; // Research phase text content
-    };
     
-    type GenerationPhaseData = {
-        status: string[];
-        worksheetTitle?: string;
-        contentLength?: number;
-        savedSuccessfully?: boolean;
-        pdfLocation?: string;
-        isComplete: boolean;
-        content?: string; // Generation phase text content
-    };
-    
-    const [researchPhaseData, setResearchPhaseData] = useState<ResearchPhaseData>({
-        status: [],
-        searchQueries: [],
-        websitesResearched: [],
-        toolCalls: [],
-        isComplete: false,
-        content: ''
-    });
-    
-    const [generationPhaseData, setGenerationPhaseData] = useState<GenerationPhaseData>({
-        status: [],
-        isComplete: false,
-        content: ''
-    });
-    
-    const [activePhase, setActivePhase] = useState<'research' | 'generation' | null>(null);
-    
-    // Doubt clearance phase tracking state
-    type DoubtClearanceData = {
-        status: string[];
-        searchQueries: string[];
-        websitesResearched: string[];
-        researchFindings?: string; // Research findings from contentResearcher
-        finalAnswer?: string; // Final synthesized answer
-        isComplete: boolean;
-        totalToolCalls?: number;
-    };
-    
-    const [doubtClearanceData, setDoubtClearanceData] = useState<DoubtClearanceData>({
-        status: [],
-        searchQueries: [],
-        websitesResearched: [],
-        researchFindings: '',
-        finalAnswer: '',
-        isComplete: false,
-        totalToolCalls: 0
-    });
 
     // Ref for scroll area
     const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-    // Auto-scroll to bottom when messages change
-    useEffect(() => {
-        if (scrollAreaRef.current) {
-            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-            if (scrollContainer) {
-                scrollContainer.scrollTop = scrollContainer.scrollHeight;
-            }
-        }
-    }, [messages, currentResponse, currentResearchResponse, currentGenerationResponse, streamingStatus]);
 
 
     useEffect(()=>{
@@ -194,139 +140,6 @@ const Chat = ()=>{
 
         fetchClassroomAndSubject();
     }, [classroom_id, subject_id]);
-
-    // Load chat history when chatId changes
-    useEffect(() => {
-        const loadChatHistory = async () => {
-            if (!chatId || !user?.teacher_id || !subject_id) return;
-            
-            setLoadingMessages(true);
-            try {
-                const response = await sudarAgent.getChatMessages(chatId);
-                
-                console.log('Chat Messages Response:', response);
-                
-                if (response.success && response.success !== true) {
-                    // Error response from API
-                    console.log('Error fetching chat:', response.message);
-                    setMessages([]);
-                } else if (response.messages && Array.isArray(response.messages)) {
-                    // Success: response has messages array directly
-                    console.log('Loading messages:', response.messages.length);
-                    const loadedMessages: Message[] = [];
-                    
-                    for (const msg of response.messages) {
-                        if (msg.messageType === 'user' && msg.userMessage) {
-                            loadedMessages.push({
-                                role: 'user',
-                                content: msg.userMessage.query
-                            });
-                        } else if (msg.messageType === 'agent' && msg.agentMessage) {
-                            // Extract content based on flow type
-                            if (msg.agentMessage.flowType === 'worksheet_generation') {
-                                // For worksheet generation, separate research and generation content
-                                const researchContent = msg.agentMessage.research_findings?.content || '';
-                                const generationContent = msg.agentMessage.worksheet_content || '';
-                                
-                                // Populate phase data from database
-                                const researchMetadata = msg.agentMessage.finalMetadata?.research || msg.agentMessage.finalMetadata?.worksheetFlow?.researchPhase;
-                                const generationMetadata = msg.agentMessage.finalMetadata?.generation || msg.agentMessage.finalMetadata?.worksheetFlow?.generationPhase;
-                                
-                                // Extract researched_websites from research_findings (primary source) or metadata (fallback)
-                                const researchedWebsites = msg.agentMessage.research_findings?.researched_websites || 
-                                                          researchMetadata?.websitesResearched || 
-                                                          [];
-                                
-                                setResearchPhaseData({
-                                    status: [],
-                                    searchQueries: researchMetadata?.searchQueries || [],
-                                    websitesResearched: researchedWebsites,
-                                    toolCalls: [],
-                                    isComplete: researchMetadata?.completed || true,
-                                    content: researchContent
-                                });
-                                
-                                setGenerationPhaseData({
-                                    status: [],
-                                    worksheetTitle: generationMetadata?.worksheetTitle || '',
-                                    contentLength: generationMetadata?.contentLength || 0,
-                                    savedSuccessfully: generationMetadata?.savedSuccessfully || false,
-                                    pdfLocation: generationMetadata?.pdfLocation || '',
-                                    isComplete: generationMetadata?.completed || true,
-                                    content: generationContent
-                                });
-                                
-                                // Store researched_websites in metadata for rendering
-                                const enhancedMetadata = {
-                                    ...msg.agentMessage.finalMetadata,
-                                    research_findings: {
-                                        ...msg.agentMessage.research_findings,
-                                        researched_websites: researchedWebsites
-                                    }
-                                };
-                                
-                                loadedMessages.push({
-                                    role: 'assistant',
-                                    content: generationContent || researchContent, // Fallback for backward compatibility
-                                    researchContent: researchContent,
-                                    generationContent: generationContent,
-                                    metadata: enhancedMetadata
-                                });
-                            } else if (msg.agentMessage.flowType === 'doubt_clearance') {
-                                // For doubt clearance, extract research findings and final answer
-                                const doubtMetadata = msg.agentMessage.finalMetadata?.doubtClearance;
-                                const researchedWebsites = msg.agentMessage.research_findings?.researched_websites || 
-                                                          doubtMetadata?.websitesReferenced || 
-                                                          [];
-                                
-                                // The content is the final answer, research findings might be embedded or separate
-                                const finalAnswer = msg.agentMessage.research_findings?.content || '';
-                                const researchFindings = ''; // Research findings not stored separately in DB, only final answer
-                                
-                                // Store in enhanced metadata
-                                const enhancedMetadata = {
-                                    ...msg.agentMessage.finalMetadata,
-                                    researchFindings: researchFindings,
-                                    finalAnswer: finalAnswer,
-                                    research_findings: {
-                                        ...msg.agentMessage.research_findings,
-                                        researched_websites: researchedWebsites
-                                    }
-                                };
-                                
-                                loadedMessages.push({
-                                    role: 'assistant',
-                                    content: finalAnswer,
-                                    researchContent: researchFindings, // Empty for now, as research findings aren't stored separately
-                                    metadata: enhancedMetadata
-                                });
-                            } else {
-                                // Fallback for other flow types
-                                const content = msg.agentMessage.research_findings?.content || msg.agentMessage.worksheet_content || '';
-                                loadedMessages.push({
-                                    role: 'assistant',
-                                    content: content,
-                                    metadata: msg.agentMessage.finalMetadata
-                                });
-                            }
-                        }
-                    }
-                    setMessages(loadedMessages);
-                }
-            } catch (error: any) {
-                console.error("Failed to load chat history:", error);
-                setMessages([]);
-            } finally {
-                setLoadingMessages(false);
-            }
-        };
-
-        loadChatHistory();
-        
-        // Clear indexed files and selected context when chat changes
-        setIndexedFiles([]);
-        setSelectedContext(new Set());
-    }, [chatId, user?.teacher_id, subject_id]);
 
     // Cleanup polling intervals on unmount
     useEffect(() => {
@@ -409,371 +222,6 @@ const Chat = ()=>{
 
         pollingIntervalsRef.current.set(filename, pollInterval);
     };
-
-    const sendMessage = async (message: string) => {
-        
-        if (!chatId || !classroom_id || !message.trim()) {
-            toast.error("Cannot send message. Please start a new chat.");
-            return;
-        }
-
-        // Add user message to chat
-        const userMessage: Message = { role: 'user', content: message };
-        setMessages(prev => [...prev, userMessage]);
-        setIsStreaming(true);
-        setCurrentResponse("");
-        setCurrentResearchResponse("");
-        setCurrentGenerationResponse("");
-        setStreamingStatus('');
-        
-        // Reset phase data for worksheet generation
-        if (flowType === 'worksheet_generation') {
-            setResearchPhaseData({
-                status: [],
-                searchQueries: [],
-                websitesResearched: [],
-                toolCalls: [],
-                isComplete: false,
-                content: ''
-            });
-            setGenerationPhaseData({
-                status: [],
-                isComplete: false,
-                content: ''
-            });
-            setActivePhase(null);
-        } else if (flowType === 'doubt_clearance') {
-            // Reset doubt clearance data
-            setDoubtClearanceData({
-                status: [],
-                searchQueries: [],
-                websitesResearched: [],
-                researchFindings: '',
-                finalAnswer: '',
-                isComplete: false,
-                totalToolCalls: 0
-            });
-        }
-
-        let accumulatedResponse = "";
-        let accumulatedResearchResponse = "";
-        let accumulatedGenerationResponse = "";
-        let accumulatedResearchFindings = ""; // For doubt clearance research findings
-        let accumulatedFinalAnswer = ""; // For doubt clearance final answer
-        let isInResearchPhase = true; // Track if we're in research phase for doubt clearance
-        let metadata: any = {};
-
-        try {
-            const abortFn = await sudarAgent.streamChat(
-                {
-                    chat_id: chatId,
-                    classroom_id: classroom_id,
-                    subject_id: subject_id,
-                    query: message,
-                    flow_type: flowType,
-                    research_mode: researchMode
-                },
-                {
-                    onEvent: (event: SSEEvent) => {
-                        console.log('SSE Event:', event); // Debug log
-                        
-                        // Track active phase
-                        if (event.metadata?.phase) {
-                            if (event.metadata.phase === 'research') {
-                                setActivePhase('research');
-                            } else if (event.metadata.phase === 'generation') {
-                                setActivePhase('generation');
-                            }
-                        }
-                        
-                        switch (event.type) {
-                            case 'start':
-                                setStreamingStatus(`Starting ${event.flowType || 'chat'}...`);
-                                if (event.flowType === 'worksheet_generation') {
-                                    setActivePhase('research');
-                                }
-                                break;
-                                
-                            case 'token':
-                                // Separate text by phase for worksheet generation
-                                if (event.flowType === 'worksheet_generation' && event.metadata?.phase) {
-                                    if (event.metadata.phase === 'research') {
-                                        accumulatedResearchResponse += event.content;
-                                        setCurrentResearchResponse(accumulatedResearchResponse);
-                                        setResearchPhaseData(prev => ({
-                                            ...prev,
-                                            content: accumulatedResearchResponse
-                                        }));
-                                    } else if (event.metadata.phase === 'generation') {
-                                        accumulatedGenerationResponse += event.content;
-                                        setCurrentGenerationResponse(accumulatedGenerationResponse);
-                                        setGenerationPhaseData(prev => ({
-                                            ...prev,
-                                            content: accumulatedGenerationResponse
-                                        }));
-                                    }
-                                } else if (event.flowType === 'doubt_clearance') {
-                                    // For doubt clearance, track research findings vs final answer
-                                    if (isInResearchPhase) {
-                                        // Still in research phase - accumulate research findings
-                                        accumulatedResearchFindings += event.content;
-                                        setDoubtClearanceData(prev => ({
-                                            ...prev,
-                                            researchFindings: accumulatedResearchFindings
-                                        }));
-                                    } else {
-                                        // In answer generation phase - accumulate final answer
-                                        accumulatedFinalAnswer += event.content;
-                                        setDoubtClearanceData(prev => ({
-                                            ...prev,
-                                            finalAnswer: accumulatedFinalAnswer
-                                        }));
-                                    }
-                                    // Also update currentResponse for backward compatibility
-                                    accumulatedResponse += event.content;
-                                    setCurrentResponse(accumulatedResponse);
-                                } else {
-                                    // For other flows, use single response
-                                    accumulatedResponse += event.content;
-                                    setCurrentResponse(accumulatedResponse);
-                                }
-                                break;
-                                
-                            case 'status':
-                                // Show status messages and track by phase
-                                if (event.content) {
-                                    setStreamingStatus(event.content);
-                                    
-                                    // Add status to appropriate phase
-                                    if (event.metadata?.phase === 'research') {
-                                        setResearchPhaseData(prev => ({
-                                            ...prev,
-                                            status: [...prev.status, event.content]
-                                        }));
-                                    } else if (event.metadata?.phase === 'generation') {
-                                        setGenerationPhaseData(prev => ({
-                                            ...prev,
-                                            status: [...prev.status, event.content]
-                                        }));
-                                    } else if (event.flowType === 'doubt_clearance') {
-                                        // Track status for doubt clearance
-                                        setDoubtClearanceData(prev => ({
-                                            ...prev,
-                                            status: [...prev.status, event.content]
-                                        }));
-                                        
-                                        // Check if we're transitioning from research to answer generation
-                                        if (event.content.toLowerCase().includes('generating answer') || 
-                                            event.content.toLowerCase().includes('answer based')) {
-                                            isInResearchPhase = false;
-                                        } else if (event.content.toLowerCase().includes('research') || 
-                                                   event.content.toLowerCase().includes('searching')) {
-                                            isInResearchPhase = true;
-                                        }
-                                    }
-                                }
-                                break;
-                                
-                            case 'phase_change':
-                                // Handle phase changes (worksheet flow)
-                                if (event.metadata?.currentPhase) {
-                                    setStreamingStatus(event.content || `Entering ${event.metadata.currentPhase} phase`);
-                                    
-                                    // Update active phase
-                                    if (event.metadata.currentPhase === 'generation') {
-                                        setActivePhase('generation');
-                                        setResearchPhaseData(prev => ({ ...prev, isComplete: true }));
-                                    }
-                                }
-                                break;
-                                
-                            case 'tool_call':
-                                // Show tool call information and track
-                                if (event.metadata?.toolName) {
-                                    setStreamingStatus(`Calling tool: ${event.metadata.toolName}`);
-                                    console.log(`Tool called: ${event.metadata.toolName}`);
-                                    
-                                    // Track tool call by phase
-                                    if (event.metadata.phase === 'research') {
-                                        setResearchPhaseData(prev => ({
-                                            ...prev,
-                                            toolCalls: [...prev.toolCalls, { 
-                                                toolName: event.metadata!.toolName!, 
-                                                timestamp: Date.now() 
-                                            }]
-                                        }));
-                                    }
-                                }
-                                break;
-                                
-                            case 'tool_result':
-                                // Tool result received
-                                if (event.metadata?.toolName) {
-                                    setStreamingStatus(`Completed: ${event.metadata.toolName}`);
-                                }
-                                console.log(`Tool result from: ${event.metadata?.toolName}`);
-                                break;
-                                
-                            case 'metadata':
-                                // Store metadata for final message
-                                metadata = { ...metadata, ...event.metadata };
-                                
-                                // Handle different metadata types
-                                if (event.metadata?.summaryType === 'research' || event.metadata?.summaryType === 'research_phase') {
-                                    // Research phase metadata
-                                    setResearchPhaseData(prev => ({
-                                        ...prev,
-                                        searchQueries: event.metadata?.searchQueries || prev.searchQueries,
-                                        websitesResearched: event.metadata?.websitesResearched || prev.websitesResearched,
-                                        isComplete: event.metadata?.completed || false
-                                    }));
-                                    
-                                    if (event.metadata?.findingsLength) {
-                                        setStreamingStatus(`Research complete: ${event.metadata.findingsLength} characters of findings`);
-                                    }
-                                } else if (event.metadata?.summaryType === 'generation_phase') {
-                                    // Generation phase metadata
-                                    setGenerationPhaseData(prev => ({
-                                        ...prev,
-                                        worksheetTitle: event.metadata?.worksheetTitle,
-                                        contentLength: event.metadata?.contentLength,
-                                        savedSuccessfully: event.metadata?.savedSuccessfully,
-                                        pdfLocation: event.metadata?.pdfLocation
-                                    }));
-                                    
-                                    if (event.metadata?.worksheetTitle) {
-                                        setStreamingStatus(`Worksheet generated: ${event.metadata.worksheetTitle}`);
-                                    }
-                                } else if (event.metadata?.summaryType === 'flow') {
-                                    // Doubt clearance metadata (flow type)
-                                    setDoubtClearanceData(prev => ({
-                                        ...prev,
-                                        searchQueries: event.metadata?.searchQueries || prev.searchQueries,
-                                        websitesResearched: event.metadata?.websitesResearched || prev.websitesResearched,
-                                        totalToolCalls: event.metadata?.totalToolCalls || prev.totalToolCalls,
-                                        isComplete: event.metadata?.completed || false
-                                    }));
-                                }
-                                break;
-                                
-                            case 'phase_complete':
-                                // Phase completed
-                                setStreamingStatus(event.content || `${event.metadata?.phase} phase completed`);
-                                
-                                if (event.metadata?.phase === 'research') {
-                                    setResearchPhaseData(prev => ({ ...prev, isComplete: true }));
-                                } else if (event.metadata?.phase === 'generation') {
-                                    setGenerationPhaseData(prev => ({ ...prev, isComplete: true }));
-                                }
-                                break;
-                                
-                            case 'done':
-                                // Finalize the assistant message
-                                if (event.flowType === 'worksheet_generation') {
-                                    // For worksheet generation, save both research and generation content
-                                    setMessages(prev => [...prev, { 
-                                        role: 'assistant', 
-                                        content: accumulatedGenerationResponse || accumulatedResearchResponse, // Fallback
-                                        researchContent: accumulatedResearchResponse,
-                                        generationContent: accumulatedGenerationResponse,
-                                        metadata: metadata
-                                    }]);
-                                    // Mark phases as complete and clear streaming state
-                                    setResearchPhaseData(prev => ({ ...prev, isComplete: true }));
-                                    setGenerationPhaseData(prev => ({ ...prev, isComplete: true }));
-                                } else if (event.flowType === 'doubt_clearance') {
-                                    // For doubt clearance, save research findings and final answer
-                                    setDoubtClearanceData(prev => ({ ...prev, isComplete: true }));
-                                    setMessages(prev => [...prev, { 
-                                        role: 'assistant', 
-                                        content: accumulatedFinalAnswer || accumulatedResponse, // Final answer as main content
-                                        researchContent: accumulatedResearchFindings, // Research findings
-                                        metadata: {
-                                            ...metadata,
-                                            researchFindings: accumulatedResearchFindings,
-                                            finalAnswer: accumulatedFinalAnswer || accumulatedResponse
-                                        }
-                                    }]);
-                                } else {
-                                    // For other flows, use single response
-                                    setMessages(prev => [...prev, { 
-                                        role: 'assistant', 
-                                        content: accumulatedResponse,
-                                        metadata: metadata
-                                    }]);
-                                }
-                                // Clear all streaming responses and state
-                                setCurrentResponse("");
-                                setCurrentResearchResponse("");
-                                setCurrentGenerationResponse("");
-                                setIsStreaming(false);
-                                setStreamingStatus('');
-                                setActivePhase(null);
-                                // Clear phase data to prevent duplicate renderers
-                                if (event.flowType === 'worksheet_generation') {
-                                    setResearchPhaseData({
-                                        status: [],
-                                        searchQueries: [],
-                                        websitesResearched: [],
-                                        toolCalls: [],
-                                        isComplete: false,
-                                        content: ''
-                                    });
-                                    setGenerationPhaseData({
-                                        status: [],
-                                        isComplete: false,
-                                        content: ''
-                                    });
-                                } else if (event.flowType === 'doubt_clearance') {
-                                    setDoubtClearanceData({
-                                        status: [],
-                                        searchQueries: [],
-                                        websitesResearched: [],
-                                        researchFindings: '',
-                                        finalAnswer: '',
-                                        isComplete: false,
-                                        totalToolCalls: 0
-                                    });
-                                }
-                                break;
-                                
-                            case 'error':
-                                setStreamingStatus(event.content || "Error during streaming");
-                                toast.error(event.content || "Error during streaming");
-                                setIsStreaming(false);
-                                setCurrentResponse("");
-                                setCurrentResearchResponse("");
-                                setCurrentGenerationResponse("");
-                                setStreamingStatus('');
-                                setActivePhase(null);
-                                break;
-                                
-                            default:
-                                // Handle any other event types
-                                console.log('Unknown event type:', event.type, event);
-                        }
-                    },
-                    onError: (error: any) => {
-                        toast.error(error.message || "Failed to send message");
-                        setIsStreaming(false);
-                        setCurrentResponse("");
-                        setCurrentResearchResponse("");
-                        setCurrentGenerationResponse("");
-                        setStreamingStatus('');
-                    }
-                }
-            );
-
-            abortControllerRef.current = abortFn;
-        } catch (error: any) {
-            toast.error(error.message || "Failed to send message");
-            setIsStreaming(false);
-            setCurrentResponse("");
-            setCurrentResearchResponse("");
-            setCurrentGenerationResponse("");
-        }
-
-    }
 
     // Fetch files when popover opens
     const fetchFiles = async () => {
@@ -858,7 +306,7 @@ const Chat = ()=>{
     const fetchChatHistory = async () => {
         if (!subject_id) return;
         
-        setLoadingHistory(true);
+        setChatHistoryLoading(true);
         try {
             const response = await sudarAgent.getChatsBySubject(subject_id, 1, 50);
             
@@ -870,7 +318,7 @@ const Chat = ()=>{
         } catch (error: any) {
             toast.error(error.message || "Failed to fetch chat history");
         } finally {
-            setLoadingHistory(false);
+            setChatHistoryLoading(false);
         }
     };
 
@@ -1295,7 +743,7 @@ const Chat = ()=>{
                             maxWidth="max-w-3xl"
                             scrollAreaHeight="h-[65vh]"
                             sections={[
-                                ...(loadingHistory ? [{
+                                ...(chatHistoryLoading ? [{
                                     id: "loading",
                                     content: (
                                         <div className="flex items-center justify-center py-8">
@@ -1387,14 +835,14 @@ const Chat = ()=>{
                 </div>
 
                 {/*Scrollable area for chat messages*/}
-                    {loadingMessages ? (
+                    {loadingHistory ? (
                         <div className="w-full h-[60%] flex flex-col items-center justify-center">
                             <div className="text-center space-y-4 px-4">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                                 <p className="text-muted-foreground">Loading chat messages...</p>
                             </div>
                         </div>
-                    ) : messages.length == 0 ? (
+                    ) : historyMessages.length == 0 ? (
                         <div className="w-full h-[60%] flex flex-col items-center justify-center">
                             <div className="text-center space-y-4 px-4">
                                     <h2 className="text-3xl font-bold">
@@ -1412,7 +860,7 @@ const Chat = ()=>{
                                     <Conversation>
                                         <ConversationContent>
                                             <div className="space-y-6">
-                                                {messages.map((msg, idx) => (
+                                                {historyMessages.map((msg, idx) => (
                                             <div key={idx} className="space-y-4">
                                                 {msg.role === 'user' ? (
                                                     <div className="flex gap-3 justify-end">
@@ -1426,260 +874,29 @@ const Chat = ()=>{
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    // Assistant message
-                                                    msg.researchContent !== undefined || msg.generationContent !== undefined ? (
-                                                        // Check if this is worksheet generation or doubt clearance
-                                                        msg.generationContent !== undefined ? (
-                                                            // Worksheet generation: use phase renderers for consistency
-                                                            <div className="space-y-4">
-                                                                {/* Research Phase - using ResearchPhaseRenderer */}
-                                                                {msg.researchContent && (() => {
-                                                                    // Extract metadata from message to populate phase data
-                                                                    const researchMetadata = msg.metadata?.research || msg.metadata?.worksheetFlow?.researchPhase;
-                                                                    // Extract researched_websites from multiple possible locations
-                                                                    const websitesResearched = msg.metadata?.research_findings?.researched_websites ||
-                                                                        researchMetadata?.websitesResearched || 
-                                                                        msg.metadata?.worksheetFlow?.researchPhase?.websitesResearched ||
-                                                                        [];
-                                                                    
-                                                                    const researchPhaseDataForRenderer: ResearchPhaseData = {
-                                                                        status: [],
-                                                                        searchQueries: researchMetadata?.searchQueries || [],
-                                                                        websitesResearched: websitesResearched,
-                                                                        toolCalls: [],
-                                                                        isComplete: researchMetadata?.completed !== undefined ? researchMetadata.completed : true,
-                                                                        content: msg.researchContent
-                                                                    };
-                                                                    
-                                                                    return (
-                                                                        <ResearchPhaseRenderer 
-                                                                            data={researchPhaseDataForRenderer} 
-                                                                            isActive={false}
-                                                                        />
-                                                                    );
-                                                                })()}
-                                                                
-                                                                {/* Generation Phase - using GenerationPhaseRenderer */}
-                                                                {msg.generationContent && (() => {
-                                                                    // Extract metadata from message to populate phase data
-                                                                    const generationMetadata = msg.metadata?.generation || msg.metadata?.worksheetFlow?.generationPhase;
-                                                                    const generationPhaseDataForRenderer: GenerationPhaseData = {
-                                                                        status: [],
-                                                                        worksheetTitle: generationMetadata?.worksheetTitle || '',
-                                                                        contentLength: generationMetadata?.contentLength || 0,
-                                                                        savedSuccessfully: generationMetadata?.savedSuccessfully || false,
-                                                                        pdfLocation: generationMetadata?.pdfLocation || '',
-                                                                        isComplete: generationMetadata?.completed !== undefined ? generationMetadata.completed : true,
-                                                                        content: msg.generationContent
-                                                                    };
-                                                                    
-                                                                    return (
-                                                                        <GenerationPhaseRenderer 
-                                                                            data={generationPhaseDataForRenderer} 
-                                                                            isActive={false}
-                                                                        />
-                                                                    );
-                                                                })()}
-                                                            </div>
+                                                    <div className="p-4">
+                                                        {msg.steps && msg.steps.length > 0 ? (
+                                                            <StreamingMessageRenderer
+                                                                steps={msg.steps}
+                                                                isStreaming={false}
+                                                            />
                                                         ) : (
-                                                            // Doubt clearance: Show answer outside, research details in card
-                                                            (() => {
-                                                                // Extract metadata for doubt clearance
-                                                                const doubtMetadata = msg.metadata?.doubtClearance || msg.metadata?.finalMetadata?.doubtClearance;
-                                                                const websitesResearched = msg.metadata?.research_findings?.researched_websites ||
-                                                                    doubtMetadata?.websitesReferenced ||
-                                                                    [];
-                                                                
-                                                                const doubtClearanceDataForRenderer: DoubtClearanceData = {
-                                                                    status: [],
-                                                                    searchQueries: doubtMetadata?.searchQueries || [],
-                                                                    websitesResearched: websitesResearched,
-                                                                    researchFindings: msg.metadata?.researchFindings || msg.researchContent || '',
-                                                                    finalAnswer: msg.metadata?.finalAnswer || msg.content || '',
-                                                                    isComplete: doubtMetadata?.completed !== undefined ? doubtMetadata.completed : true,
-                                                                    totalToolCalls: doubtMetadata?.totalToolCalls || 0
-                                                                };
-                                                                
-                                                                // Check if there are researched websites or search queries
-                                                                const hasResearchDetails = doubtClearanceDataForRenderer.websitesResearched.length > 0 || 
-                                                                                          doubtClearanceDataForRenderer.searchQueries.length > 0;
-                                                                
-                                                                return (
-                                                                    <div className="space-y-4">
-                                                                        {/* Display the answer outside the card */}
-                                                                        {doubtClearanceDataForRenderer.finalAnswer && (
-                                                                            <div className="flex gap-3 justify-start">
-                                                                                <div className="rounded-lg px-4 py-3 max-w-[80%]">
-                                                                                    <Response
-                                                                                        className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                                                        parseIncompleteMarkdown={true}
-                                                                                    >
-                                                                                        {doubtClearanceDataForRenderer.finalAnswer}
-                                                                                    </Response>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                        
-                                                                        {/* Display research details in card only if there are researched websites or search queries */}
-                                                                        {hasResearchDetails && (
-                                                                            <DoubtClearanceRenderer 
-                                                                                data={doubtClearanceDataForRenderer} 
-                                                                                isActive={false}
-                                                                            />
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })()
-                                                        )
-                                                    ) : (
-                                                        // Other flows: show single content
-                                                        <div className="flex gap-3 justify-start">
-                                                            <div className="rounded-lg px-4 py-3 max-w-[80%]">
-                                                                <Response
-                                                                    className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                                    parseIncompleteMarkdown={true}
-                                                                >
-                                                                    {msg.content}
-                                                                </Response>
-                                                            </div>
-                                                        </div>
-                                                    )
+                                                            <p className="text-sm">{msg.content}</p>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}
-                                        
-                                        {/* Streaming status with Shimmer effect */}
-                                        {isStreaming && streamingStatus && (
-                                            <div className="flex gap-3 justify-start">
-                                                <div className="rounded-lg px-4 py-3 max-w-[80%]">
-                                                    <Shimmer className="text-sm" duration={2}>
-                                                        {streamingStatus}
-                                                    </Shimmer>
-                                                </div>
+                                        {streamingState.isStreaming && (
+                                            <div className="p-4 border-primary">
+                                                <StreamingMessageRenderer
+                                                    steps={streamingState.accumulatedSteps}
+                                                    isStreaming={true}
+                                                    currentPhase={streamingState.currentPhase}
+                                                />
                                             </div>
                                         )}
-                                        
-                                        {/* Streaming response - separate for worksheet generation */}
-                                        {isStreaming && flowType === 'worksheet_generation' && (
-                                            <div className="space-y-4">
-                                                {/* Streaming Research Phase Content */}
-                                                {currentResearchResponse && (
-                                                    <div className="flex gap-3 justify-start">
-                                                        <div className="rounded-lg px-4 py-3 max-w-[80%] border-l-4 border-blue-500 bg-blue-50/30 dark:bg-blue-950/10">
-                                                            <div className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">
-                                                                <span>🔍 Research Phase</span>
-                                                                {activePhase === 'research' && (
-                                                                    <span className="text-xs text-muted-foreground">(streaming...)</span>
-                                                                )}
-                                                            </div>
-                                                            <Response 
-                                                                className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                                parseIncompleteMarkdown={true}
-                                                            >
-                                                                {currentResearchResponse}
-                                                            </Response>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Streaming Generation Phase Content */}
-                                                {currentGenerationResponse && (
-                                                    <div className="flex gap-3 justify-start">
-                                                        <div className="rounded-lg px-4 py-3 max-w-[80%] border-l-4 border-green-500 bg-green-50/30 dark:bg-green-950/10">
-                                                            <div className="text-xs font-medium text-green-700 dark:text-green-400 mb-2 flex items-center gap-2">
-                                                                <span>📝 Generation Phase</span>
-                                                                {activePhase === 'generation' && (
-                                                                    <span className="text-xs text-muted-foreground">(streaming...)</span>
-                                                                )}
-                                                            </div>
-                                                            <Response 
-                                                                className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                                parseIncompleteMarkdown={true}
-                                                            >
-                                                                {currentGenerationResponse}
-                                                            </Response>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        
-                                        {/* Streaming response - Doubt Clearance */}
-                                        {isStreaming && flowType === 'doubt_clearance' && (
-                                            (doubtClearanceData.researchFindings || doubtClearanceData.finalAnswer || doubtClearanceData.status.length > 0) && (
-                                                <div className="space-y-4">
-                                                    {/* Display streaming answer outside the card */}
-                                                    {doubtClearanceData.finalAnswer && (
-                                                        <div className="flex gap-3 justify-start">
-                                                            <div className="rounded-lg px-4 py-3 max-w-[80%]">
-                                                                <Response 
-                                                                    className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                                    parseIncompleteMarkdown={true}
-                                                                >
-                                                                    {doubtClearanceData.finalAnswer}
-                                                                </Response>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* Display research details in card */}
-                                                    <DoubtClearanceRenderer 
-                                                        data={doubtClearanceData} 
-                                                        isActive={true} 
-                                                    />
-                                                </div>
-                                            )
-                                        )}
-                                        
-                                        {/* Worksheet Generation Phase Renderers - Only show during streaming, not after message is saved */}
-                                        {flowType === 'worksheet_generation' && isStreaming && (() => {
-                                            // Check if the last message already has the content (meaning it's been saved)
-                                            const lastMessage = messages[messages.length - 1];
-                                            const messageHasContent = lastMessage?.researchContent !== undefined || lastMessage?.generationContent !== undefined;
-                                            
-                                            // Only show phase renderers if we're streaming AND the message hasn't been saved yet
-                                            if (messageHasContent) {
-                                                return null;
-                                            }
-                                            
-                                            return (
-                                                <div className="space-y-4 mt-6">
-                                                    {/* Research Phase */}
-                                                    {(researchPhaseData.status.length > 0 || 
-                                                      researchPhaseData.searchQueries.length > 0 || 
-                                                      researchPhaseData.websitesResearched.length > 0 || 
-                                                      researchPhaseData.isComplete) && (
-                                                        <ResearchPhaseRenderer 
-                                                            data={researchPhaseData} 
-                                                            isActive={activePhase === 'research'} 
-                                                        />
-                                                    )}
-                                                    
-                                                    {/* Generation Phase */}
-                                                    {(generationPhaseData.status.length > 0 || 
-                                                      generationPhaseData.worksheetTitle || 
-                                                      generationPhaseData.isComplete) && (
-                                                        <GenerationPhaseRenderer 
-                                                            data={generationPhaseData} 
-                                                            isActive={activePhase === 'generation'} 
-                                                        />
-                                                    )}
-                                                </div>
-                                            );
-                                        })()}
-                                        
-                                        {/* Loading indicator */}
-                                        {isStreaming && !currentResponse && (
-                                            <div className="flex gap-3 justify-start">
-                                                <div className="rounded-lg px-4 py-3 bg-muted">
-                                                    <div className="flex gap-1">
-                                                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]"></div>
-                                                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]"></div>
-                                                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                                      
                                     </div>
                                 </ConversationContent>
                                 <ConversationScrollButton />
@@ -1692,7 +909,7 @@ const Chat = ()=>{
                 <div className="w-full h-[30%] flex justify-center items-center py-4">
                     <ChatInput
                         maxHeight={100}
-                        messageHandler={sendMessage}
+                        messageHandler={handleSendMessage}
                         onAddFiles={handleAddFiles}
                         isUploadingFiles={uploadingFiles.length > 0}
                         onAddContext={handleContextOpenChange}
