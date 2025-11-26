@@ -30,6 +30,7 @@ export interface ProcessedMessage {
     content: string;
     steps?: StreamChunk[];
     metadata?: any;
+    messageId?: string;
 }
 
 export interface StreamingState {
@@ -123,7 +124,8 @@ export const useStreamingChat = ({
                                 role: 'assistant',
                                 content: finalContent,
                                 steps: accumulatedSteps,
-                                metadata: event.metadata || {}
+                                metadata: event.metadata || {},
+                                messageId: event.messageId || event.id || undefined
                             };
 
                             // Reset streaming state
@@ -225,6 +227,27 @@ export const useStreamingChat = ({
         if (abortControllerRef.current) {
             abortControllerRef.current();
             abortControllerRef.current = null;
+        }
+
+        // If there is partial content, finalize and emit it
+        if (streamingState.isStreaming && streamingState.accumulatedSteps.length > 0) {
+            let finalContent = '';
+            for (const step of streamingState.accumulatedSteps) {
+                if (step.type === 'text-delta') {
+                    finalContent += step.textDelta || step.delta || '';
+                }
+            }
+
+            const finalMessage: ProcessedMessage = {
+                role: 'assistant',
+                content: finalContent,
+                steps: streamingState.accumulatedSteps,
+                metadata: { stopped: true }
+            };
+
+            if (onMessageComplete) {
+                onMessageComplete(finalMessage);
+            }
         }
 
         setStreamingState({

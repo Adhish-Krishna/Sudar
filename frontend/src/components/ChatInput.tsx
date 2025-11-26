@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { ArrowUp, Plus, Paperclip, Workflow} from "lucide-react";
+import { ArrowUp, Plus, Paperclip, Workflow, Square } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { useState, useRef} from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
@@ -16,8 +16,10 @@ interface IndexedFileResponse {
 interface ChatInputProps{
     maxHeight: number;
     messageHandler: (message: string) => void;
+    onStopStreaming?: () => void;
     onAddFiles?: () => void;
     isUploadingFiles?: boolean;
+    isStreaming?: boolean;
     onAddContext?: (open: boolean) => void;
     contextOpen?: boolean;
     indexedFiles?: IndexedFileResponse[];
@@ -35,6 +37,8 @@ const ChatInput = ({
     messageHandler, 
     onAddFiles, 
     isUploadingFiles = false,
+    onStopStreaming,
+    isStreaming = false,
     onAddContext,
     contextOpen = false,
     indexedFiles = [],
@@ -53,7 +57,11 @@ const ChatInput = ({
 
     const isMobile = useIsMobile();
 
-    const handleSend = () => {
+    const handleSendOrStop = () => {
+        if (isStreaming) {
+            onStopStreaming?.();
+            return;
+        }
         if (message.trim()) {
             messageHandler(message);
             setMessage("");
@@ -99,7 +107,11 @@ const ChatInput = ({
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            handleSend();
+            if (isStreaming) {
+                onStopStreaming?.();
+            } else {
+                handleSendOrStop();
+            }
         }
     };
 
@@ -323,11 +335,17 @@ const ChatInput = ({
                         </Popover>
                     </div>
                     <Button 
-                        className="gap-1.5 md:gap-2 rounded-full px-4 md:px-6 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 text-xs md:text-sm"
-                        onClick={handleSend}
-                        disabled={!message.trim()}
+                        className={`gap-1.5 md:gap-2 rounded-full px-4 md:px-6 shadow-md transition-all duration-200 text-xs md:text-sm`}
+                        onClick={handleSendOrStop}
+                        disabled={!isStreaming && !message.trim()}
                     >
-                        <ArrowUp className="size-3.5 md:size-4"/>
+                        {isStreaming ? (
+                            <>
+                                <Square className="size-3.5 md:size-4" />
+                            </>
+                        ) : (
+                            <ArrowUp className="size-3.5 md:size-4"/>
+                        )}
                     </Button>
                 </div>
             </div>

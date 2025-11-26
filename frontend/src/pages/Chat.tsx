@@ -910,8 +910,10 @@ const Chat = ()=>{
                     <ChatInput
                         maxHeight={100}
                         messageHandler={handleSendMessage}
+                        onStopStreaming={stopStreaming}
                         onAddFiles={handleAddFiles}
                         isUploadingFiles={uploadingFiles.length > 0}
+                        isStreaming={streamingState.isStreaming}
                         onAddContext={handleContextOpenChange}
                         contextOpen={contextOpen}
                         indexedFiles={indexedFiles}
