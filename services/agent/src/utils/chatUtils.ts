@@ -2,7 +2,7 @@
  * Chat Utilities
  * 
  * Helper functions for working with the chat schema.
- * Includes utilities for converting flow steps to database format,
+ * Includes utilities for converting stream chunks to database format,
  * creating messages, and managing conversations.
  */
 
@@ -10,15 +10,10 @@ import { randomUUID } from 'crypto';
 import { 
   ChatConversation, 
   IChatConversationDocument,
-  IAgentMessage,
   IAgentStep,
-  UserMessageInput,
   type IInputFile
 } from '../models/chatSchema';
-
-// Import flow step types
-import type { DoubtClearanceStep } from '../flows/doubtClearanceFlow';
-import type { WorksheetFlowStep } from '../flows/worksheetFlow';
+import type { UserContext } from '../mcpClient';
 
 /**
  * Extract files from a query and convert to IInputFile format
@@ -32,228 +27,113 @@ export function createInputFiles(extractedFiles: string[]): IInputFile[] {
 }
 
 /**
- * Convert DoubtClearanceStep to IAgentStep
+ * Convert streaming chunk to IAgentStep format
+ * Returns null for chunk types we don't want to store
  */
-export function convertDoubtClearanceStep(step: DoubtClearanceStep): IAgentStep {
-  const agentStep: IAgentStep = {
-    step: step.step,
-    phase: 'chat',
-    type: step.type,
-    timestamp: new Date()
-  };
-
-  // Handle different step types
-  switch (step.type) {
-    case 'tool_call':
-      agentStep.toolCall = {
-        step: step.step,
-        toolName: step.toolName!,
-        toolArgs: step.toolArgs,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'tool_result':
-      agentStep.toolResult = {
-        step: step.step,
-        toolName: step.toolName!,
-        toolResult: step.toolResult,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'text':
-      agentStep.textChunk = {
-        step: step.step,
-        text: step.text!,
-        timestamp: new Date(),
-        isStreaming: true
-      };
-      break;
-
-    case 'status':
-      agentStep.statusMessage = {
-        step: step.step,
-        status: step.status!,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'metadata':
-      agentStep.doubtClearanceMetadata = {
-        searchQueries: step.metadata?.searchQueries || [],
-        totalSearches: step.metadata?.totalSearches || 0,
-        responseLength: step.metadata?.responseLength || 0,
-        completed: step.metadata?.completed || false,
-        extractedFiles: step.metadata?.extractedFiles || [],
-        fileRetrievals: step.metadata?.fileRetrievals || 0
-      };
-      break;
-
-    case 'finish':
-      agentStep.finishReason = step.finishReason;
-      if (step.text) {
-        agentStep.errorMessage = step.text;
-      }
-      break;
-  }
-
-  return agentStep;
-}
-
-/**
- * Convert WorksheetFlowStep to IAgentStep
- */
-export function convertWorksheetFlowStep(step: WorksheetFlowStep): IAgentStep {
-  const agentStep: IAgentStep = {
-    step: step.step,
-    phase: step.phase,
-    type: step.type,
-    timestamp: new Date()
-  };
-
-  // Handle different step types
-  switch (step.type) {
-    case 'tool_call':
-      agentStep.toolCall = {
-        step: step.step,
-        toolName: step.toolName!,
-        toolArgs: step.toolArgs,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'tool_result':
-      agentStep.toolResult = {
-        step: step.step,
-        toolName: step.toolName!,
-        toolResult: step.toolResult,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'text':
-      agentStep.textChunk = {
-        step: step.step,
-        text: step.text!,
-        timestamp: new Date(),
-        isStreaming: true
-      };
-      break;
-
-    case 'status':
-      agentStep.statusMessage = {
-        step: step.step,
-        status: step.status!,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'phase_change':
-      agentStep.phaseChange = {
-        step: step.step,
-        previousPhase: step.phaseInfo?.previousPhase,
-        currentPhase: step.phaseInfo!.currentPhase,
-        message: step.phaseInfo!.message,
-        timestamp: new Date()
-      };
-      break;
-
-    case 'metadata':
-      if (step.phase === 'flow' && step.metadata?.flowSummary) {
-        // Final worksheet flow metadata
-        agentStep.worksheetFlowMetadata = {
-          flowSummary: step.metadata.flowSummary,
-          researchPhase: step.metadata.researchPhase,
-          generationPhase: step.metadata.generationPhase
-        };
-      } else if (step.phase === 'research' && step.metadata) {
-        // Research phase metadata
-        agentStep.researchMetadata = {
-          websitesResearched: step.metadata.websitesResearched || [],
-          searchQueries: step.metadata.searchQueries || [],
-          totalToolCalls: step.metadata.totalToolCalls || 0,
-          researchMode: step.metadata.researchMode || 'moderate',
-          findingsLength: 0,
-          completed: false
-        };
-      } else if (step.phase === 'generation' && step.metadata) {
-        // Generation phase metadata
-        agentStep.generationMetadata = {
-          worksheetTitle: step.metadata.worksheetTitle || '',
-          contentLength: step.metadata.contentLength || 0,
-          savedSuccessfully: step.metadata.savedSuccessfully || false,
-          pdfLocation: step.metadata.pdfLocation || '',
-          totalToolCalls: step.metadata.totalToolCalls || 0,
-          completed: step.metadata.completed || false
-        };
-      }
-      break;
-
-    case 'finish':
-      agentStep.finishReason = step.finishReason;
-      if (step.status) {
-        agentStep.errorMessage = step.status;
-      }
-      break;
-  }
-
-  return agentStep;
-}
-
-/**
- * Create a new chat conversation
- */
-export async function createChatConversation(
-  userId: string,
-  subjectId: string,
-  classroomId: string,
-  title?: string
-): Promise<any> {
-  const chatId = randomUUID();
+export function convertChunkToStep(chunk: any, phase: string, stepNumber: number): IAgentStep | null {
+  // Skip chunk types we don't want to store in database
+  const skipTypes = [
+    'start', 'start-step', 'finish-step',
+    'message-start', 'message-end', 
+    'text-start', 'text-end', 
+    'tool-input-start', 'tool-input-delta',
+    'reasoning-start', 'reasoning-end', 
+    'error', 'file', 'data'
+  ];
   
-  const conversation = new ChatConversation({
-    chatId,
-    userId,
-    subjectId,
-    classroomId,
-    title: title || `Chat ${new Date().toLocaleDateString()}`,
-    messages: [],
-    conversationMetadata: {
-      totalMessages: 0,
-      totalUserQueries: 0,
-      totalAgentResponses: 0,
-      totalFilesProcessed: 0,
-      conversationStartTime: new Date(),
-      lastActivityTime: new Date()
-    },
-    status: 'active'
-  });
+  if (skipTypes.includes(chunk.type)) {
+    return null;
+  }
 
-  return await conversation.save();
+  const agentStep: IAgentStep = {
+    step: stepNumber,
+    phase: phase as any,
+    type: 'text', // default type
+    timestamp: new Date()
+  };
+
+  // Handle different chunk types from AI SDK
+  switch (chunk.type) {
+    case 'tool-input-available':
+      agentStep.type = 'tool_call';
+      agentStep.toolCall = {
+        step: stepNumber,
+        toolName: chunk.toolName || 'unknown',
+        toolArgs: chunk.input,
+        timestamp: new Date()
+      };
+      break;
+
+    case 'tool-output-available':
+      // Tool output chunks should have toolName added by the flow
+      if (!chunk.toolName) {
+        // Skip if toolName wasn't mapped (shouldn't happen if flow is working correctly)
+        return null;
+      }
+      agentStep.type = 'tool_result';
+      agentStep.toolResult = {
+        step: stepNumber,
+        toolName: chunk.toolName,
+        toolResult: chunk.output,
+        timestamp: new Date()
+      };
+      break;
+
+    case 'text-delta':
+      agentStep.type = 'text';
+      agentStep.textChunk = {
+        step: stepNumber,
+        text: chunk.textDelta || chunk.delta || '',
+        timestamp: new Date(),
+        isStreaming: true
+      };
+      break;
+
+    case 'finish':
+      agentStep.type = 'finish';
+      agentStep.finishReason = chunk.finishReason;
+      break;
+
+    default:
+      // Handle any other types as text if they have text content
+      if (chunk.text) {
+        agentStep.type = 'text';
+        agentStep.textChunk = {
+          step: stepNumber,
+          text: chunk.text,
+          timestamp: new Date(),
+          isStreaming: true
+        };
+      } else {
+        // Skip unknown types without text
+        return null;
+      }
+      break;
+  }
+
+  return agentStep;
 }
 
 /**
- * Ensure conversation exists and add a user message
+ * Add user message to conversation
  */
 export async function addUserMessage(
   chatId: string,
-  userMessage: UserMessageInput,
-  userContext?: { userId: string; classroomId: string; subjectId: string }
-): Promise<any> {
+  query: string,
+  inputFiles: string[],
+  userContext: UserContext
+): Promise<void> {
   const messageId = randomUUID();
   
-  // First, try to find the conversation
   let conversation = await ChatConversation.findOne({ chatId });
   
-  // If conversation doesn't exist and we have user context, create it
-  if (!conversation && userContext) {
+  if (!conversation) {
+    // Create new conversation
     conversation = new ChatConversation({
       chatId,
       userId: userContext.userId,
       subjectId: userContext.subjectId,
       classroomId: userContext.classroomId,
-      title: `Chat ${new Date().toLocaleDateString()}`,
       messages: [],
       conversationMetadata: {
         totalMessages: 0,
@@ -263,329 +143,201 @@ export async function addUserMessage(
         conversationStartTime: new Date(),
         lastActivityTime: new Date()
       },
-      status: 'active'
-    });
-    await conversation.save();
-  }
-  
-  const update = {
-    $push: {
-      messages: {
-        messageId,
-        messageType: 'user',
-        userMessage: {
-          ...userMessage,
-          timestamp: new Date()
-        },
-        timestamp: new Date()
+      status: 'active',
+      isPublic: false,
+      settings: {
+        allowFileUploads: true,
+        maxFileSize: 50 * 1024 * 1024,
+        allowedFileTypes: ['.pdf', '.txt', '.md', '.doc', '.docx'],
+        defaultResearchMode: 'moderate'
       }
-    },
-    $inc: {
-      'conversationMetadata.totalMessages': 1,
-      'conversationMetadata.totalUserQueries': 1,
-      'conversationMetadata.totalFilesProcessed': userMessage.inputFiles?.length || 0
-    },
-    $set: {
-      'conversationMetadata.lastActivityTime': new Date()
-    }
-  };
+    });
+  }
 
-  return await ChatConversation.findOneAndUpdate(
-    { chatId },
-    update,
-    { new: true }
-  );
+  // Add user message
+  conversation.messages.push({
+    messageId,
+    messageType: 'user',
+    userMessage: {
+      query,
+      inputFiles: createInputFiles(inputFiles),
+      timestamp: new Date()
+    },
+    timestamp: new Date()
+  });
+
+  // Update metadata
+  conversation.conversationMetadata.totalMessages += 1;
+  conversation.conversationMetadata.totalUserQueries += 1;
+  conversation.conversationMetadata.totalFilesProcessed += inputFiles.length;
+  conversation.conversationMetadata.lastActivityTime = new Date();
+
+  await conversation.save();
 }
 
 /**
- * Initialize an agent message (for streaming responses)
+ * Initialize agent message (creates placeholder)
  */
 export async function initializeAgentMessage(
   chatId: string,
-  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat',
-  extractedFiles: string[] = []
+  flowType: 'doubt_clearance' | 'worksheet_generation',
+  inputFiles: string[]
 ): Promise<string> {
   const messageId = randomUUID();
   
-  const agentMessage: IAgentMessage = {
-    flowType,
-    startTime: new Date(),
-    totalSteps: 0,
-    steps: [],
-    research_findings:{
-      content: '',
-      researched_websites: []
-    },
-    worksheet_content: '',
-    executionSummary: {
-      success: false,
-      totalToolCalls: 0,
-      totalTextLength: 0,
-      duration: 0,
-      errorCount: 0,
-      finalStatus: 'initializing'
-    },
-    fileProcessing: {
-      extractedFiles,
-      fileRetrievals: 0,
-      hasFiles: extractedFiles.length > 0
-    }
-  };
+  const conversation = await ChatConversation.findOne({ chatId });
+  if (!conversation) {
+    throw new Error('Conversation not found');
+  }
 
-  const update = {
-    $push: {
-      messages: {
-        messageId,
-        messageType: 'agent',
-        agentMessage,
-        timestamp: new Date()
+  // Add agent message placeholder
+  conversation.messages.push({
+    messageId,
+    messageType: 'agent',
+    agentMessage: {
+      flowType,
+      startTime: new Date(),
+      totalSteps: 0,
+      steps: [],
+      research_findings: {
+        content: '',
+        researched_websites: []
+      },
+      worksheet_content: '',
+      executionSummary: {
+        success: false,
+        totalToolCalls: 0,
+        totalTextLength: 0,
+        duration: 0,
+        errorCount: 0,
+        finalStatus: 'in_progress'
+      },
+      fileProcessing: {
+        extractedFiles: inputFiles,
+        fileRetrievals: 0,
+        hasFiles: inputFiles.length > 0
       }
     },
-    $inc: {
-      'conversationMetadata.totalMessages': 1,
-      'conversationMetadata.totalAgentResponses': 1
-    },
-    $set: {
-      'conversationMetadata.lastActivityTime': new Date()
-    }
-  };
+    timestamp: new Date()
+  });
 
-  await ChatConversation.findOneAndUpdate({ chatId }, update);
+  await conversation.save();
   return messageId;
 }
 
 /**
- * Update agent message with a new step
+ * Add step to agent message
  */
-export async function updateAgentMessageStep(
+export async function addStepToAgentMessage(
   chatId: string,
   messageId: string,
   step: IAgentStep
-): Promise<any> {
-  const updateOperations: any = {
-    $push: {
-      'messages.$[msg].agentMessage.steps': step
-    },
-    $inc: {
-      'messages.$[msg].agentMessage.totalSteps': 1
-    },
-    $set: {
-      'conversationMetadata.lastActivityTime': new Date()
-    }
-  };
+): Promise<void> {
+  const conversation = await ChatConversation.findOne({ chatId });
+  if (!conversation) return;
 
-  return await ChatConversation.findOneAndUpdate(
-    { chatId },
-    updateOperations,
-    {
-      new: true,
-      arrayFilters: [{ 'msg.messageId': messageId }]
-    }
-    ) as IChatConversationDocument | null;
+  const message = conversation.messages.find(m => m.messageId === messageId);
+  if (!message || !message.agentMessage) return;
+
+  message.agentMessage.steps.push(step);
+  message.agentMessage.totalSteps += 1;
+
+  await conversation.save();
 }
 
 /**
- * Append text to agent message response
- */
-export async function appendTextToAgentMessage(
-  chatId: string,
-  messageId: string,
-  text: string
-): Promise<any> {
-  return await ChatConversation.findOneAndUpdate(
-    { chatId },
-    {
-      $set: {
-        'messages.$[msg].agentMessage.fullResponse': text,
-        'conversationMetadata.lastActivityTime': new Date()
-      }
-    },
-    {
-      new: true,
-      arrayFilters: [{ 'msg.messageId': messageId }]
-    }
-    ) as IChatConversationDocument | null;
-}
-
-/**
- * Update research findings in agent message
- */
-export async function updateResearchFindings(
-  chatId: string,
-  messageId: string,
-  content: string,
-  researchedWebsites: string[]
-): Promise<any> {
-  return await ChatConversation.findOneAndUpdate(
-    { chatId },
-    {
-      $set: {
-        'messages.$[msg].agentMessage.research_findings.content': content,
-        'messages.$[msg].agentMessage.research_findings.researched_websites': researchedWebsites,
-        'conversationMetadata.lastActivityTime': new Date()
-      }
-    },
-    {
-      new: true,
-      arrayFilters: [{ 'msg.messageId': messageId }]
-    }
-  ) as IChatConversationDocument | null;
-}
-
-/**
- * Update worksheet content in agent message
- */
-export async function updateWorksheetContent(
-  chatId: string,
-  messageId: string,
-  worksheetContent: string
-): Promise<any> {
-  return await ChatConversation.findOneAndUpdate(
-    { chatId },
-    {
-      $set: {
-        'messages.$[msg].agentMessage.worksheet_content': worksheetContent,
-        'conversationMetadata.lastActivityTime': new Date()
-      }
-    },
-    {
-      new: true,
-      arrayFilters: [{ 'msg.messageId': messageId }]
-    }
-  ) as IChatConversationDocument | null;
-}
-
-/**
- * Finalize agent message with execution summary
+ * Finalize agent message with complete data
  */
 export async function finalizeAgentMessage(
   chatId: string,
   messageId: string,
-  executionSummary: IAgentMessage['executionSummary'],
-  finalMetadata?: IAgentMessage['finalMetadata'],
-  steps?: IAgentStep[],
-  researchFindings?: { content: string; researched_websites: string[] },
-  worksheetContent?: string,
-  endTime?: Date
-): Promise<any> {
-  const update: any = {
-    $set: {
-      'messages.$[msg].agentMessage.endTime': endTime || new Date(),
-      'messages.$[msg].agentMessage.executionSummary': executionSummary,
-      'conversationMetadata.lastActivityTime': new Date()
-    }
+  researchFindings: string,
+  researchedWebsites: string[],
+  worksheetContent: string,
+  executionSummary: {
+    success: boolean;
+    totalToolCalls: number;
+    totalTextLength: number;
+    duration: number;
+    errorCount: number;
+    finalStatus: string;
+  }
+): Promise<void> {
+  const conversation = await ChatConversation.findOne({ chatId });
+  if (!conversation) return;
+
+  const message = conversation.messages.find(m => m.messageId === messageId);
+  if (!message || !message.agentMessage) return;
+
+  message.agentMessage.endTime = new Date();
+  message.agentMessage.research_findings = {
+    content: researchFindings,
+    researched_websites: researchedWebsites
   };
+  message.agentMessage.worksheet_content = worksheetContent;
+  message.agentMessage.executionSummary = executionSummary;
 
-  if (finalMetadata) {
-    update.$set['messages.$[msg].agentMessage.finalMetadata'] = finalMetadata;
-  }
+  // Update conversation metadata
+  conversation.conversationMetadata.totalMessages += 1;
+  conversation.conversationMetadata.totalAgentResponses += 1;
+  conversation.conversationMetadata.lastActivityTime = new Date();
 
-  if (steps && steps.length > 0) {
-    update.$set['messages.$[msg].agentMessage.steps'] = steps;
-    update.$set['messages.$[msg].agentMessage.totalSteps'] = steps.length;
-  }
-
-  if (researchFindings) {
-    update.$set['messages.$[msg].agentMessage.research_findings'] = researchFindings;
-  }
-
-  if (worksheetContent !== undefined) {
-    update.$set['messages.$[msg].agentMessage.worksheet_content'] = worksheetContent;
-  }
-
-  return await ChatConversation.findOneAndUpdate(
-    { chatId },
-    update,
-    {
-      new: true,
-      arrayFilters: [{ 'msg.messageId': messageId }]
-    }
-  );
+  await conversation.save();
 }
 
 /**
  * Get conversation by chatId
  */
-export async function getConversation(chatId: string): Promise<any> {
-  return await ChatConversation.findOne({ chatId }).lean(); // Convert to plain JavaScript object
+export async function getConversation(chatId: string): Promise<IChatConversationDocument | null> {
+  return await ChatConversation.findOne({ chatId, status: { $ne: 'deleted' } });
 }
 
 /**
- * Get user conversations with pagination
- */
-export async function getUserConversations(
-  userId: string,
-  page: number = 1,
-  limit: number = 20
-): Promise<any[]> {
-  const skip = (page - 1) * limit;
-  
-  return await ChatConversation.find({ userId, status: 'active' })
-    .sort({ 'conversationMetadata.lastActivityTime': -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean(); // Convert to plain JavaScript objects
-}
-
-/**
- * Get conversations by subject with pagination (direct Mongoose query)
+ * Get chats by subject
  */
 export async function getChatsBySubject(
   userId: string,
   subjectId: string,
   page: number = 1,
   limit: number = 20
-): Promise<any[]> {
+): Promise<IChatConversationDocument[]> {
   const skip = (page - 1) * limit;
   
-  return await ChatConversation.find({ 
-    userId, 
+  return await ChatConversation.find({
+    userId,
     subjectId,
-    status: 'active' 
+    status: { $ne: 'deleted' }
   })
-    .sort({ 'conversationMetadata.lastActivityTime': -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean(); // Convert to plain JavaScript objects
+  .sort({ 'conversationMetadata.lastActivityTime': -1 })
+  .skip(skip)
+  .limit(limit)
+  .exec();
 }
 
 /**
- * Count conversations by subject
+ * Count chats by subject
  */
-export async function countChatsBySubject(
-  userId: string,
-  subjectId: string
-): Promise<number> {
-  return await ChatConversation.countDocuments({ 
-    userId, 
+export async function countChatsBySubject(userId: string, subjectId: string): Promise<number> {
+  return await ChatConversation.countDocuments({
+    userId,
     subjectId,
-    status: 'active' 
+    status: { $ne: 'deleted' }
   });
 }
 
 /**
- * Archive a conversation
+ * Delete conversation (soft delete)
  */
-export async function archiveConversation(chatId: string): Promise<any> {
-  return await ChatConversation.findOneAndUpdate(
+export async function deleteConversation(chatId: string): Promise<void> {
+  await ChatConversation.updateOne(
     { chatId },
-    { 
-      $set: { 
-        status: 'archived',
-        'conversationMetadata.lastActivityTime': new Date()
-      } 
-    },
-    { new: true }
+    { $set: { status: 'deleted' } }
   );
 }
 
 /**
- * Permanently delete a conversation (hard delete)
+ * Permanently delete conversation
  */
-export async function deleteConversation(chatId: string): Promise<any> {
-  return await ChatConversation.deleteOne({ chatId });
+export async function permanentlyDeleteConversation(chatId: string): Promise<void> {
+  await ChatConversation.deleteOne({ chatId });
 }
-
-export {
-  ChatConversation
-};

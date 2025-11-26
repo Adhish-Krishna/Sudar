@@ -43,12 +43,6 @@ export interface IToolResult {
   executionTime?: number;
 }
 
-export interface IStatusMessage {
-  step: number;
-  status: string;
-  timestamp: Date;
-}
-
 export interface ITextChunk {
   step: number;
   text: string;
@@ -56,75 +50,18 @@ export interface ITextChunk {
   isStreaming?: boolean;
 }
 
-export interface IPhaseChange {
-  step: number;
-  previousPhase?: string;
-  currentPhase: string;
-  message: string;
-  timestamp: Date;
-}
-
-export interface IDoubtClearanceMetadata {
-  searchQueries: string[];
-  totalSearches: number;
-  responseLength: number;
-  completed: boolean;
-  extractedFiles: string[];
-  fileRetrievals: number;
-}
-
-export interface IResearchPhaseMetadata {
-  websitesResearched: string[];
-  searchQueries: string[];
-  totalToolCalls: number;
-  researchMode: 'simple' | 'moderate' | 'deep';
-  findingsLength: number;
-  completed: boolean;
-}
-
-export interface IGenerationPhaseMetadata {
-  worksheetTitle: string;
-  contentLength: number;
-  savedSuccessfully: boolean;
-  pdfLocation: string;
-  totalToolCalls: number;
-  completed: boolean;
-}
-
-export interface IWorksheetFlowMetadata {
-  flowSummary: {
-    success: boolean;
-    totalSteps: number;
-    duration: number;
-    startTime: string;
-    endTime: string;
-    extractedFiles: string[];
-    hasFiles: boolean;
-  };
-  researchPhase: IResearchPhaseMetadata;
-  generationPhase: IGenerationPhaseMetadata;
-}
-
 export interface IAgentStep {
   step: number;
-  phase?: 'research' | 'generation' | 'flow' | 'chat';
-  type: 'tool_call' | 'tool_result' | 'text' | 'finish' | 'status' | 'metadata' | 'phase_change';
+  phase?: 'research' | 'generation' | 'answer' | 'chat';
+  type: 'tool_call' | 'tool_result' | 'text' | 'finish';
   timestamp: Date;
   
   // Tool-related fields
   toolCall?: IToolCall;
   toolResult?: IToolResult;
   
-  // Text and status fields
+  // Text field
   textChunk?: ITextChunk;
-  statusMessage?: IStatusMessage;
-  phaseChange?: IPhaseChange;
-  
-  // Metadata fields (flow-specific)
-  doubtClearanceMetadata?: IDoubtClearanceMetadata;
-  worksheetFlowMetadata?: IWorksheetFlowMetadata;
-  researchMetadata?: IResearchPhaseMetadata;
-  generationMetadata?: IGenerationPhaseMetadata;
   
   // Finish information
   finishReason?: string;
@@ -144,13 +81,6 @@ export interface IAgentMessage {
     researched_websites: string[];
   }
   worksheet_content: string;
-  // Final metadata
-  finalMetadata?: {
-    doubtClearance?: IDoubtClearanceMetadata;
-    worksheetFlow?: IWorksheetFlowMetadata;
-    research?: IResearchPhaseMetadata;
-    generation?: IGenerationPhaseMetadata;
-  };
   
   // Execution summary
   executionSummary: {
@@ -245,13 +175,6 @@ const ToolResultSchema = new Schema<IToolResult>({
   executionTime: { type: Number }
 });
 
-// Status Message Schema
-const StatusMessageSchema = new Schema<IStatusMessage>({
-  step: { type: Number, required: true },
-  status: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now }
-});
-
 // Text Chunk Schema
 const TextChunkSchema = new Schema<ITextChunk>({
   step: { type: Number, required: true },
@@ -260,67 +183,13 @@ const TextChunkSchema = new Schema<ITextChunk>({
   isStreaming: { type: Boolean, default: false }
 });
 
-// Phase Change Schema
-const PhaseChangeSchema = new Schema<IPhaseChange>({
-  step: { type: Number, required: true },
-  previousPhase: { type: String },
-  currentPhase: { type: String, required: true },
-  message: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now }
-});
-
-// Doubt Clearance Metadata Schema
-const DoubtClearanceMetadataSchema = new Schema<IDoubtClearanceMetadata>({
-  searchQueries: [{ type: String }],
-  totalSearches: { type: Number, default: 0 },
-  responseLength: { type: Number, default: 0 },
-  completed: { type: Boolean, default: false },
-  extractedFiles: [{ type: String }],
-  fileRetrievals: { type: Number, default: 0 }
-});
-
-// Research Phase Metadata Schema
-const ResearchPhaseMetadataSchema = new Schema<IResearchPhaseMetadata>({
-  websitesResearched: [{ type: String }],
-  searchQueries: [{ type: String }],
-  totalToolCalls: { type: Number, default: 0 },
-  researchMode: { type: String, enum: ['simple', 'moderate', 'deep'], default: 'moderate' },
-  findingsLength: { type: Number, default: 0 },
-  completed: { type: Boolean, default: false }
-});
-
-// Generation Phase Metadata Schema
-const GenerationPhaseMetadataSchema = new Schema<IGenerationPhaseMetadata>({
-  worksheetTitle: { type: String, default: '' },
-  contentLength: { type: Number, default: 0 },
-  savedSuccessfully: { type: Boolean, default: false },
-  pdfLocation: { type: String, default: '' },
-  totalToolCalls: { type: Number, default: 0 },
-  completed: { type: Boolean, default: false }
-});
-
-// Worksheet Flow Metadata Schema
-const WorksheetFlowMetadataSchema = new Schema<IWorksheetFlowMetadata>({
-  flowSummary: {
-    success: { type: Boolean, required: true },
-    totalSteps: { type: Number, required: true },
-    duration: { type: Number, required: true },
-    startTime: { type: String, required: true },
-    endTime: { type: String, required: true },
-    extractedFiles: [{ type: String }],
-    hasFiles: { type: Boolean, default: false }
-  },
-  researchPhase: ResearchPhaseMetadataSchema,
-  generationPhase: GenerationPhaseMetadataSchema
-});
-
 // Agent Step Schema
 const AgentStepSchema = new Schema<IAgentStep>({
   step: { type: Number, required: true },
-  phase: { type: String, enum: ['research', 'generation', 'flow', 'chat'] },
+  phase: { type: String, enum: ['research', 'generation', 'answer', 'chat'] },
   type: { 
     type: String, 
-    enum: ['tool_call', 'tool_result', 'text', 'finish', 'status', 'metadata', 'phase_change'],
+    enum: ['tool_call', 'tool_result', 'text', 'finish'],
     required: true 
   },
   timestamp: { type: Date, default: Date.now },
@@ -329,14 +198,6 @@ const AgentStepSchema = new Schema<IAgentStep>({
   toolCall: ToolCallSchema,
   toolResult: ToolResultSchema,
   textChunk: TextChunkSchema,
-  statusMessage: StatusMessageSchema,
-  phaseChange: PhaseChangeSchema,
-  
-  // Metadata fields
-  doubtClearanceMetadata: DoubtClearanceMetadataSchema,
-  worksheetFlowMetadata: WorksheetFlowMetadataSchema,
-  researchMetadata: ResearchPhaseMetadataSchema,
-  generationMetadata: GenerationPhaseMetadataSchema,
   
   // Finish fields
   finishReason: { type: String },
@@ -362,12 +223,6 @@ const AgentMessageSchema = new Schema<IAgentMessage>({
     }]
   },
   worksheet_content: { type: String, default: '' },
-  finalMetadata: {
-    doubtClearance: DoubtClearanceMetadataSchema,
-    worksheetFlow: WorksheetFlowMetadataSchema,
-    research: ResearchPhaseMetadataSchema,
-    generation: GenerationPhaseMetadataSchema
-  },
   
   executionSummary: {
     success: { type: Boolean, default: false },

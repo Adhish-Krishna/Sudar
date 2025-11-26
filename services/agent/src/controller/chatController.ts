@@ -35,7 +35,6 @@ const streamChat = async (req: Request, res: Response) => {
         }
 
         // Set up SSE headers
-        // Use the origin from the request, or fall back to FRONTEND_URL env variable
         const allowedOrigin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
         
         res.writeHead(200, {
@@ -55,265 +54,24 @@ const streamChat = async (req: Request, res: Response) => {
             classroomId: classroom_id
         };
 
-        // Determine flow type
         const selectedFlowType = flow_type || 'doubt_clearance';
 
-        try {
-            // Send start event
-            res.write(`data: ${JSON.stringify({ 
-                type: 'start', 
-                flowType: selectedFlowType,
-                content: '',
-                metadata: {}
-            })}\n\n`);
-
-            if (selectedFlowType === 'worksheet_generation') {
-                // Use worksheet flow
-                for await (const step of worksheetFlow({
-                    query,
-                    userContext,
-                    research_mode
-                })) {
-                    // Phase change events (flow level)
-                    if (step.type === 'phase_change') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'phase_change',
-                            flowType: selectedFlowType,
-                            content: step.phaseInfo?.message || '',
-                            metadata: {
-                                currentPhase: step.phaseInfo?.currentPhase,
-                                previousPhase: step.phaseInfo?.previousPhase,
-                                phase: step.phase
-                            }
-                        })}\n\n`);
-                    }
-                    // Status messages (can come from any phase)
-                    else if (step.type === 'status') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'status',
-                            flowType: selectedFlowType,
-                            content: step.status || '',
-                            metadata: {
-                                phase: step.phase
-                            }
-                        })}\n\n`);
-                    }
-                    // Text streaming (from research or generation agents)
-                    else if (step.type === 'text') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'token',
-                            flowType: selectedFlowType,
-                            content: step.text || '',
-                            metadata: {
-                                phase: step.phase
-                            }
-                        })}\n\n`);
-                    }
-                    // Tool calls (from agents)
-                    else if (step.type === 'tool_call') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'tool_call',
-                            flowType: selectedFlowType,
-                            content: `Calling ${step.toolName}`,
-                            metadata: {
-                                phase: step.phase,
-                                toolName: step.toolName,
-                                toolArgs: step.toolArgs
-                            }
-                        })}\n\n`);
-                    }
-                    // Tool results (from agents)
-                    else if (step.type === 'tool_result') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'tool_result',
-                            flowType: selectedFlowType,
-                            content: `${step.toolName} completed`,
-                            metadata: {
-                                phase: step.phase,
-                                toolName: step.toolName,
-                                toolResult: step.toolResult
-                            }
-                        })}\n\n`);
-                    }
-                    // Metadata events
-                    else if (step.type === 'metadata') {
-                        // Handle different types of metadata based on phase and content
-                        if (step.phase === 'flow' && step.metadata?.researchSummary) {
-                            // Research phase summary
-                            res.write(`data: ${JSON.stringify({ 
-                                type: 'metadata',
-                                flowType: selectedFlowType,
-                                content: '',
-                                metadata: {
-                                    summaryType: 'research',
-                                    phase: step.phase,
-                                    researchMode: step.metadata.researchSummary.researchMode,
-                                    findingsLength: step.metadata.researchSummary.findingsLength,
-                                    websitesResearched: step.metadata.researchSummary.websitesResearched || [],
-                                    searchQueries: step.metadata.researchSummary.searchQueries || [],
-                                    totalToolCalls: step.metadata.researchSummary.totalToolCalls,
-                                    completed: step.metadata.researchSummary.completed
-                                }
-                            })}\n\n`);
-                        } else if (step.phase === 'flow' && step.metadata?.flowSummary) {
-                            // Complete flow summary
-                            res.write(`data: ${JSON.stringify({ 
-                                type: 'metadata',
-                                flowType: selectedFlowType,
-                                content: '',
-                                metadata: {
-                                    summaryType: 'flow',
-                                    phase: step.phase,
-                                    flowSummary: step.metadata.flowSummary,
-                                    researchPhase: step.metadata.researchPhase,
-                                    generationPhase: step.metadata.generationPhase
-                                }
-                            })}\n\n`);
-                        } else if (step.phase === 'research' && step.metadata) {
-                            // Research phase metadata
-                            res.write(`data: ${JSON.stringify({
-                                type: 'metadata',
-                                flowType: selectedFlowType,
-                                content: '',
-                                metadata: {
-                                    summaryType: 'research_phase',
-                                    phase: step.phase,
-                                    researchMode: step.metadata.researchMode?.toUpperCase(),
-                                    searchQueries: step.metadata.searchQueries || [],
-                                    websitesResearched: step.metadata.websitesResearched || [],
-                                    totalToolCalls: step.metadata.totalToolCalls || 0
-                                }
-                            })}\n\n`);
-                        } else if (step.phase === 'generation' && step.metadata) {
-                            // Generation phase metadata
-                            res.write(`data: ${JSON.stringify({
-                                type: 'metadata',
-                                flowType: selectedFlowType,
-                                content: '',
-                                metadata: {
-                                    summaryType: 'generation_phase',
-                                    phase: step.phase,
-                                    worksheetTitle: step.metadata.worksheetTitle,
-                                    contentLength: step.metadata.contentLength,
-                                    savedSuccessfully: step.metadata.savedSuccessfully,
-                                    pdfLocation: step.metadata.pdfLocation,
-                                    totalToolCalls: step.metadata.totalToolCalls || 0
-                                }
-                            })}\n\n`);
-                        }
-                    }
-                    // Finish event
-                    else if (step.type === 'finish') {
-                        // Only send done event for flow-level finish
-                        if (step.phase === 'flow') {
-                            res.write(`data: ${JSON.stringify({ 
-                                type: 'done',
-                                flowType: selectedFlowType,
-                                content: step.status || '',
-                                metadata: {
-                                    phase: step.phase,
-                                    finishReason: step.finishReason
-                                }
-                            })}\n\n`);
-                            break;
-                        } else {
-                            // Send phase completion event for phase-level finish
-                            res.write(`data: ${JSON.stringify({ 
-                                type: 'phase_complete',
-                                flowType: selectedFlowType,
-                                content: `${step.phase} phase completed`,
-                                metadata: {
-                                    phase: step.phase,
-                                    finishReason: step.finishReason
-                                }
-                            })}\n\n`);
-                        }
-                    }
-                }
-            } else {
-                // Use doubt clearance flow (default)
-                let toolCallCount = 0;
-                
-                for await (const step of doubtClearanceFlow({
-                    query,
-                    userContext,
-                    research_mode
-                })) {
-                    // Status messages
-                    if (step.type === 'status') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'status',
-                            flowType: selectedFlowType,
-                            content: step.status || '',
-                            metadata: {}
-                        })}\n\n`);
-                    }
-                    else if(step.type === "tool_call"){
-                        toolCallCount++;
-                    }
-                    // Text streaming
-                    else if (step.type === 'text') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'token',
-                            flowType: selectedFlowType,
-                            content: step.text || '',
-                            metadata: {}
-                        })}\n\n`);
-                    }
-                    // Metadata summary
-                    else if (step.type === 'metadata') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'metadata',
-                            flowType: selectedFlowType,
-                            content: '',
-                            metadata: {
-                                summaryType: 'doubt_clearance',
-                                searchQueries: step.metadata?.searchQueries || [],
-                                totalSearches: step.metadata?.totalSearches || 0,
-                                responseLength: step.metadata?.responseLength || 0,
-                                completed: step.metadata?.completed || false,
-                                extractedFiles: step.metadata?.extractedFiles || [],
-                                fileRetrievals: step.metadata?.fileRetrievals || 0,
-                                websitesReferenced: step.metadata?.websitesReferenced || [],
-                                totalToolCalls: toolCallCount
-                            }
-                        })}\n\n`);
-                    }
-                    // Finish event
-                    else if (step.type === 'finish') {
-                        res.write(`data: ${JSON.stringify({ 
-                            type: 'done',
-                            flowType: selectedFlowType,
-                            content: '✨ Doubt clearance complete!',
-                            metadata: {
-                                finishReason: step.finishReason,
-                                totalToolCalls: toolCallCount
-                            }
-                        })}\n\n`);
-                        
-                        if (step.finishReason === 'error' && step.text) {
-                            res.write(`data: ${JSON.stringify({ 
-                                type: 'error',
-                                flowType: selectedFlowType,
-                                content: `❌ Error: ${step.text}`,
-                                metadata: {}
-                            })}\n\n`);
-                        }
-                        break;
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error in chat flow:', error);
-            res.write(`data: ${JSON.stringify({ 
-                type: 'error',
-                flowType: selectedFlowType,
-                content: `Chat failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                metadata: {}
-            })}\n\n`);
+        if(selectedFlowType === "doubt_clearance"){
+            await doubtClearanceFlow({
+                query: query,
+                userContext: userContext,
+                research_mode: research_mode ? research_mode : 'simple',
+                res: res
+            });
         }
-
-        res.end();
+        else{
+            await worksheetFlow({
+                query: query,
+                userContext: userContext,
+                research_mode: research_mode ? research_mode : 'simple',
+                res: res
+            });
+        }
         return;
     } catch (error) {
         console.error('Error setting up chat:', error);
@@ -347,44 +105,6 @@ const getChatMessages = async (req: Request, res: Response) => {
             });
         }
 
-        // Transform messages to plain structure without Mongoose internals
-        const transformedMessages = conversation.messages.map((msg: any) => {
-            if (msg.messageType === 'user') {
-                return {
-                    messageId: msg.messageId,
-                    messageType: msg.messageType,
-                    timestamp: msg.timestamp,
-                    userMessage: {
-                        query: msg.userMessage.query,
-                        inputFiles: msg.userMessage.inputFiles || [],
-                        timestamp: msg.userMessage.timestamp
-                    }
-                };
-            } else if (msg.messageType === 'agent') {
-                return {
-                    messageId: msg.messageId,
-                    messageType: msg.messageType,
-                    timestamp: msg.timestamp,
-                    agentMessage: {
-                        research_findings: msg.agentMessage.research_findings || {
-                            content: '',
-                            researched_websites: []
-                        },
-                        worksheet_content: msg.agentMessage.worksheet_content || '',
-                        flowType: msg.agentMessage.flowType,
-                        startTime: msg.agentMessage.startTime,
-                        endTime: msg.agentMessage.endTime,
-                        totalSteps: msg.agentMessage.totalSteps,
-                        steps: msg.agentMessage.steps || [],
-                        finalMetadata: msg.agentMessage.finalMetadata || {},
-                        executionSummary: msg.agentMessage.executionSummary || {},
-                        fileProcessing: msg.agentMessage.fileProcessing || {}
-                    }
-                };
-            }
-            return msg;
-        });
-
         return res.status(200).json({
             success: true,
             chatId: conversation.chatId,
@@ -395,7 +115,7 @@ const getChatMessages = async (req: Request, res: Response) => {
             description: conversation.description,
             tags: conversation.tags || [],
             totalMessages: conversation.messages.length,
-            messages: transformedMessages,
+            messages: conversation.messages,
             metadata: conversation.conversationMetadata,
             status: conversation.status
         });
@@ -427,7 +147,6 @@ const getChatsBySubject = async (req: Request, res: Response) => {
             });
         }
 
-        // Get chats filtered by subject_id directly from Mongoose
         const conversations = await getChatsBySubjectUtil(user_id, subject_id, page, limit);
         const totalChats = await countChatsBySubject(user_id, subject_id);
         
@@ -438,7 +157,6 @@ const getChatsBySubject = async (req: Request, res: Response) => {
             page,
             limit,
             chats: conversations.map(conv => {
-                // Get the last message for preview
                 const lastMessage = conv.messages[conv.messages.length - 1];
                 let lastMessagePreview = '';
                 let lastMessageType = '';
@@ -448,21 +166,10 @@ const getChatsBySubject = async (req: Request, res: Response) => {
                         lastMessagePreview = lastMessage.userMessage.query.substring(0, 100);
                         lastMessageType = 'user';
                     } else if (lastMessage.messageType === 'agent' && lastMessage.agentMessage) {
-                        // Get preview from appropriate field based on flow type
                         const agentMsg = lastMessage.agentMessage;
-                        if (agentMsg.flowType === 'worksheet_generation') {
-                            lastMessagePreview = agentMsg.worksheet_content 
-                                ? `Worksheet: ${agentMsg.worksheet_content.substring(0, 100)}...`
-                                : 'Worksheet generated';
-                        } else if (agentMsg.flowType === 'doubt_clearance') {
-                            lastMessagePreview = agentMsg.research_findings?.content 
-                                ? agentMsg.research_findings.content.substring(0, 100)
-                                : 'Response provided';
-                        } else {
-                            lastMessagePreview = agentMsg.research_findings?.content 
-                                ? agentMsg.research_findings.content.substring(0, 100)
-                                : 'Agent response';
-                        }
+                        lastMessagePreview = agentMsg.research_findings?.content 
+                            ? agentMsg.research_findings.content.substring(0, 100)
+                            : 'Agent response';
                         lastMessageType = 'agent';
                     }
                 }
@@ -473,8 +180,6 @@ const getChatsBySubject = async (req: Request, res: Response) => {
                     description: conv.description,
                     tags: conv.tags,
                     totalMessages: conv.conversationMetadata.totalMessages,
-                    totalUserQueries: conv.conversationMetadata.totalUserQueries,
-                    totalAgentResponses: conv.conversationMetadata.totalAgentResponses,
                     conversationStartTime: conv.conversationMetadata.conversationStartTime,
                     lastActivityTime: conv.conversationMetadata.lastActivityTime,
                     status: conv.status,
@@ -499,7 +204,7 @@ const getChatsBySubject = async (req: Request, res: Response) => {
  * Delete a chat conversation
  * DELETE /api/chat/:chat_id
  */
-const deleteChat = async (req: Request, res: Response) => {
+const deleteChatById = async (req: Request, res: Response) => {
     try {
         await waitForConnection();
         
@@ -519,12 +224,11 @@ const deleteChat = async (req: Request, res: Response) => {
             });
         }
 
-        // Permanently delete the conversation (hard delete)
         await deleteConversation(chat_id);
         
         return res.status(200).json({
             success: true,
-            message: 'Chat conversation deleted permanently',
+            message: 'Chat conversation deleted',
             chatId: chat_id
         });
 
@@ -536,4 +240,4 @@ const deleteChat = async (req: Request, res: Response) => {
     }
 }
 
-export { streamChat, getChatMessages, getChatsBySubject, deleteChat };
+export { streamChat, getChatMessages, getChatsBySubject, deleteChatById };

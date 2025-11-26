@@ -17,26 +17,7 @@ import { google } from '@ai-sdk/google';
 import { createMCPClientWithContext, type UserContext } from '../mcpClient';
 import { worksheetGeneratorPrompt } from '../prompts';
 import dotenv from 'dotenv';
-
 dotenv.config();
-
-export interface WorksheetStep {
-  step: number;
-  type: 'tool_call' | 'tool_result' | 'text' | 'finish' | 'status' | 'metadata';
-  toolName?: string;
-  toolArgs?: any;
-  toolResult?: any;
-  text?: string;
-  finishReason?: string;
-  status?: string;
-  metadata?: {
-    worksheetTitle?: string;
-    contentLength?: number;
-    savedSuccessfully?: boolean;
-    pdfLocation?: string;
-    totalToolCalls?: number;
-  };
-}
 
 export interface WorksheetOptions {
   query: string;
@@ -47,7 +28,7 @@ export interface WorksheetOptions {
 
 export async function* worksheetGenerator(
   options: WorksheetOptions
-): AsyncGenerator<WorksheetStep> {
+): AsyncGenerator<any> {
   const {
     query,
     content,
@@ -63,17 +44,7 @@ export async function* worksheetGenerator(
     .reduce((obj, key) => {
       obj[key] = tools[key];
       return obj;
-    }, {} as typeof tools);
-
-  let stepCount = 0;
-  
-  const worksheetState = {
-    worksheetTitle: '',
-    contentLength: 0,
-    savedSuccessfully: false,
-    pdfLocation: '',
-    totalToolCalls: 0
-  };
+    }, {} as typeof tools)
 
   try {
     const agent = new Agent({
@@ -86,111 +57,30 @@ export async function* worksheetGenerator(
 
     const prompt = `USER QUERY: ${query}
 
-RESEARCH CONTENT (FOR YOUR REFERENCE ONLY - DO NOT INCLUDE THIS IN THE WORKSHEET):
-${content}
+    RESEARCH CONTENT (FOR YOUR REFERENCE ONLY - DO NOT INCLUDE THIS IN THE WORKSHEET):
+    ${content}
 
-IMPORTANT: The research content above is provided to help you understand the topic and create relevant questions. DO NOT include this research content in the worksheet you save. 
+    IMPORTANT: The research content above is provided to help you understand the topic and create relevant questions. DO NOT include this research content in the worksheet you save. 
 
-Your task:
-1. Use the research content to understand the topic thoroughly
-2. Create practice questions that test understanding of this material
-3. Include an answer key ONLY if the user's query explicitly asks for it (look for phrases like "with answer key", "include answers", "with solutions", etc.)
-4. Save ONLY the questions (and answer key if requested) using the save_content tool
+    Your task:
+    1. Use the research content to understand the topic thoroughly
+    2. Create practice questions that test understanding of this material
+    3. Include an answer key ONLY if the user's query explicitly asks for it (look for phrases like "with answer key", "include answers", "with solutions", etc.)
+    4. Save ONLY the questions (and answer key if requested) using the save_content tool
 
-Generate a worksheet with diverse question types (MCQ, short answer, long answer, critical thinking) based on the research content. After creating the questions, save them as a PDF using the save_content tool.`;
+    Generate a worksheet with diverse question types (MCQ, short answer, long answer, critical thinking) based on the research content. After creating the questions, save them as a PDF using the save_content tool.`;
 
     const result = await agent.stream({
       prompt: prompt
     });
-
-    for await (const part of result.fullStream) {
-      if (part.type === 'tool-call') {
-        stepCount++;
-        worksheetState.totalToolCalls++;
-        const toolArgs = 'args' in part ? part.args : part.input;
-        
-        let statusMessage = '';
-        if (part.toolName === 'save_content') {
-          const title = (toolArgs as any)?.title;
-          const contentLen = (toolArgs as any)?.content?.length || 0;
-          worksheetState.worksheetTitle = title || 'Untitled Worksheet';
-          worksheetState.contentLength = contentLen;
-          statusMessage = `Saving worksheet: "${title}" (${contentLen} characters) as PDF...`;
-        }
-        
-        if (statusMessage) {
-          yield {
-            step: stepCount,
-            type: 'status' as const,
-            status: statusMessage
-          };
-        }
-        
-        yield {
-          step: stepCount,
-          type: 'tool_call' as const,
-          toolName: part.toolName,
-          toolArgs: toolArgs
-        };
-      } else if (part.type === 'tool-result') {
-        const toolResult = 'result' in part ? part.result : part.output;
-        
-        if (part.toolName === 'save_content' && toolResult) {
-          try {
-            const resultContent = (toolResult as any)?.content?.[0]?.text;
-            if (resultContent) {
-              const parsed = JSON.parse(resultContent);
-              if (parsed.success) {
-                worksheetState.savedSuccessfully = true;
-                worksheetState.pdfLocation = parsed.object_name || parsed.url || 'Unknown location';
-              }
-            }
-          } catch (e) {
-
-            }
-        }
-        
-        yield {
-          step: stepCount,
-          type: 'tool_result' as const,
-          toolName: part.toolName,
-          toolResult: toolResult
-        };
-      } else if (part.type === 'text-delta') {
-        yield {
-          step: stepCount,
-          type: 'text' as const,
-          text: part.text
-        };
-      } else if (part.type === 'finish') {
-        yield {
-          step: stepCount,
-          type: 'metadata' as const,
-          metadata: {
-            worksheetTitle: worksheetState.worksheetTitle,
-            contentLength: worksheetState.contentLength,
-            savedSuccessfully: worksheetState.savedSuccessfully,
-            pdfLocation: worksheetState.pdfLocation,
-            totalToolCalls: worksheetState.totalToolCalls
-          }
-        };
-        
-        yield {
-          step: stepCount,
-          type: 'finish' as const,
-          finishReason: part.finishReason
-        };
-      }
+    
+    const stream = result.toUIMessageStream();
+    
+    for await (const chunk of stream) {
+      yield chunk;
     }
-
   } catch (error) {
     console.error('Error in worksheet generator:', error);
-    yield {
-      step: stepCount,
-      type: 'finish' as const,
-      finishReason: 'error',
-      text: `Worksheet generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    };
   }
 }
 
