@@ -20,17 +20,94 @@ import redis
 from redis.exceptions import RedisError
 from dotenv import load_dotenv
 
-load_dotenv()
-
-PORT = os.getenv("PORT", 3004)
+from minio import Minio
+from minio.commonconfig import Tags
+from minio.error import S3Error
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import uvicorn
 
-app = FastAPI(title="Manim Renderer Service", version="1.0.0", root_path="/manim")
+load_dotenv()
+
+PORT = os.getenv("PORT", 3004)
+
+MINIO_URL = os.getenv("MINIO_URL", "http://localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "sudar-content")
+minio_client: Optional[Minio] = None
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+JOB_STATUS_TTL_SECONDS = int(os.getenv("JOB_STATUS_TTL_SECONDS", "3600"))
+redis_client: Optional[redis.Redis] = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage app startup and shutdown events."""
+    # Startup
+    global redis_client, minio_client
+    create_necessary_folders()
+    cleanup_old_files()
+    
+    # Initialize Redis
+    try:
+        redis_client = redis.Redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            socket_timeout=5,
+            health_check_interval=30,
+        )
+        await asyncio.to_thread(redis_client.ping)
+        logger.info("Connected to Redis for job status tracking")
+    except RedisError as exc:
+        redis_client = None
+        logger.error("Failed to connect to Redis: %s", exc)
+    
+    # Initialize MinIO
+    try:
+        endpoint = MINIO_URL.replace("http://", "").replace("https://", "")
+        minio_client = Minio(
+            endpoint=endpoint,
+            access_key=MINIO_ACCESS_KEY,
+            secret_key=MINIO_SECRET_KEY,
+            secure=False
+        )
+        
+        # Ensure bucket exists
+        if not minio_client.bucket_exists(bucket_name=MINIO_BUCKET_NAME):
+            minio_client.make_bucket(bucket_name=MINIO_BUCKET_NAME)
+            logger.info(f"Created MinIO bucket: {MINIO_BUCKET_NAME}")
+        else:
+            logger.info(f"MinIO bucket exists: {MINIO_BUCKET_NAME}")
+            
+        logger.info("Connected to MinIO for video storage")
+    except Exception as exc:
+        minio_client = None
+        logger.error("Failed to connect to MinIO: %s", exc)
+    
+    # Start periodic cleanup
+    def periodic_cleanup():
+        while True:
+            time.sleep(3600)  # Run every hour
+            cleanup_old_files()
+    
+    cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
+    cleanup_thread.start()
+    
+    yield
+    # Shutdown - no cleanup needed as threads are daemonic
+
+app = FastAPI(
+    title="Manim Renderer Service",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    openapi_url="/openapi.json"
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -52,10 +129,83 @@ process_lock = threading.Lock()
 
 logger = logging.getLogger(__name__)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-JOB_STATUS_TTL_SECONDS = int(os.getenv("JOB_STATUS_TTL_SECONDS", "3600"))
-redis_client: Optional[redis.Redis] = None
+class ManimRequest(BaseModel):
+    code: str
+    scene_name: Optional[str] = None
+    quality: Optional[str] = "medium_quality"  # low_quality, medium_quality, high_quality
+    format: Optional[str] = "mp4"  # mp4, gif
+    timeout: Optional[int] = 300  # 5 minutes default timeout
+    # Metadata fields for MinIO storage
+    user_id: str
+    chat_id: str
+    classroom_id: str
+    subject_id: str
 
+class ProcessStatus(BaseModel):
+    job_id: str
+    status: str  # running, completed, error, timeout, cancelled
+    message: str
+    progress: Optional[int] = None
+    output_file: Optional[str] = None
+    error_details: Optional[str] = None
+
+def upload_to_minio(
+    file_path: str,
+    user_id: str,
+    chat_id: str,
+    classroom_id: str,
+    subject_id: str,
+    format: str
+) -> Optional[str]:
+    """Upload video to MinIO storage.
+    
+    Returns:
+        MinIO object URL on success, None on failure
+    """
+    if not minio_client:
+        logger.error("MinIO client not initialized")
+        return None
+    
+    try:
+        # Generate filename with timestamp
+        timestamp = int(time.time())
+        video_filename = f"video_{timestamp}.{format}"
+        
+        # Construct object path: {user_id}/{classroom_id}/{subject_id}/{chat_id}/{video_filename}
+        object_name = f"{user_id}/{classroom_id}/{subject_id}/{chat_id}/{video_filename}"
+        
+        # Prepare tags
+        tags = Tags(for_object=True)
+        tags["user_id"] = user_id
+        tags["chat_id"] = chat_id
+        tags["classroom_id"] = classroom_id
+        tags["subject_id"] = subject_id
+        tags["type"] = "generated_video"
+        tags["timestamp"] = str(timestamp)
+        
+        # Determine content type
+        content_type = "video/mp4" if format == "mp4" else "image/gif"
+        
+        # Upload to MinIO
+        minio_client.fput_object(
+            bucket_name=MINIO_BUCKET_NAME,
+            object_name=object_name,
+            file_path=file_path,
+            content_type=content_type,
+            tags=tags
+        )
+        
+        # Return MinIO URL
+        minio_url = f"{MINIO_URL}/{MINIO_BUCKET_NAME}/{object_name}"
+        logger.info(f"Successfully uploaded video to MinIO: {minio_url}")
+        return minio_url
+        
+    except S3Error as e:
+        logger.error(f"MinIO upload failed: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error during MinIO upload: {e}")
+        return None
 
 def set_job_status(job_id: str, status: str) -> None:
     """Persist job status in Redis when available."""
@@ -87,20 +237,6 @@ def delete_job_status(job_id: str) -> None:
     except RedisError as exc:
         logger.warning("Failed to delete status for job %s: %s", job_id, exc)
 
-class ManimRequest(BaseModel):
-    code: str
-    scene_name: Optional[str] = None
-    quality: Optional[str] = "medium_quality"  # low_quality, medium_quality, high_quality
-    format: Optional[str] = "mp4"  # mp4, gif
-    timeout: Optional[int] = 300  # 5 minutes default timeout
-
-class ProcessStatus(BaseModel):
-    job_id: str
-    status: str  # running, completed, error, timeout, cancelled
-    message: str
-    progress: Optional[int] = None
-    output_file: Optional[str] = None
-    error_details: Optional[str] = None
 
 def create_necessary_folders():
     """Create necessary temp and output folders outside src directory"""
@@ -302,16 +438,33 @@ def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, for
 
                 if output_files:
                     output_file = output_files[0]
-                    final_output = output_dir / f"{job_id}.{format}"
-                    shutil.copy(output_file, final_output)
-
+                    
+                    # Upload to MinIO instead of local storage
+                    # Get metadata from job_info
+                    with process_lock:
+                        job_info = running_processes.get(job_id)
+                        metadata = job_info.get("metadata", {})
+                    
+                    minio_url = upload_to_minio(
+                        file_path=str(output_file),
+                        user_id=metadata.get("user_id", ""),
+                        chat_id=metadata.get("chat_id", ""),
+                        classroom_id=metadata.get("classroom_id", ""),
+                        subject_id=metadata.get("subject_id", ""),
+                        format=format
+                    )
+                    
                     with process_lock:
                         job_info = running_processes.get(job_id)
                         if job_info and job_info.get("status") != "cancelled":
-                            job_info["status"] = "completed"
-                            job_info["message"] = "Rendering completed successfully"
-                            job_info["progress"] = 100
-                            job_info["output_file"] = str(final_output)
+                            if minio_url:
+                                job_info["status"] = "completed"
+                                job_info["message"] = "Rendering completed successfully"
+                                job_info["progress"] = 100
+                                job_info["output_file"] = minio_url  # Store MinIO URL instead of local path
+                            else:
+                                job_info["status"] = "error"
+                                job_info["message"] = "Failed to upload video to storage"
                     set_job_status(job_id, "completed")
                 else:
                     # Debug: List all files created for troubleshooting
@@ -396,14 +549,20 @@ async def render_manim(request: ManimRequest):
     # Generate job ID
     job_id = str(uuid.uuid4())
     
-    # Initialize process tracking
+    # Initialize process tracking with metadata
     with process_lock:
         running_processes[job_id] = {
             "status": "queued",
             "message": "Job queued for processing",
             "progress": 0,
-            "created_at": time.time()
-        }
+            "created_at": time.time(),
+            "metadata": {
+                "user_id": request.user_id,
+                "chat_id": request.chat_id,
+                "classroom_id": request.classroom_id,
+                "subject_id": request.subject_id
+            }
+    }
 
     set_job_status(job_id, "ongoing")
     
@@ -525,37 +684,6 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "manim-renderer"}
 
-@app.on_event("startup")
-async def startup_event():
-    """Create necessary folders in the startup"""
-    global redis_client
-
-    create_necessary_folders()
-
-    """Cleanup old files on startup"""
-    cleanup_old_files()
-
-    try:
-        redis_client = redis.Redis.from_url(
-            REDIS_URL,
-            decode_responses=True,
-            socket_timeout=5,
-            health_check_interval=30,
-        )
-        # Validate connection during startup
-        await asyncio.to_thread(redis_client.ping)
-        logger.info("Connected to Redis for job status tracking")
-    except RedisError as exc:
-        redis_client = None
-        logger.error("Failed to connect to Redis: %s", exc)
-    
-    # Start periodic cleanup
-    def periodic_cleanup():
-        while True:
-            time.sleep(3600)  # Run every hour
-            cleanup_old_files()
-    
-    threading.Thread(target=periodic_cleanup, daemon=True).start()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(PORT))
