@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 echo "Starting Ollama..."
 /bin/ollama serve &
 pid=$!
