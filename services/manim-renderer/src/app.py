@@ -624,27 +624,6 @@ async def stream_status(job_id: str):
         }
     )
 
-@app.get("/download/{job_id}")
-async def download_result(job_id: str):
-    """Download the rendered video"""
-    with process_lock:
-        if job_id not in running_processes:
-            raise HTTPException(status_code=404, detail="Job not found")
-        
-        job_info = running_processes[job_id]
-        if job_info["status"] != "completed":
-            raise HTTPException(status_code=400, detail="Job not completed yet")
-        
-        output_file = job_info.get("output_file")
-        if not output_file or not os.path.exists(output_file):
-            raise HTTPException(status_code=404, detail="Output file not found")
-    
-    return FileResponse(
-        output_file,
-        media_type="application/octet-stream",
-        filename=f"manim_output_{job_id}.{Path(output_file).suffix[1:]}"
-    )
-
 @app.delete("/job/{job_id}")
 async def cancel_job(job_id: str):
     """Cancel a running job"""
