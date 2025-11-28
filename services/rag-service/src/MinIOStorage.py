@@ -228,7 +228,7 @@ class MinIOStorage:
             File content as bytes, or None if retrieval fails
         """
         try:
-            response = self.client.get_object(self.bucket_name, object_name)
+            response = self.client.get_object(bucket_name=self.bucket_name, object_name=object_name)
             # Read all data from response
             data = response.read()
             response.close()

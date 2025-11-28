@@ -98,7 +98,7 @@ def process_ingest_job(job_data):
         }))
         
         # Retrieve file from MinIO
-        file_content = minio_storage.get_file(minio_object_name)
+        file_content = minio_storage.get_file(object_name=minio_object_name)
         if not file_content:
             raise ValueError(f"Failed to retrieve file from MinIO: {minio_object_name}")
         

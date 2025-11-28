@@ -473,7 +473,7 @@ const Chat = ()=>{
             const response = await context.getContext(chatId);
             
             if (response.status && response.status !== 200) {
-                // toast.error(response.message || "Failed to fetch indexed files");
+                setIndexedFiles([]);
             } else if (Array.isArray(response)) {
                 setIndexedFiles(response);
             }

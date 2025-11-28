@@ -96,10 +96,11 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
             generation: 'Generation Phase'
         };
 
+        // Subtle, phase-specific accents without changing functionality
         const phaseColors = {
-            research: 'border bg-muted',
-            answer: 'border bg-muted',
-            generation: 'border bg-muted'
+            research: 'border bg-muted/60 hover:bg-muted/70',
+            answer: 'border bg-muted/60 hover:bg-muted/70',
+            generation: 'border bg-muted/60 hover:bg-muted/70'
         };
 
         return (
@@ -109,7 +110,7 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
                     <button
                         onClick={() => toggleSection(phase)}
                         className={cn(
-                            "w-full flex items-center justify-between p-3 rounded-lg border transition-all",
+                            "w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200",
                             phaseColors[phase],
                             isCurrentPhase && "ring-2 ring-primary/20"
                         )}
@@ -119,7 +120,7 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
                                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
                             )}
                             <span className="font-semibold text-sm">{phaseLabels[phase]}</span>
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="text-xs px-2 py-0.5">
                                 {toolSteps.length} step{toolSteps.length !== 1 ? 's' : ''}
                             </Badge>
                         </div>
@@ -165,11 +166,11 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
 
                         {/* Text Content */}
                         {textContent && (
-                            <Card className="p-4 bg-background animate-in slide-in-from-bottom-2 duration-300">
+                            <Card className="p-4 bg-background/60 backdrop-blur-sm animate-in slide-in-from-bottom-2 duration-300 border border-border/50">
                                 <div className="flex items-start gap-3">
                                     <FileText className="h-4 w-4 text-primary mt-1 shrink-0" />
                                     <div className="flex-1">
-                                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                                        <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed">
                                             <ReactMarkdown>{textContent}</ReactMarkdown>
                                         </div>
                                     </div>
@@ -230,7 +231,7 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
 
                         {/* Answer text content - no card wrapper */}
                         {getTextContentByPhase(groupedSteps.answer) && (
-                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed">
                                 <ReactMarkdown>{getTextContentByPhase(groupedSteps.answer)}</ReactMarkdown>
                             </div>
                         )}
@@ -242,7 +243,7 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
 
             {/* Global Streaming Indicator */}
             {isStreaming && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t">
+                <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground pt-2 border-t">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Generating response...</span>
                 </div>

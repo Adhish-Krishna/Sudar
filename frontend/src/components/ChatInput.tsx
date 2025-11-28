@@ -148,7 +148,7 @@ const ChatInput = ({
                                 setMessage(inputRef.current?.textContent || "");
                             }}
                             data-placeholder="Message Sudar"
-                            className="w-full min-h-10 px-2 md:px-3 py-2 text-sm md:text-base bg-transparent border-0 outline-none focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/60 empty:before:pointer-events-none"
+                            className="w-full min-h-10 px-3 md:px-4 py-2 text-sm md:text-base bg-transparent border-0 outline-none focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/60 empty:before:pointer-events-none leading-relaxed"
                             style={{ maxHeight: `${maxHeight}px` }}
                             suppressContentEditableWarning
                         />
@@ -335,7 +335,7 @@ const ChatInput = ({
                         </Popover>
                     </div>
                     <Button 
-                        className={`gap-1.5 md:gap-2 rounded-full px-4 md:px-6 shadow-md transition-all duration-200 text-xs md:text-sm`}
+                        className={`gap-1.5 md:gap-2 rounded-full px-4 md:px-6 shadow-md transition-all duration-200 text-xs md:text-sm ${isStreaming ? 'bg-destructive text-destructive-foreground hover:brightness-95' : 'hover:shadow-lg hover:scale-105'}`}
                         onClick={handleSendOrStop}
                         disabled={!isStreaming && !message.trim()}
                     >
@@ -344,7 +344,9 @@ const ChatInput = ({
                                 <Square className="size-3.5 md:size-4" />
                             </>
                         ) : (
-                            <ArrowUp className="size-3.5 md:size-4"/>
+                            <>
+                                <ArrowUp className="size-3.5 md:size-4"/>
+                            </>
                         )}
                     </Button>
                 </div>
