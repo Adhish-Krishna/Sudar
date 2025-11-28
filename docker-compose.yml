@@ -203,6 +203,10 @@ services:
       - PORT=3004
       - REDIS_URL=redis://redis:6379/0
       - JOB_STATUS_TTL_SECONDS=3600
+      - MINIO_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=sudar-content
     ports:
       - "3004:3004"
     volumes:
@@ -321,6 +325,7 @@ services:
       - MINIO_BUCKET_NAME=sudar-content
       - MD_TO_PDF_URL=http://md-to-pdf:3000/convert
       - RAG_SERVICE_URL=http://rag-service:3001/rag
+      - MANIM_RENDERER_URL=http://localhost:3004
       - HOST=0.0.0.0
       - PORT=3002
     ports:
