@@ -124,7 +124,7 @@ export async function addUserMessage(
  */
 export async function initializeAgentMessage(
   chatId: string,
-  flowType: 'doubt_clearance' | 'worksheet_generation',
+  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat' | 'content_generation',
   inputFiles: string[]
 ): Promise<string> {
   const messageId = randomUUID();

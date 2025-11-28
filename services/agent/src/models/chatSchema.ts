@@ -30,7 +30,7 @@ export interface IUserMessage {
 
 export interface IAgentStep {
   step: number;
-  phase?: 'research' | 'generation' | 'answer' | 'chat';
+  phase?: 'research' | 'generation' | 'answer' | 'chat' | 'evaluation'| 'video' | 'completion';
   type: string; // Store the original chunk type from AI SDK
   timestamp: Date;
   
@@ -39,7 +39,7 @@ export interface IAgentStep {
 }
 
 export interface IAgentMessage {
-  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat';
+  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat' | 'content_generation';
   startTime: Date;
   endTime?: Date;
   totalSteps: number;
@@ -131,7 +131,19 @@ const UserMessageSchema = new Schema<IUserMessage>({
 // Agent Step Schema
 const AgentStepSchema = new Schema<IAgentStep>({
   step: { type: Number, required: true },
-  phase: { type: String, enum: ['research', 'generation', 'answer', 'chat'] },
+  // Align allowed phases with all flows (content generation, doubt clearance, worksheet)
+  phase: { type: String, enum: [
+    'research',
+    'script',
+    'code',
+    'refinement',
+    'evaluation',
+    'video',
+    'completion',
+    'generation',
+    'answer',
+    'chat'
+  ] },
   type: { 
     type: String,
     required: true 
@@ -146,7 +158,7 @@ const AgentStepSchema = new Schema<IAgentStep>({
 const AgentMessageSchema = new Schema<IAgentMessage>({
   flowType: { 
     type: String, 
-    enum: ['doubt_clearance', 'worksheet_generation', 'content_research', 'generic_chat'],
+    enum: ['doubt_clearance', 'worksheet_generation', 'content_research', 'generic_chat', 'content_generation'],
     required: true 
   },
   startTime: { type: Date, default: Date.now },

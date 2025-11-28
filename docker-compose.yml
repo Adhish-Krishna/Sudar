@@ -325,7 +325,6 @@ services:
       - MINIO_BUCKET_NAME=sudar-content
       - MD_TO_PDF_URL=http://md-to-pdf:3000/convert
       - RAG_SERVICE_URL=http://rag-service:3001/rag
-      - MANIM_RENDERER_URL=http://localhost:3004
       - HOST=0.0.0.0
       - PORT=3002
     ports:
@@ -349,6 +348,7 @@ services:
       - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_API_KEY}
       - MCP_SERVER_URL=http://sudar-tools-mcp-server:3002/mcp
       - MONGODB_URI=mongodb://mongodb-server:27017/sudar_agent
+      - MANIM_RENDERER_URL=http://manim-renderer:3004
     expose:
       - "3003"
     depends_on:

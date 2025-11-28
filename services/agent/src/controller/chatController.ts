@@ -9,14 +9,15 @@ import {
   countChatsBySubject,
   deleteConversation 
 } from '../utils/chatUtils';
+import { contentCreationFlow } from '../flows/contentCreationFlow';
 
 interface ChatRequest {
-  chat_id: string;
-  subject_id: string;
-  classroom_id: string;
-  query: string;
-  flow_type?: 'doubt_clearance' | 'worksheet_generation';
-  research_mode?: 'simple' | 'moderate' | 'deep';
+    chat_id: string;
+    subject_id: string;
+    classroom_id: string;
+    query: string;
+    flow_type?: 'doubt_clearance' | 'worksheet_generation' | 'content_creation';
+    research_mode?: 'simple' | 'moderate' | 'deep';
 }
 
 const streamChat = async (req: Request, res: Response) => {
@@ -25,7 +26,7 @@ const streamChat = async (req: Request, res: Response) => {
         await waitForConnection();
 
         const user_id = req.user_id!;
-        
+
         const { chat_id, subject_id, classroom_id, query, flow_type, research_mode = 'moderate' }: ChatRequest = req.body;
 
         if (!chat_id || !classroom_id || !query) {
@@ -36,7 +37,7 @@ const streamChat = async (req: Request, res: Response) => {
 
         // Set up SSE headers
         const allowedOrigin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
-        
+
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
@@ -56,21 +57,41 @@ const streamChat = async (req: Request, res: Response) => {
 
         const selectedFlowType = flow_type || 'doubt_clearance';
 
-        if(selectedFlowType === "doubt_clearance"){
-            await doubtClearanceFlow({
-                query: query,
-                userContext: userContext,
-                research_mode: research_mode ? research_mode : 'simple',
-                res: res
-            });
-        }
-        else{
-            await worksheetFlow({
-                query: query,
-                userContext: userContext,
-                research_mode: research_mode ? research_mode : 'simple',
-                res: res
-            });
+        switch (selectedFlowType) {
+            case 'doubt_clearance':
+                await doubtClearanceFlow({
+                    query: query,
+                    userContext: userContext,
+                    research_mode: research_mode ? research_mode : 'simple',
+                    res: res
+                });
+                break;
+
+            case 'worksheet_generation':
+                await worksheetFlow({
+                    query: query,
+                    userContext: userContext,
+                    research_mode: research_mode ? research_mode : 'simple',
+                    res: res
+                });
+                break;
+
+            case 'content_creation':
+                await contentCreationFlow({
+                    query: query,
+                    userContext: userContext,
+                    research_mode: research_mode? research_mode : 'simple',
+                    res: res
+                });
+                break;
+
+            default:
+                await doubtClearanceFlow({
+                    query: query,
+                    userContext: userContext,
+                    research_mode: research_mode ? research_mode : 'simple',
+                    res: res
+                });
         }
         return;
     } catch (error) {
@@ -88,9 +109,9 @@ const streamChat = async (req: Request, res: Response) => {
 const getChatMessages = async (req: Request, res: Response) => {
     try {
         await waitForConnection();
-        
+
         const { chat_id } = req.params;
-        
+
         if (!chat_id) {
             return res.status(400).json({
                 error: 'Missing required parameter: chat_id'
@@ -98,7 +119,7 @@ const getChatMessages = async (req: Request, res: Response) => {
         }
 
         const conversation = await getConversation(chat_id);
-        
+
         if (!conversation) {
             return res.status(404).json({
                 error: 'Chat conversation not found'
@@ -135,12 +156,12 @@ const getChatMessages = async (req: Request, res: Response) => {
 const getChatsBySubject = async (req: Request, res: Response) => {
     try {
         await waitForConnection();
-        
+
         const user_id = req.user_id!;
         const { subject_id } = req.params;
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 20;
-        
+
         if (!subject_id) {
             return res.status(400).json({
                 error: 'Missing required parameter: subject_id'
@@ -149,7 +170,7 @@ const getChatsBySubject = async (req: Request, res: Response) => {
 
         const conversations = await getChatsBySubjectUtil(user_id, subject_id, page, limit);
         const totalChats = await countChatsBySubject(user_id, subject_id);
-        
+
         return res.status(200).json({
             success: true,
             subject_id,
@@ -160,20 +181,20 @@ const getChatsBySubject = async (req: Request, res: Response) => {
                 const lastMessage = conv.messages[conv.messages.length - 1];
                 let lastMessagePreview = '';
                 let lastMessageType = '';
-                
+
                 if (lastMessage) {
                     if (lastMessage.messageType === 'user' && lastMessage.userMessage) {
                         lastMessagePreview = lastMessage.userMessage.query.substring(0, 100);
                         lastMessageType = 'user';
                     } else if (lastMessage.messageType === 'agent' && lastMessage.agentMessage) {
                         const agentMsg = lastMessage.agentMessage;
-                        lastMessagePreview = agentMsg.research_findings?.content 
+                        lastMessagePreview = agentMsg.research_findings?.content
                             ? agentMsg.research_findings.content.substring(0, 100)
                             : 'Agent response';
                         lastMessageType = 'agent';
                     }
                 }
-                
+
                 return {
                     chatId: conv.chatId,
                     title: conv.title,
@@ -207,9 +228,9 @@ const getChatsBySubject = async (req: Request, res: Response) => {
 const deleteChatById = async (req: Request, res: Response) => {
     try {
         await waitForConnection();
-        
+
         const { chat_id } = req.params;
-        
+
         if (!chat_id) {
             return res.status(400).json({
                 error: 'Missing required parameter: chat_id'
@@ -217,7 +238,7 @@ const deleteChatById = async (req: Request, res: Response) => {
         }
 
         const conversation = await getConversation(chat_id);
-        
+
         if (!conversation) {
             return res.status(404).json({
                 error: 'Chat conversation not found'
@@ -225,7 +246,7 @@ const deleteChatById = async (req: Request, res: Response) => {
         }
 
         await deleteConversation(chat_id);
-        
+
         return res.status(200).json({
             success: true,
             message: 'Chat conversation deleted',

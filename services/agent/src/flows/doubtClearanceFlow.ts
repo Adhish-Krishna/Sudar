@@ -18,7 +18,7 @@
  */
 
 import { Experimental_Agent as Agent, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
+import { models, get_model } from '../llm_models';
 import { createMCPClientWithContext, type UserContext } from '../mcpClient';
 import { extractFilesFromQuery } from '../utils/fileExtractor';
 import { contentResearcher } from '../agent/contentResearcher';
@@ -125,7 +125,7 @@ export async function doubtClearanceFlow(
       }, {} as typeof tools);
 
     const agent = new Agent({
-      model: google('gemini-2.5-flash'),
+      model: get_model(models.doubt_clearance_agent.provider, models.doubt_clearance_agent.model),
       system: enhancedSystemPrompt,
       tools: filteredTools,
       stopWhen: stepCountIs(5),

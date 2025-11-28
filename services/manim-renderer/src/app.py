@@ -462,10 +462,11 @@ def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, for
                                 job_info["message"] = "Rendering completed successfully"
                                 job_info["progress"] = 100
                                 job_info["output_file"] = minio_url  # Store MinIO URL instead of local path
+                                set_job_status(job_id, "completed")
                             else:
                                 job_info["status"] = "error"
                                 job_info["message"] = "Failed to upload video to storage"
-                    set_job_status(job_id, "completed")
+                                set_job_status(job_id, "error")
                 else:
                     # Debug: List all files created for troubleshooting
                     all_files = list(output_dir.glob("**/*")) + list(job_temp_dir.glob("**/*"))
@@ -477,7 +478,7 @@ def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, for
                             job_info["status"] = "error"
                             job_info["message"] = "Output file not found"
                             job_info["error_details"] = f"stdout: {stdout}\nstderr: {stderr}\nFiles created: {file_list}"
-                    set_job_status(job_id, "completed")
+                    set_job_status(job_id, "error")
             else:
                 with process_lock:
                     job_info = running_processes.get(job_id)
@@ -485,7 +486,7 @@ def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, for
                         job_info["status"] = "error"
                         job_info["message"] = "Manim execution failed"
                         job_info["error_details"] = f"Return code: {process.returncode}\nstdout: {stdout}\nstderr: {stderr}"
-                set_job_status(job_id, "completed")
+                set_job_status(job_id, "error")
                     
         except subprocess.TimeoutExpired:
             # Kill the process group
@@ -501,7 +502,7 @@ def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, for
                     job_info["status"] = "timeout"
                     job_info["message"] = f"Process timed out after {timeout} seconds"
                     job_info["error_details"] = "Execution exceeded maximum allowed time"
-            set_job_status(job_id, "completed")
+            set_job_status(job_id, "timeout")
     
     except Exception as e:
         with process_lock:
@@ -510,7 +511,7 @@ def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, for
                 job_info["status"] = "error"
                 job_info["message"] = "Internal error occurred"
                 job_info["error_details"] = str(e) + "\n" + traceback.format_exc()
-        set_job_status(job_id, "completed")
+        set_job_status(job_id, "error")
     
     finally:
         # Cleanup job-specific temp directory
@@ -583,7 +584,26 @@ async def render_manim(request: ManimRequest):
 
 @app.get("/status")
 async def get_status(job_id: str = Query(..., description="Rendering job identifier")):
-    """Get the status of a rendering job using Redis."""
+    """Get the status of a rendering job.
+
+    Prefer in-memory details when available; otherwise fall back to Redis status.
+    """
+    # Try in-memory first for richer context
+    with process_lock:
+        job_info = running_processes.get(job_id)
+
+    if job_info:
+        # Return a subset of the detailed info
+        return {
+            "job_id": job_id,
+            "status": job_info.get("status"),
+            "message": job_info.get("message"),
+            "progress": job_info.get("progress"),
+            "output_file": job_info.get("output_file"),
+            "error_details": job_info.get("error_details"),
+        }
+
+    # Fall back to Redis
     if not redis_client:
         raise HTTPException(status_code=503, detail="Status store unavailable")
 
@@ -644,7 +664,8 @@ async def cancel_job(job_id: str):
             job_info["status"] = "cancelled"
             job_info["message"] = "Job cancelled by user"
 
-        set_job_status(job_id, "completed")
+        # Reflect cancellation in Redis
+        set_job_status(job_id, "cancelled")
         
         # Clean up job info after a delay
         def cleanup_later():

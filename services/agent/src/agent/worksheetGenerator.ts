@@ -13,10 +13,10 @@
  */
 
 import { Experimental_Agent as Agent, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
 import { createMCPClientWithContext, type UserContext } from '../mcpClient';
 import { worksheetGeneratorPrompt } from '../prompts';
 import dotenv from 'dotenv';
+import { models, get_model } from '../llm_models';
 dotenv.config();
 
 export interface WorksheetOptions {
@@ -48,7 +48,7 @@ export async function* worksheetGenerator(
 
   try {
     const agent = new Agent({
-      model: google('gemini-2.5-flash'),
+      model: get_model(models.worksheet_generator.provider, models.worksheet_generator.model),
       system: systemPrompt,
       tools: saveContentTool,
       stopWhen: stepCountIs(5),

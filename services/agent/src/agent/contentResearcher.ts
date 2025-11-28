@@ -16,10 +16,10 @@
  */
 
 import { Experimental_Agent as Agent, stepCountIs } from 'ai';
-import { google } from '@ai-sdk/google';
 import { createMCPClientWithContext, type UserContext } from '../mcpClient';
 import { contentResearcherPrompt } from '../prompts';
 import dotenv from 'dotenv';
+import { models, get_model } from '../llm_models';
 dotenv.config();
 
 export interface ResearchOptions {
@@ -86,7 +86,7 @@ export async function* contentResearcher(
 
   try {
     const agent = new Agent({
-      model: google('gemini-2.5-flash'),
+      model: get_model(models.content_researcher.provider, models.content_researcher.model),
       system: enhancedSystemPrompt,
       tools: tools,
       stopWhen: stepCountIs(12)

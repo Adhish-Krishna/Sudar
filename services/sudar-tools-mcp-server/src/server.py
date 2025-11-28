@@ -7,7 +7,7 @@ from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
 from starlette.responses import JSONResponse
 
-from .tools import WebSearchTool, WebsiteScraperTool, ContentSaverTool, ContentRetrieverTool, ManimRendererTool
+from .tools import WebSearchTool, WebsiteScraperTool, ContentSaverTool, ContentRetrieverTool
 
 # Load environment variables
 load_dotenv()
@@ -27,7 +27,6 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "sudar-content")
 
 MD_TO_PDF_URL = os.getenv("MD_TO_PDF_URL", "http://localhost:3000/convert")
-MANIM_RENDERER_URL = os.getenv("MANIM_RENDERER_URL", "http://localhost:3004")
 
 # RAG service configuration
 RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://localhost:8001")
@@ -42,8 +41,6 @@ content_saver_tool = ContentSaverTool(
     md_to_pdf_url=MD_TO_PDF_URL
 )
 content_retriever_tool = ContentRetrieverTool(rag_service_url=RAG_SERVICE_URL)
-
-video_generation_tool = ManimRendererTool(manim_renderer_url=MANIM_RENDERER_URL)
 
 
 @mcp.tool()
@@ -195,52 +192,6 @@ def retrieve_content(
         top_k=top_k
     )
 
-@mcp.tool()
-def generate_video(
-    code: str,
-    scene_name: Optional[str] = None,
-    quality: str = "medium_quality",
-    format: str = "mp4",
-    timeout: int = 300
-) -> dict:
-    """Generate an educational video using Manim animation code.
-    
-    Args:
-        code: Python code containing Manim animations (must include a Scene class)
-        scene_name: Optional scene class name to render
-        quality: Video quality - "low_quality", "medium_quality", or "high_quality"
-        format: Output format - "mp4" or "gif"
-        timeout: Maximum time in seconds to wait for generation (default: 300)
-    
-    Returns:
-        Dict with success status, video_url, job_id, and other details
-    """
-    headers = get_http_headers(include_all=True)
-    
-    user_id = headers.get("x-user-id")
-    chat_id = headers.get("x-chat-id")
-    subject_id = headers.get("x-subject-id")
-    classroom_id = headers.get("x-classroom-id")
-    
-    if not all([user_id, chat_id, classroom_id, subject_id]):
-        return {
-            "success": False,
-            "error": "Missing required user context headers"
-        }
-
-    return video_generation_tool.generate_video(
-        code=code,
-        user_id=user_id,
-        chat_id=chat_id,
-        classroom_id=classroom_id,
-        subject_id=subject_id,
-        scene_name=scene_name,
-        quality=quality,
-        format=format,
-        timeout=timeout
-    )
-
-
 # Add health check endpoint
 @mcp.custom_route("/health", methods=["GET"])
 def health_check(request):
@@ -262,7 +213,6 @@ def main():
     print(f"MinIO: {MINIO_URL}")
     print(f"MD-to-PDF Service: {MD_TO_PDF_URL}")
     print(f"RAG Service: {RAG_SERVICE_URL}")
-    print(f"Manim Renderer: {MANIM_RENDERER_URL}")
     
     # Run with HTTP transport
     mcp.run(transport="streamable-http", host=host, port=port)
