@@ -27,7 +27,7 @@ const streamChat = async (req: Request, res: Response) => {
 
         const user_id = req.user_id!;
 
-        const { chat_id, subject_id, classroom_id, query, flow_type, research_mode = 'moderate' }: ChatRequest = req.body;
+        const { chat_id, subject_id, classroom_id, query, flow_type, research_mode}: ChatRequest = req.body;
 
         if (!chat_id || !classroom_id || !query) {
             return res.status(400).json({

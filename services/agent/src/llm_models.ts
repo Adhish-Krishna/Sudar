@@ -10,10 +10,6 @@ type AgentModel = {
 }
 
 export const models = {
-    code_evaluator: <AgentModel>{
-        provider: "google",
-        model: "gemini-2.5-flash"
-    },
     content_researcher: <AgentModel>{
         provider: "google",
         model: "gemini-2.0-flash"
@@ -25,10 +21,6 @@ export const models = {
     code_generator: <AgentModel>{
         provider: "google",
         model: "gemini-2.5-pro"
-    },
-    code_refinement_agent: <AgentModel>{
-        provider: "google",
-        model: "gemini-2.5-flash"
     },
     doubt_clearance_agent: <AgentModel>{
         provider: "google",

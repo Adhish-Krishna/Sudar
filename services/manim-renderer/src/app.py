@@ -167,6 +167,7 @@ class ProcessStatus(BaseModel):
     error_details: Optional[str] = None
 
 def upload_to_minio(
+    scene_name: str,
     file_path: str,
     user_id: str,
     chat_id: str,
@@ -186,7 +187,7 @@ def upload_to_minio(
     try:
         # Generate filename with timestamp
         timestamp = int(time.time())
-        video_filename = f"video_{timestamp}.{format}"
+        video_filename = f"video_{timestamp}{scene_name.strip() if scene_name else '_'}.{format}"
         
         # Construct object path: {user_id}/{classroom_id}/{subject_id}/{chat_id}/{video_filename}
         object_name = f"{user_id}/{classroom_id}/{subject_id}/{chat_id}/{video_filename}"
@@ -504,6 +505,7 @@ def run_manim_process(job_id: str, code: str, scene_name: str, quality: str, for
                         metadata = job_info.get("metadata", {})
                     
                     minio_url = upload_to_minio(
+                        scene_name=scene_name,
                         file_path=str(output_file),
                         user_id=metadata.get("user_id", ""),
                         chat_id=metadata.get("chat_id", ""),
