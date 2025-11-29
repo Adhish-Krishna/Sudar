@@ -39,7 +39,7 @@ export function convertChunkToStep(chunk: any, phase: string, stepNumber: number
     'text-start', 'text-end', 
     'tool-input-start', 'tool-input-delta',
     'reasoning-start', 'reasoning-end', 
-    'error', 'file', 'data'
+    'file', 'data'
   ];
   
   if (skipTypes.includes(chunk.type)) {
@@ -124,7 +124,7 @@ export async function addUserMessage(
  */
 export async function initializeAgentMessage(
   chatId: string,
-  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat' | 'content_generation',
+  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat' | 'content_generation' | 'content_creation',
   inputFiles: string[]
 ): Promise<string> {
   const messageId = randomUUID();
@@ -139,6 +139,7 @@ export async function initializeAgentMessage(
     messageId,
     messageType: 'agent',
     agentMessage: {
+      // Preserve the flowType as-is, but normalize any legacy names if necessary
       flowType,
       startTime: new Date(),
       totalSteps: 0,

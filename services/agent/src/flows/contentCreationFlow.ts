@@ -70,7 +70,7 @@ export async function contentCreationFlow(
         // Initialize agent message
         const messageId = await initializeAgentMessage(
             userContext.chatId,
-            'content_generation',
+            'content_creation',
             fileExtraction.extractedFiles
         );
 
@@ -160,8 +160,8 @@ export async function contentCreationFlow(
 
             // Send evaluation result to client
             res.write(`data: ${JSON.stringify({
-                type: 'evaluation',
                 phase: 'evaluation',
+                type: 'evaluation',
                 iteration: refinementIteration + 1,
                 isValid: codeEvaluation.isValid,
                 errors: codeEvaluation.errors,
@@ -187,8 +187,8 @@ export async function contentCreationFlow(
 
             if (refinementIteration >= MAX_REFINEMENT_ITERATIONS) {
                 res.write(`data: ${JSON.stringify({
-                    type: 'warning',
                     phase: 'evaluation',
+                    type: 'warning',
                     message: 'Maximum refinement iterations reached. Proceeding with current code.'
                 })}\n\n`);
                 break;
@@ -248,8 +248,8 @@ export async function contentCreationFlow(
 
         // ====== PHASE 5: VIDEO GENERATION (ASYNC) ======
         res.write(`data: ${JSON.stringify({
-            type: 'phase-start',
             phase: 'video',
+            type: 'phase-start',
             message: 'Starting video generation (this may take a few minutes)...'
         })}\n\n`);
 
@@ -273,8 +273,8 @@ export async function contentCreationFlow(
             };
 
             res.write(`data: ${JSON.stringify({
-                type: 'video-request',
                 phase: 'video',
+                type: 'video-request',
                 message: 'Submitting video generation request...'
             })}\n\n`);
 
@@ -300,13 +300,23 @@ export async function contentCreationFlow(
                     job_id: jobId,
                     message: 'Video generation started! This will take a few minutes. You can safely leave this page and come back later to view the video.'
                 })}\n\n`);
+
+                // Store a dedicated video-processing step to the DB so history can reconstruct job polling
+                stepNumber++;
+                await addStepToAgentMessage(userContext.chatId, messageId, {
+                    step: stepNumber,
+                    phase: 'video',
+                    type: 'video-processing',
+                    chunkData: { job_id: jobId, message: 'Video generation started' },
+                    timestamp: new Date()
+                });
             }
 
         } catch (error) {
             console.error('Failed to start video generation:', error);
             res.write(`data: ${JSON.stringify({
-                type: 'error',
                 phase: 'video',
+                type: 'error',
                 message: `Failed to start video generation: ${error instanceof Error ? error.message : 'Unknown error'}`
             })}\n\n`);
         }
@@ -357,8 +367,8 @@ export async function contentCreationFlow(
         );
 
         res.write(`data: ${JSON.stringify({
-            type: 'done',
             phase: 'completion',
+            type: 'done',
             video_job_id: jobId,
             message: 'Workflow complete. Video is generating in background.'
         })}\n\n`);

@@ -39,7 +39,7 @@ export interface IAgentStep {
 }
 
 export interface IAgentMessage {
-  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat' | 'content_generation';
+  flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_research' | 'generic_chat' | 'content_generation' | 'content_creation';
   startTime: Date;
   endTime?: Date;
   totalSteps: number;
@@ -158,7 +158,7 @@ const AgentStepSchema = new Schema<IAgentStep>({
 const AgentMessageSchema = new Schema<IAgentMessage>({
   flowType: { 
     type: String, 
-    enum: ['doubt_clearance', 'worksheet_generation', 'content_research', 'generic_chat', 'content_generation'],
+    enum: ['doubt_clearance', 'worksheet_generation', 'content_research', 'generic_chat', 'content_generation', 'content_creation'],
     required: true 
   },
   startTime: { type: Date, default: Date.now },

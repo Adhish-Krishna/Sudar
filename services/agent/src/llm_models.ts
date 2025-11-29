@@ -20,7 +20,7 @@ export const models = {
     },
     worksheet_generator: <AgentModel>{
         provider: "google",
-        model: "gemini-2.0-flash"
+        model: "gemini-2.5-flash"
     },
     code_generator: <AgentModel>{
         provider: "google",
