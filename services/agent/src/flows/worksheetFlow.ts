@@ -31,6 +31,7 @@ import {
   finalizeAgentMessage,
   convertChunkToStep
 } from '../utils/chatUtils';
+import { startHeartbeat } from '../utils/streamUtils';
 
 export interface WorksheetFlowOptions {
   query: string;
@@ -63,8 +64,10 @@ export async function worksheetFlow(
   let researchFindings = '';
   let worksheetContent = '';
   const researchedWebsites = new Set<string>();
+  let stopHeartbeat: (() => void) | null = null;
 
   try {
+    stopHeartbeat = startHeartbeat(res, 10000);
     // Add user message to database
     await addUserMessage(
       userContext.chatId,
@@ -151,11 +154,13 @@ export async function worksheetFlow(
       }
     );
     
-    res.write(`data: ${JSON.stringify({ type: 'done', phase: 'flow' })}\n\n`);
+    stopHeartbeat();
+    res.write(`data: ${JSON.stringify({ type: 'done', phase: 'completion' })}\n\n`);
     res.end();
 
   } catch (error) {
     console.error('Error in worksheet flow:', error);
+    if (typeof stopHeartbeat === 'function') stopHeartbeat();
     res.write(`data: ${JSON.stringify({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
     res.end();
   }

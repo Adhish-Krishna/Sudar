@@ -24,6 +24,7 @@ import { extractFilesFromQuery } from '../utils/fileExtractor';
 import { contentResearcher } from '../agent/contentResearcher';
 import { doubtClearanceFlowPrompt } from '../prompts';
 import dotenv from 'dotenv';
+import { startHeartbeat } from '../utils/streamUtils';
 import type { Response } from 'express';
 import {
   addUserMessage,
@@ -63,8 +64,10 @@ export async function doubtClearanceFlow(
   let researchFindings = '';
   let finalAnswer = '';
   const researchedWebsites = new Set<string>();
+  let stopHeartbeat: (() => void) | null = null;
 
   try {
+    stopHeartbeat = startHeartbeat(res, 10000);
     // Add user message to database
     await addUserMessage(
       userContext.chatId,
@@ -177,12 +180,15 @@ export async function doubtClearanceFlow(
       }
     );
     
-    res.write(`data: ${JSON.stringify({ type: 'done', phase: 'answer' })}\n\n`);
+    // Stop heartbeat once flow completes
+    stopHeartbeat();
+    res.write(`data: ${JSON.stringify({ type: 'done', phase: 'completion' })}\n\n`);
     res.end();
     return;
 
   } catch (error) {
     console.error('Error in doubt clearance flow:', error);
+    if (typeof stopHeartbeat === 'function') stopHeartbeat();
     res.write(`data: ${JSON.stringify({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
     res.end();
   }

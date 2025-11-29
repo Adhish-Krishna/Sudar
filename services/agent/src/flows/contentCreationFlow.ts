@@ -25,9 +25,11 @@ import {
 } from '../utils/chatUtils';
 import { extractFilesFromQuery } from '../utils/fileExtractor';
 import dotenv from 'dotenv'
+import { startHeartbeat } from '../utils/streamUtils';
 import axios from 'axios';
 import { models, get_model } from '../llm_models';
-import { z } from 'zod';
+// zod used by shared schemas
+import { CodeOutputSchema, type CodeOutput } from '../schemas/codeOutputSchema';
 
 dotenv.config();
 
@@ -71,6 +73,7 @@ export async function contentCreationFlow(
     const actualQuery = fileExtraction.hasFiles ? fileExtraction.cleanedQuery : query;
 
     let messageId: string | undefined;
+    let stopHeartbeat: (() => void) | null = null;
     try {
         // Add user message to database
         await addUserMessage(
@@ -88,6 +91,8 @@ export async function contentCreationFlow(
         );
 
         // ====== PHASE 1: RESEARCH ======
+        // Start server heartbeat to keep SSE alive during long operations
+        stopHeartbeat = startHeartbeat(res, 10000);
         for await (const result of contentResearcher({
             query: actualQuery,
             userContext,
@@ -132,10 +137,8 @@ export async function contentCreationFlow(
                 'OUTPUT: Respond with JSON only: { "code": "<python code>", "sceneName": "<SceneName or empty>" }'
             ];
             
-            const CodeOutputSchema = z.object({
-                code: z.string(),
-                sceneName: z.string()
-            });
+            // Reuse central schema for code output validation
+            // const CodeOutputSchema = z.object({ code: z.string(), sceneName: z.string() });
             let code: string = '';
             let sceneName: string = '';
             try {
@@ -146,8 +149,9 @@ export async function contentCreationFlow(
                     schema: CodeOutputSchema,
                 });
                 if (object) {
-                    code = object.code;
-                    sceneName = object.sceneName;
+                    const result: CodeOutput = object;
+                    code = result.code;
+                    sceneName = result.sceneName || '';
                 }
             } catch (err) {
                     console.log(err);
@@ -210,6 +214,9 @@ export async function contentCreationFlow(
                             chunkData: { job_id: jobId, message: 'Video started' },
                             timestamp: new Date()
                         });
+
+                        // Also stream a video-processing chunk so frontend starts polling
+                        res.write(`data: ${JSON.stringify({ phase: 'video', type: 'video-processing', job_id: jobId, message: 'Video is processing' })}\n\n`);
                         break; // success
                     }
                 } catch (err) {
@@ -236,6 +243,8 @@ export async function contentCreationFlow(
             timestamp: new Date()
         });
 
+        // Stop heartbeat before finishing
+        stopHeartbeat();
         // ====== PHASE 6: COMPLETION ======
         const duration = Date.now() - startTime;
         const finalMessage = `✅ Content creation workflow completed!\n\nRefinement iterations: ${iterate}\nCode validation: ${validationResponse?.is_valid ? 'Passed' : 'Completed with warnings'}\nVideo generation: ${videoStarted ? 'Started (processing in background)' : 'Failed to start'}\nJob ID: ${jobId || 'N/A'}\nTotal time: ${(duration / 1000).toFixed(2)}s\n\n💡 The video is being generated. You can close this page and come back later to view it.`;
@@ -270,6 +279,12 @@ export async function contentCreationFlow(
             }
         );
 
+        res.write(`data: ${JSON.stringify({
+            type: 'done',
+            phase: 'completion',
+            video_job_id: jobId,
+            message: 'Workflow complete. Video is generating in background.'
+        })}\n\n`);
         res.end();
 
     } catch (error) {
@@ -284,6 +299,7 @@ export async function contentCreationFlow(
             timestamp: new Date()
             });
         }
+        if (typeof stopHeartbeat === 'function') stopHeartbeat();
         res.end();
     }
 }
