@@ -9,6 +9,8 @@ import uuid
 import subprocess
 import signal
 import tokenize
+import ast
+import py_compile
 from pathlib import Path
 from typing import Dict, Any, Optional
 import threading
@@ -140,6 +142,21 @@ class ManimRequest(BaseModel):
     chat_id: str
     classroom_id: str
     subject_id: str
+
+
+class ManimValidateRequest(BaseModel):
+    code: str
+    scene_name: Optional[str] = None
+
+
+class ValidationResponse(BaseModel):
+    is_valid: bool
+    compile_errors: list[str] = []
+    syntax_error: Optional[dict] = None
+    runtime_errors: list[str] = []
+    warnings: list[str] = []
+    suggested_fixes: list[str] = []
+    scene_names: list[str] = []
 
 class ProcessStatus(BaseModel):
     job_id: str
@@ -338,6 +355,47 @@ def validate_manim_code(code: str) -> tuple[bool, str]:
                 return False, f"Potential infinite loop detected at line {i + 1}"
     
     return True, "Code validation passed"
+
+
+def compile_check(code: str) -> tuple[bool, list[str], Optional[dict]]:
+    """Perform AST parse and py_compile checks to detect syntax errors.
+
+    Returns tuple: (is_valid, compile_errors, syntax_error)
+    """
+    errors: list[str] = []
+    syntax_error = None
+    # AST parse
+    try:
+        ast.parse(code)
+    except SyntaxError as se:
+        syntax_error = {"msg": str(se), "lineno": se.lineno, "offset": se.offset}
+        errors.append(f"SyntaxError: {se.msg} at line {se.lineno}:{se.offset}")
+        return False, errors, syntax_error
+    except Exception as e:
+        errors.append(f"AST parse error: {e}")
+        return False, errors, syntax_error
+
+    # py_compile
+    try:
+        tmpfile = temp_dir / f"validate_{uuid.uuid4().hex}.py"
+        tmpfile.parent.mkdir(parents=True, exist_ok=True)
+        tmpfile.write_text(code)
+        py_compile.compile(str(tmpfile), doraise=True)
+        tmpfile.unlink(missing_ok=True)
+    except py_compile.PyCompileError as ce:
+        errors.append(str(ce))
+        if tmpfile.exists():
+            tmpfile.unlink(missing_ok=True)
+        return False, errors, syntax_error
+    except Exception as e:
+        errors.append(f"py_compile error: {e}")
+        try:
+            tmpfile.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return False, errors, syntax_error
+
+    return True, errors, syntax_error
 
 def extract_scene_names(code: str) -> list[str]:
     """Extract scene class names from the code"""
@@ -613,37 +671,6 @@ async def get_status(job_id: str = Query(..., description="Rendering job identif
 
     return {"job_id": job_id, "status": status}
 
-@app.get("/status/{job_id}/stream")
-async def stream_status(job_id: str):
-    """Stream job status updates via SSE"""
-    async def generate():
-        if not redis_client:
-            yield "data: {\"error\": \"Status store unavailable\"}\n\n"
-            return
-
-        while True:
-            status = await get_job_status(job_id)
-            if status is None:
-                yield "data: {\"error\": \"Job not found\"}\n\n"
-                break
-
-            if status == "completed":
-                yield "data: job completed\n\n"
-                break
-
-            # Send a keep-alive comment to prevent connection timeout
-            yield ": waiting\n\n"
-            await asyncio.sleep(1)
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
-        }
-    )
-
 @app.delete("/job/{job_id}")
 async def cancel_job(job_id: str):
     """Cancel a running job"""
@@ -678,6 +705,44 @@ async def cancel_job(job_id: str):
         threading.Thread(target=cleanup_later, daemon=True).start()
     
     return {"message": "Job cancelled successfully"}
+
+@app.post("/validate", response_model=ValidationResponse)
+async def validate_code_endpoint(req: ManimValidateRequest):
+    """Validate code for syntax issues, dangerous patterns, and basic runtime import checks."""
+    code = req.code
+    is_valid, message = validate_manim_code(code)
+
+    # Compile and AST checks
+    compile_ok, compile_errors, syntax_error = compile_check(code)
+    if not compile_ok:
+        is_valid = False
+
+    # Minimal import/runtime check
+    runtime_errors: list[str] = []
+    try:
+        # Use sys.executable to ensure same interpreter
+        cmd = [sys.executable, "-c", "import manim; from manim import *"]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        if proc.returncode != 0:
+            runtime_errors.append(proc.stderr.strip() or proc.stdout.strip())
+            is_valid = False
+    except Exception as e:
+        runtime_errors.append(str(e))
+        is_valid = False
+
+    scenes = extract_scene_names(code)
+
+    response = ValidationResponse(
+        is_valid=is_valid and compile_ok,
+        compile_errors=compile_errors,
+        syntax_error=syntax_error,
+        runtime_errors=runtime_errors,
+        warnings=[message] if message and message != "Code validation passed" else [],
+        suggested_fixes=[],
+        scene_names=scenes
+    )
+
+    return response
 
 @app.get("/health")
 async def health_check():
