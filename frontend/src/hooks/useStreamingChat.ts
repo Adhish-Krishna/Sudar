@@ -7,11 +7,12 @@
 
 import { useState, useRef } from 'react';
 import { sudarAgent } from '../api';
+import { pollRenderStatus } from '../lib/renderPoller';
 import { toast } from 'sonner';
 
 export interface StreamChunk {
     type: string;
-    phase?: 'research' | 'generation' | 'answer' | 'chat';
+    phase?: 'research' | 'generation' | 'answer' | 'chat' | 'video';
     // Text chunks
     textDelta?: string;
     delta?: string;
@@ -22,6 +23,10 @@ export interface StreamChunk {
     output?: any;
     // Metadata
     finishReason?: string;
+    // Video-specific
+    job_id?: string;
+    video_url?: string;
+    error?: string;
     [key: string]: any;
 }
 
@@ -35,7 +40,7 @@ export interface ProcessedMessage {
 
 export interface StreamingState {
     isStreaming: boolean;
-    currentPhase: 'research' | 'generation' | 'answer' | null;
+    currentPhase: 'research' | 'generation' | 'answer' | 'video' | null;
     accumulatedSteps: StreamChunk[];
     currentStepNumber: number;
 }
@@ -63,10 +68,12 @@ export const useStreamingChat = ({
     });
 
     const abortControllerRef = useRef<(() => void) | null>(null);
+    const chatIdRef = useRef<string | null>(chatId);
+    const activePollsRef = useRef<Set<string>>(new Set());
 
     const sendMessage = async (
         message: string,
-        flowType: 'doubt_clearance' | 'worksheet_generation',
+        flowType: 'doubt_clearance' | 'worksheet_generation' | 'content_creation',
         researchMode: 'simple' | 'moderate' | 'deep'
     ) => {
         if (!message.trim()) {
@@ -86,6 +93,8 @@ export const useStreamingChat = ({
         let currentPhase: 'research' | 'generation' | 'answer' | null = null;
 
         try {
+            // capture chat id for fallback database lookups in case SSE connection dies
+            chatIdRef.current = chatId;
             const abortFn = await sudarAgent.streamChat(
                 {
                     chat_id: chatId,
@@ -108,8 +117,9 @@ export const useStreamingChat = ({
                             }));
                         }
 
-                        // Handle finish event - complete the message
-                        if (event.type === 'finish') {
+                        // Handle flow-level 'done' event (server sends this when the flow is finished)
+                        // Do NOT stop streaming on SDK 'finish' chunks (they can happen per-agent). Only stop on 'done' flow-level signals.
+                        if (event.type === 'done' || event.type === 'error') {
                             console.log('Stream complete. Total steps:', accumulatedSteps.length);
                             
                             // Build final message content from text chunks
@@ -143,8 +153,7 @@ export const useStreamingChat = ({
                             return;
                         }
 
-                        // Process the chunk based on its type
-                        // The backend now sends raw chunks with type like 'text-delta', 'tool-input-available', etc.
+                        // Normalize chunk and process
                         const processedChunk: StreamChunk = {
                             type: event.type,
                             phase: event.phase || currentPhase || undefined,
@@ -152,7 +161,7 @@ export const useStreamingChat = ({
                         };
 
                         // Add to accumulated steps (skip meta chunks that don't represent actual content)
-                        const skipTypes = ['start', 'start-step', 'finish-step'];
+                        const skipTypes = ['start', 'start-step', 'finish-step', 'heartbeat'];
                         if (!skipTypes.includes(event.type)) {
                             accumulatedSteps.push(processedChunk);
                             
@@ -161,6 +170,62 @@ export const useStreamingChat = ({
                                 accumulatedSteps: [...accumulatedSteps],
                                 currentStepNumber: accumulatedSteps.length
                             }));
+                        }
+
+                        // If we received a 'video-processing' chunk start polling for the job status
+                        if (processedChunk.phase === 'video' && processedChunk.type === 'video-processing') {
+                            const jobId = getJobIdFromChunk(processedChunk);
+                            if (jobId) {
+                                if (activePollsRef.current.has(jobId)) return; // already polling this job
+                                activePollsRef.current.add(jobId);
+                                (async () => {
+                                    try {
+                                            const statusResp = await pollRenderStatus(jobId);
+                                        if (!statusResp) {
+                                            // timed out
+                                            const timedOutChunk: StreamChunk = {
+                                                type: 'video-error',
+                                                phase: 'video',
+                                                job_id: jobId,
+                                                error: 'Render status polling timed out',
+                                                status: 'error'
+                                            };
+                                            accumulatedSteps.push(timedOutChunk);
+                                            setStreamingState(prev => ({ ...prev, accumulatedSteps: [...accumulatedSteps], currentStepNumber: accumulatedSteps.length }));
+                                        } else if (statusResp.status === 'completed') {
+                                                    const already = accumulatedSteps.some(c => c.type === 'video-completed' && getJobIdFromChunk(c) === jobId);
+                                            if (!already) {
+                                                const completedChunk: StreamChunk = {
+                                                    type: 'video-completed',
+                                                    phase: 'video',
+                                                    job_id: jobId,
+                                                    video_url: statusResp.url || statusResp.video_url || statusResp.videoUrl,
+                                                    status: 'completed'
+                                                };
+                                                accumulatedSteps.push(completedChunk);
+                                                setStreamingState(prev => ({ ...prev, accumulatedSteps: [...accumulatedSteps], currentStepNumber: accumulatedSteps.length }));
+                                            }
+                                        } else if (statusResp.status === 'error') {
+                                            const alreadyErr = accumulatedSteps.some(c => c.type === 'video-error' && getJobIdFromChunk(c) === jobId);
+                                            if (!alreadyErr) {
+                                                const errorChunk: StreamChunk = {
+                                                    type: 'video-error',
+                                                    phase: 'video',
+                                                    job_id: jobId,
+                                                    error: statusResp.error || statusResp.error_details || 'Unknown renderer error',
+                                                    status: 'error'
+                                                };
+                                                accumulatedSteps.push(errorChunk);
+                                                setStreamingState(prev => ({ ...prev, accumulatedSteps: [...accumulatedSteps], currentStepNumber: accumulatedSteps.length }));
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.warn('Render status poll failed:', err);
+                                    } finally {
+                                        activePollsRef.current.delete(jobId);
+                                    }
+                                })();
+                            }
                         }
                     },
                     onError: (error: any) => {
@@ -189,7 +254,6 @@ export const useStreamingChat = ({
                             currentStepNumber: 0
                         });
 
-                        // Still notify completion with partial message
                         if (onMessageComplete) {
                             onMessageComplete(finalMessage);
                         }
@@ -203,9 +267,6 @@ export const useStreamingChat = ({
 
             abortControllerRef.current = abortFn;
 
-            // The stream will end when connection closes, so we handle completion here
-            // by setting up a check after the stream function returns
-            // Note: The actual completion will be detected when no more events arrive
         } catch (error: any) {
             console.error('Failed to start stream:', error);
             toast.error(error.message || "Failed to send message");
@@ -221,6 +282,10 @@ export const useStreamingChat = ({
                 onError(error);
             }
         }
+    };
+
+    const getJobIdFromChunk = (chunk: StreamChunk | any) => {
+        return chunk?.job_id || chunk?.chunkData?.job_id || chunk?.jobId || chunk?.data?.job_id || undefined;
     };
 
     const stopStreaming = () => {

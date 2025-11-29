@@ -159,7 +159,7 @@ export interface ChatRequest {
   subject_id?: string;
   classroom_id: string;
   query: string;
-  flow_type: 'doubt_clearance' | 'worksheet_generation';
+  flow_type: 'doubt_clearance' | 'worksheet_generation' | 'content_creation';
   research_mode: 'simple' | 'moderate' | 'deep';
 }
 
@@ -1032,6 +1032,7 @@ async function streamSSEPost(
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    let seenDoneEvent = false;
 
     (async () => {
       try {
@@ -1053,12 +1054,23 @@ async function streamSSEPost(
             if (dataMatch) {
               try {
                 const parsed = JSON.parse(dataMatch[1]);
+                if (parsed?.type === 'done' || parsed?.type === 'completion') {
+                  seenDoneEvent = true;
+                }
                 onEvent(parsed);
               } catch (e) {
                 console.error('Failed to parse SSE data:', dataMatch[1]);
               }
             }
           }
+        }
+        // Connection closed by server gracefully. If we haven't seen a 'done' event,
+        // notify the client that the connection was closed unexpectedly so it can
+        // attempt to recover or query the DB for final metadata.
+        if (!seenDoneEvent) {
+          try {
+            onEvent({ type: 'connection_closed' } as any);
+          } catch (e) { /* ignore errors */ }
         }
       } catch (err) {
         if (onError) onError(err);
@@ -1104,6 +1116,21 @@ export const sudarAgent = {
         status: error.response?.status || 500, 
         message: error.response?.data?.message || error.message || 'Failed to get chat messages' 
       };
+    }
+  },
+
+  /**
+   * Poll the renderer status for a job
+   * GET {MANIM_RENDERER_URL}/status?job_id=...
+   */
+  getRenderStatus: async (jobId: string): Promise<any> => {
+    try {
+      const RENDERER_URL: string = import.meta.env.VITE_MANIM_RENDERER_URL || 'http://localhost:3004';
+      const response = await axios.get(`${RENDERER_URL}/status`, { params: { job_id: jobId } });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to get render status:', error);
+      return { status: 'error', error: error?.message || 'Failed to reach renderer' };
     }
   },
 

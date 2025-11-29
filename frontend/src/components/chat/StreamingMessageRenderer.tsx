@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 interface StreamingMessageRendererProps {
     steps: StreamChunk[];
     isStreaming?: boolean;
-    currentPhase?: 'research' | 'generation' | 'answer' | null;
+    currentPhase?: 'research' | 'generation' | 'answer' | 'video' | null;
     flowType?: 'doubt_clearance' | 'worksheet_generation';
 }
 
@@ -32,7 +32,8 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
         research: true,
         answer: true,
-        generation: true
+        generation: true,
+        video: true
     });
 
     // Group steps by phase
@@ -40,7 +41,8 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
         const groups: Record<string, StreamChunk[]> = {
             research: [],
             answer: [],
-            generation: []
+            generation: [],
+            video: []
         };
 
         steps.forEach(step => {
@@ -191,6 +193,92 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
         );
     };
 
+    const renderVideoSection = (phaseSteps: StreamChunk[]) => {
+        if (!phaseSteps || phaseSteps.length === 0) return null;
+
+        // Build a map of jobId -> finalStatus so we can filter out in-progress rendering entries
+        const jobStatus = new Map<string, 'completed' | 'error' | 'processing'>();
+        for (const s of phaseSteps) {
+            const id = (s as any).job_id || (s as any).chunkData?.job_id || (s as any).chunkData?.jobId || (s as any).jobId;
+            if (!id) continue;
+            if (s.type === 'video-completed') jobStatus.set(id, 'completed');
+            if (s.type === 'video-error') jobStatus.set(id, 'error');
+            if (s.type === 'video-processing' && !jobStatus.has(id)) jobStatus.set(id, 'processing');
+        }
+
+        return (
+            <div className="space-y-3">
+                <div className="p-3 rounded-lg border border-border/50 bg-muted/40">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm">Video</span>
+                            <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                                {phaseSteps.length} step{phaseSteps.length !== 1 ? 's' : ''}
+                            </Badge>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    {phaseSteps.map((step, idx) => {
+                        if (step.type === 'video-processing') {
+                            const id = (step as any).job_id || (step as any).chunkData?.job_id || (step as any).chunkData?.jobId || (step as any).jobId;
+                            // If the job is already completed or errored, hide the processing step
+                            if (id && (jobStatus.get(id) === 'completed' || jobStatus.get(id) === 'error')) {
+                                return null;
+                            }
+                            return (
+                                <Card key={idx} className="p-3 border-dashed">
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                        <div>
+                                            <div className="font-medium">Rendering video</div>
+                                            <div className="text-xs text-muted-foreground">Job ID: {step.job_id || step.chunkData?.job_id || 'N/A'}</div>
+                                            <div className="text-xs text-muted-foreground">The video is being processed. This may take a few minutes.</div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            );
+                        }
+                        if (step.type === 'video-started') {
+                            return (
+                                <Card key={idx} className="p-3">
+                                    <div className="font-medium">Video generation started</div>
+                                    <div className="text-xs text-muted-foreground">Job ID: {step.job_id || step.chunkData?.job_id || 'N/A'}</div>
+                                </Card>
+                            );
+                        }
+                        if (step.type === 'video-completed') {
+                            const src = (step as any).video_url || (step as any).chunkData?.video_url || (step as any).chunkData?.url;
+                            return (
+                                <Card key={idx} className="p-3">
+                                    <div className="font-medium mb-2">Video ready</div>
+                                    {src ? (
+                                        <video controls className="w-full rounded">
+                                            <source src={src} type="video/mp4" />
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    ) : (
+                                        <div className="text-sm text-muted-foreground">Video is ready! You can download it from files tab</div>
+                                    )}
+                                </Card>
+                            );
+                        }
+                        if (step.type === 'video-error') {
+                            return (
+                                <Card key={idx} className="p-3 border-red-400">
+                                    <div className="font-medium text-rose-600">Video generation failed</div>
+                                    <div className="text-xs text-muted-foreground">{(step as any).error || (step as any).chunkData?.error || 'Unknown error'}</div>
+                                </Card>
+                            );
+                        }
+                        return null;
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-4">
             {/* Optional Timeline Toggle */}
@@ -229,6 +317,7 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
                             </div>
                         ))}
 
+                                {/* Video Phase (moved out) */}
                         {/* Answer text content - no card wrapper */}
                         {getTextContentByPhase(groupedSteps.answer) && (
                             <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed">
@@ -239,6 +328,9 @@ export const StreamingMessageRenderer: React.FC<StreamingMessageRendererProps> =
                 )}
 
                 {renderPhaseSection('generation', groupedSteps.generation)}
+
+                {/* Video section should be rendered independently of the Answer phase */}
+                {renderVideoSection(groupedSteps.video || [])}
             </div>
 
             {/* Global Streaming Indicator */}

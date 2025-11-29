@@ -105,7 +105,7 @@ const Chat = ()=>{
     const [selectedContext, setSelectedContext] = useState<Set<string>>(new Set());
 
     //Flow state
-    const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance">("doubt_clearance");
+    const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance"| "content_creation">("doubt_clearance");
     const [researchMode, setResearchMode] = useState<"simple" | "moderate" | "deep">("moderate");
     
 

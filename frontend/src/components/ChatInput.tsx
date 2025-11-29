@@ -26,8 +26,8 @@ interface ChatInputProps{
     loadingContext?: boolean;
     selectedContext?: Set<string>;
     onToggleContext?: (filename: string) => void;
-    flowType?: "worksheet_generation" | "doubt_clearance";
-    onFlowTypeChange?: (flowType: "worksheet_generation" | "doubt_clearance") => void;
+    flowType?: "worksheet_generation" | "doubt_clearance" | "content_creation";
+    onFlowTypeChange?: (flowType: "worksheet_generation" | "doubt_clearance"| "content_creation") => void;
     researchMode?: "simple" | "moderate" | "deep";
     onResearchModeChange?: (researchMode: "simple" | "moderate" | "deep") => void;
 }
@@ -226,7 +226,7 @@ const ChatInput = ({
                                     size="sm"
                                     className="gap-1.5 md:gap-2 hover:bg-accent/50 transition-colors text-xs md:text-sm px-2 md:px-3"
                                 >
-                                    <Workflow className="size-3.5 md:size-4"/> {!isMobile ? flowType === "doubt_clearance" ? "Doubt Clearance" : "Worksheet Generation" : ""}
+                                    <Workflow className="size-3.5 md:size-4"/> {!isMobile ? flowType === "doubt_clearance" ? "Doubt Clearance" : (flowType == "worksheet_generation" ? "Worksheet Generation" : "Content Creation") : ""}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-64 p-0" align="start">
@@ -260,6 +260,20 @@ const ChatInput = ({
                                         >
                                             <div className="font-medium text-sm">Worksheet Generation</div>
                                             <div className="text-xs opacity-80 mt-1">Create custom worksheets</div>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                onFlowTypeChange?.("content_creation");
+                                                setFlowOpen(false);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-md transition-colors ${
+                                                flowType === "content_creation" 
+                                                    ? "bg-primary text-primary-foreground" 
+                                                    : "hover:bg-accent"
+                                            }`}
+                                        >
+                                            <div className="font-medium text-sm">Content Creation</div>
+                                            <div className="text-xs opacity-80 mt-1">Create education content using Manim</div>
                                         </button>
                                     </div>
                                 </div>
