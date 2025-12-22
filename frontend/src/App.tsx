@@ -9,6 +9,7 @@ import { Toaster } from "./components/ui/sonner";
 import Classroom from "./pages/Classroom";
 import Subject from "./pages/Subject";
 import Chat from "./pages/Chat";
+import Activity from "./pages/Activity";
 
 function App() {
 
@@ -18,57 +19,65 @@ function App() {
         <Routes>
           <Route path="/" element={
             <AuthLayout>
-              <Landing/>
+              <Landing />
             </AuthLayout>
-          }/>
-          
+          } />
+
           <Route path="/auth" element={
             <AuthLayout>
-              <Auth/>
+              <Auth />
             </AuthLayout>
           } />
 
           <Route path="/forgotpassword" element={
             <AuthLayout>
-              <ForgotPassword/>
+              <ForgotPassword />
             </AuthLayout>
-          }/>
-          
+          } />
+
           <Route path="/home" element={
             <DashboardLayout>
               <ProtectedRoute>
-                <Home/>
+                <Home />
               </ProtectedRoute>
             </DashboardLayout>
-          }/>
+          } />
 
           <Route path="/classroom/:classroom_id" element={
             <DashboardLayout>
               <ProtectedRoute>
-                <Classroom/>
+                <Classroom />
               </ProtectedRoute>
             </DashboardLayout>
-          }/>
+          } />
 
           <Route path="/subject/:classroom_id/:subject_id/:color" element={
             <DashboardLayout>
               <ProtectedRoute>
-                <Subject/>
+                <Subject />
               </ProtectedRoute>
             </DashboardLayout>
-          }/>
+          } />
 
           <Route path="/chat/:classroom_id/:subject_id/:color" element={
             <DashboardLayout>
               <ProtectedRoute>
-                <Chat/>
+                <Chat />
               </ProtectedRoute>
             </DashboardLayout>
-          }/>
+          } />
+
+          <Route path="/activity/:classroom_id/:activity_id" element={
+            <DashboardLayout>
+              <ProtectedRoute>
+                <Activity />
+              </ProtectedRoute>
+            </DashboardLayout>
+          } />
 
         </Routes>
       </BrowserRouter>
-      <Toaster position="top-center"/>
+      <Toaster position="top-center" />
     </RootLayout>
   )
 }

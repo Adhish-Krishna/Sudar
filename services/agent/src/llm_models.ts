@@ -12,19 +12,19 @@ type AgentModel = {
 export const models = {
     content_researcher: <AgentModel>{
         provider: "google",
-        model: "gemini-2.0-flash"
+        model: process.env.CONTENT_RESEARCHER!
     },
     worksheet_generator: <AgentModel>{
         provider: "google",
-        model: "gemini-2.5-flash"
+        model: process.env.WORKSHEET_GENERATOR!
     },
     code_generator: <AgentModel>{
         provider: "google",
-        model: "gemini-2.5-pro"
+        model: process.env.CODE_GENERATOR!
     },
     doubt_clearance_agent: <AgentModel>{
         provider: "google",
-        model: "gemini-2.0-flash"
+        model: process.env.DOUBT_CLEARANCE!
     }
 }
 

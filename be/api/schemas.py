@@ -167,10 +167,11 @@ class ActivityResponse(BaseModel):
     title: str
     type: ActivityTypeEnum
     created_at: datetime
-    files: List[FileResponse] = []
+    files: List[FileResponse] = Field(default=[], validation_alias='activity_files')
     
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 # ============= Performance Schemas =============

@@ -1,18 +1,18 @@
 import { useParams } from "react-router-dom";
 import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbList,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Home as HomeIcon, Users, MessageSquare, Files, History, Plus, Download, FileText, Loader2, Trash2} from "lucide-react";
-import { useState, useEffect, useRef} from "react";
-import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type IndexedFileResponse, type ChatSummary} from "@/api";
+import { BookOpen, Home as HomeIcon, Users, MessageSquare, Files, History, Plus, Download, FileText, Loader2, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { subjects, classrooms, documents, sudarAgent, ragService, context, type MinioDocument, type IndexedFileResponse, type ChatSummary } from "@/api";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -26,8 +26,10 @@ import type { Section } from "@/components/FilesAndChat";
 import { useLoadChatHistory } from '../hooks/useLoadChatHistory';
 import { StreamingMessageRenderer } from '../components/chat/StreamingMessageRenderer';
 import { useStreamingChat, type ProcessedMessage } from '../hooks/useStreamingChat';
+import CreateActivityDialog from "@/components/CreateActivityDialog";
+import { Button } from "@/components/ui/button";
 
-const Chat = ()=>{
+const Chat = () => {
     // Generate UUID v4
     const generateUUID = (): string => {
         return crypto.randomUUID();
@@ -38,46 +40,46 @@ const Chat = ()=>{
         return filename.replace(/\s+/g, '_');
     };
 
-    const {classroom_id, subject_id, color} = useParams<{classroom_id: string, subject_id: string, color: string}>();
+    const { classroom_id, subject_id, color } = useParams<{ classroom_id: string, subject_id: string, color: string }>();
     const navigate = useNavigate();
     const [classroomName, setClassroomName] = useState<string>("");
     const [subjectName, setSubjectName] = useState<string>("");
     const isMobile = useIsMobile();
     const [chatId, setChatId] = useState<string | null>(generateUUID());
-    const {user} = useAuth();
+    const { user } = useAuth();
     const [chatHistoryLoading, setChatHistoryLoading] = useState<boolean>(false);
 
     const { messages: historyMessages, loading: loadingHistory, setMessages } = useLoadChatHistory({
-            chatId: chatId,
-            subjectId: subject_id,
-            userId: user?.teacher_id,
-        });
+        chatId: chatId,
+        subjectId: subject_id,
+        userId: user?.teacher_id,
+    });
 
-        const { streamingState, sendMessage, stopStreaming } = useStreamingChat({
-                chatId: chatId!,
-                classroomId: classroom_id!,
-                subjectId: subject_id!,
-                onMessageComplete: (message) => {
-                    // Add completed message to history
-                    setMessages(prev => [...prev, message]);
-                },
-                onError: (error) => {
-                    console.error('Stream error:', error);
-                }
-            });
-        
-            const handleSendMessage = async (messageText: string) => {
-                // Add user message immediately
-                const userMessage: ProcessedMessage = {
-                    role: 'user',
-                    content: messageText
-                };
-                setMessages(prev => [...prev, userMessage]);
-        
-                // Start streaming
-                await sendMessage(messageText, flowType, researchMode);
-            };
-    
+    const { streamingState, sendMessage, stopStreaming } = useStreamingChat({
+        chatId: chatId!,
+        classroomId: classroom_id!,
+        subjectId: subject_id!,
+        onMessageComplete: (message) => {
+            // Add completed message to history
+            setMessages(prev => [...prev, message]);
+        },
+        onError: (error) => {
+            console.error('Stream error:', error);
+        }
+    });
+
+    const handleSendMessage = async (messageText: string) => {
+        // Add user message immediately
+        const userMessage: ProcessedMessage = {
+            role: 'user',
+            content: messageText
+        };
+        setMessages(prev => [...prev, userMessage]);
+
+        // Start streaming
+        await sendMessage(messageText, flowType, researchMode);
+    };
+
     // Files state
     const [filesOpen, setFilesOpen] = useState(false);
     const [inputDocs, setInputDocs] = useState<MinioDocument[]>([]);
@@ -85,7 +87,7 @@ const Chat = ()=>{
     const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
     const [loadingFiles, setLoadingFiles] = useState(false);
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
-    
+
     // Chat History state
     const [historyOpen, setHistoryOpen] = useState(false);
     const [chatHistory, setChatHistory] = useState<ChatSummary[]>([]);
@@ -105,18 +107,21 @@ const Chat = ()=>{
     const [selectedContext, setSelectedContext] = useState<Set<string>>(new Set());
 
     //Flow state
-    const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance"| "content_creation">("doubt_clearance");
+    const [flowType, setFlowType] = useState<"worksheet_generation" | "doubt_clearance" | "content_creation">("doubt_clearance");
     const [researchMode, setResearchMode] = useState<"simple" | "moderate" | "deep">("moderate");
-    
+
+    // Activity creation dialog state
+    const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+
 
     // Ref for scroll area
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 
-    useEffect(()=>{
-        const fetchClassroomAndSubject = async ()=>{
-            if(!classroom_id || !subject_id) return;
-            
+    useEffect(() => {
+        const fetchClassroomAndSubject = async () => {
+            if (!classroom_id || !subject_id) return;
+
             try {
                 // Fetch classroom name
                 const classroomResponse = await classrooms.getClassroom(classroom_id);
@@ -171,20 +176,20 @@ const Chat = ()=>{
         const pollInterval = setInterval(async () => {
             try {
                 const statusResponse = await ragService.getJobStatus(jobId);
-                
+
                 if (statusResponse.status === 'completed') {
                     // Job completed successfully
                     clearInterval(pollInterval);
                     pollingIntervalsRef.current.delete(filename);
-                    
+
                     setProcessingFiles(prev => {
                         const newMap = new Map(prev);
                         newMap.delete(filename);
                         return newMap;
                     });
-                    
+
                     toast.success(`${filename} processed successfully!`);
-                    
+
                     // Refresh the files list to show the newly processed file
                     if (filesOpen) {
                         fetchFiles();
@@ -193,25 +198,25 @@ const Chat = ()=>{
                     // Job failed
                     clearInterval(pollInterval);
                     pollingIntervalsRef.current.delete(filename);
-                    
+
                     setProcessingFiles(prev => {
                         const newMap = new Map(prev);
                         newMap.delete(filename);
                         return newMap;
                     });
-                    
+
                     toast.error(`Failed to process ${filename}: ${statusResponse.message || 'Unknown error'}`);
                 } else if (typeof statusResponse.status === 'number') {
                     // Error response from API
                     clearInterval(pollInterval);
                     pollingIntervalsRef.current.delete(filename);
-                    
+
                     setProcessingFiles(prev => {
                         const newMap = new Map(prev);
                         newMap.delete(filename);
                         return newMap;
                     });
-                    
+
                     toast.error(`Error checking status for ${filename}`);
                 }
                 // Otherwise, job is still processing, continue polling
@@ -226,11 +231,11 @@ const Chat = ()=>{
     // Fetch files when popover opens
     const fetchFiles = async () => {
         if (!subject_id || !user?.teacher_id || !chatId) return;
-        
+
         setLoadingFiles(true);
         try {
             const [inputResponse, outputResponse] = await Promise.all([
-                documents.getInputDocuments(user.teacher_id, classroom_id! , subject_id, chatId),
+                documents.getInputDocuments(user.teacher_id, classroom_id!, subject_id, chatId),
                 documents.getOutputDocuments(user.teacher_id, classroom_id!, subject_id, chatId)
             ]);
 
@@ -257,7 +262,7 @@ const Chat = ()=>{
         setDownloadingFile(fileName);
         try {
             const response = await documents.downloadDocument(bucketType, fileName);
-            
+
             if (response.status && response.status !== 200) {
                 toast.error(response.message || "Failed to download file");
                 return;
@@ -272,7 +277,7 @@ const Chat = ()=>{
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            
+
             toast.success(`Downloaded ${response.filename}`);
         } catch (error: any) {
             toast.error(error.message || "Failed to download file");
@@ -305,11 +310,11 @@ const Chat = ()=>{
     // Fetch chat history when popover opens
     const fetchChatHistory = async () => {
         if (!subject_id) return;
-        
+
         setChatHistoryLoading(true);
         try {
             const response = await sudarAgent.getChatsBySubject(subject_id, 1, 50);
-            
+
             if (response.status && response.status !== 200) {
                 toast.error("Failed to fetch chat history");
             } else if (response.chats) {
@@ -327,16 +332,16 @@ const Chat = ()=>{
         setDeletingChatId(chatIdToDelete);
         try {
             const response = await sudarAgent.deleteChat(chatIdToDelete);
-            
+
             if (response.status && response.status !== 200) {
                 toast.error(response.message || "Failed to delete chat");
                 return;
             }
-            
+
             toast.success("Chat deleted successfully");
             // Remove the deleted chat from the list
             setChatHistory(prev => prev.filter(chat => chat.chatId !== chatIdToDelete));
-            
+
             // If the deleted chat was the current chat, reset chatId
             if (chatIdToDelete === chatId) {
                 setChatId(generateUUID());
@@ -362,7 +367,7 @@ const Chat = ()=>{
         const now = new Date();
         const diff = now.getTime() - date.getTime();
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        
+
         if (days === 0) {
             return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         } else if (days === 1) {
@@ -418,13 +423,13 @@ const Chat = ()=>{
         for (const file of filesToUpload) {
             const cleanedFileName = cleanFileName(file.name);
             setUploadingFiles(prev => [...prev, cleanedFileName]);
-            
+
             const uploadToast = toast.loading(`Uploading ${cleanedFileName}...`);
-            
+
             try {
                 // Create a new File object with cleaned filename
                 const cleanedFile = new File([file], cleanedFileName, { type: file.type });
-                
+
                 const response = await ragService.ingestDocument(
                     cleanedFile,
                     user.teacher_id,
@@ -440,14 +445,14 @@ const Chat = ()=>{
                 // Success response has string status and job_id
                 else if (response.job_id) {
                     toast.success(`${cleanedFileName} uploaded successfully. Processing...`, { id: uploadToast });
-                    
+
                     // Add to processing files and start polling
                     setProcessingFiles(prev => {
                         const newMap = new Map(prev);
                         newMap.set(cleanedFileName, response.job_id);
                         return newMap;
                     });
-                    
+
                     // Start polling for job status
                     pollJobStatus(response.job_id, cleanedFileName);
                 }
@@ -467,11 +472,11 @@ const Chat = ()=>{
     // Fetch indexed context files
     const fetchIndexedFiles = async () => {
         if (!chatId) return;
-        
+
         setLoadingContext(true);
         try {
             const response = await context.getContext(chatId);
-            
+
             if (response.status && response.status !== 200) {
                 setIndexedFiles([]);
             } else if (Array.isArray(response)) {
@@ -505,7 +510,7 @@ const Chat = ()=>{
         });
     };
 
-    return(
+    return (
         <>
             {/* Hidden file input */}
             <input
@@ -523,7 +528,7 @@ const Chat = ()=>{
                     <BreadcrumbList>
                         <BreadcrumbItem>
                             <BreadcrumbLink asChild>
-                                <button 
+                                <button
                                     onClick={() => navigate('/home')}
                                     className="flex items-center gap-1.5"
                                 >
@@ -535,7 +540,7 @@ const Chat = ()=>{
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
                             <BreadcrumbLink asChild>
-                                <button 
+                                <button
                                     onClick={() => navigate(`/classroom/${classroom_id}`)}
                                     className="flex items-center gap-1.5"
                                 >
@@ -544,10 +549,10 @@ const Chat = ()=>{
                                 </button>
                             </BreadcrumbLink>
                         </BreadcrumbItem>
-                        <BreadcrumbSeparator/>
+                        <BreadcrumbSeparator />
                         <BreadcrumbItem>
                             <BreadcrumbLink asChild>
-                                <button 
+                                <button
                                     onClick={() => navigate(`/subject/${classroom_id}/${subject_id}/${color}`)}
                                     className="flex items-center gap-1.5"
                                 >
@@ -556,10 +561,10 @@ const Chat = ()=>{
                                 </button>
                             </BreadcrumbLink>
                         </BreadcrumbItem>
-                        <BreadcrumbSeparator/>
+                        <BreadcrumbSeparator />
                         <BreadcrumbItem>
                             <BreadcrumbPage className="flex items-center gap-1.5">
-                                <MessageSquare className="h-4 w-4"/>{!isMobile &&"Chat"}
+                                <MessageSquare className="h-4 w-4" />{!isMobile && "Chat"}
                             </BreadcrumbPage>
                         </BreadcrumbItem>
                     </BreadcrumbList>
@@ -571,11 +576,11 @@ const Chat = ()=>{
                     <div className="flex flex-row gap-2 justify-center items-center h-full px-6">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <button 
+                                <button
                                     onClick={handleNewChat}
                                     className="flex flex-row gap-2 items-center px-4 py-2 rounded-lg hover:bg-accent transition-colors text-sm font-medium border"
                                 >
-                                    <Plus className="h-4 w-4"/> {!isMobile && "New Chat"}
+                                    <Plus className="h-4 w-4" /> {!isMobile && "New Chat"}
                                 </button>
                             </TooltipTrigger>
                             {isMobile && (
@@ -584,13 +589,13 @@ const Chat = ()=>{
                                 </TooltipContent>
                             )}
                         </Tooltip>
-                        
+
                         {/* Files Button */}
-                        <button 
+                        <button
                             onClick={() => setFilesOpen(true)}
                             className="flex flex-row gap-2 items-center px-4 py-2 rounded-lg hover:bg-accent transition-colors text-sm font-medium border relative"
                         >
-                            <Files className="h-4 w-4"/> {!isMobile && "Files"}
+                            <Files className="h-4 w-4" /> {!isMobile && "Files"}
                             {processingFiles.size > 0 && (
                                 <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-primary text-primary-foreground text-xs rounded-full animate-pulse">
                                     {processingFiles.size}
@@ -604,10 +609,10 @@ const Chat = ()=>{
                             onOpenChange={handleFilesOpenChange}
                             title="Chat Files"
                             description={
-                                processingFiles.size > 0 
-                                    ? `${processingFiles.size} file(s) processing` 
-                                    : selectedFiles.size > 0 
-                                        ? `${selectedFiles.size} file(s) selected` 
+                                processingFiles.size > 0
+                                    ? `${processingFiles.size} file(s) processing`
+                                    : selectedFiles.size > 0
+                                        ? `${selectedFiles.size} file(s) selected`
                                         : "Select files to perform actions"
                             }
                             maxWidth="max-w-3xl"
@@ -629,7 +634,7 @@ const Chat = ()=>{
                                             <div className="space-y-1">
                                                 {inputDocs.map((doc) => {
                                                     const isProcessing = processingFiles.has(doc.name);
-                                                    
+
                                                     return (
                                                         <div
                                                             key={doc.name}
@@ -639,8 +644,8 @@ const Chat = ()=>{
                                                                 <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                                                             ) : (
                                                                 <Checkbox
-                                                                    checked={selectedFiles.has(doc.name)}
-                                                                    onCheckedChange={() => toggleFileSelection(doc.name)}
+                                                                    checked={selectedFiles.has(`input:${doc.name}`)}
+                                                                    onCheckedChange={() => toggleFileSelection(`input:${doc.name}`)}
                                                                     className="shrink-0"
                                                                 />
                                                             )}
@@ -685,8 +690,8 @@ const Chat = ()=>{
                                                         className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent transition-colors group"
                                                     >
                                                         <Checkbox
-                                                            checked={selectedFiles.has(doc.name)}
-                                                            onCheckedChange={() => toggleFileSelection(doc.name)}
+                                                            checked={selectedFiles.has(`output:${doc.name}`)}
+                                                            onCheckedChange={() => toggleFileSelection(`output:${doc.name}`)}
                                                             className="shrink-0"
                                                         />
                                                         <button
@@ -724,14 +729,37 @@ const Chat = ()=>{
                                     }] : [])
                                 ])
                             ] as Section[]}
+                            footerContent={
+                                selectedFiles.size > 0 && (
+                                    <div className="flex justify-end">
+                                        <Button onClick={() => setActivityDialogOpen(true)}>
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Create Activity ({selectedFiles.size} file{selectedFiles.size > 1 ? 's' : ''})
+                                        </Button>
+                                    </div>
+                                )
+                            }
                         />
-                        
+
+                        {/* Create Activity Dialog */}
+                        <CreateActivityDialog
+                            open={activityDialogOpen}
+                            onOpenChange={setActivityDialogOpen}
+                            selectedFiles={Array.from(selectedFiles)}
+                            subjectId={subject_id!}
+                            onSuccess={() => {
+                                setSelectedFiles(new Set());
+                                setActivityDialogOpen(false);
+                                setFilesOpen(false);
+                            }}
+                        />
+
                         {/* Chat History Button */}
-                        <button 
+                        <button
                             onClick={() => setHistoryOpen(true)}
                             className="flex flex-row gap-2 items-center px-4 py-2 rounded-lg hover:bg-accent transition-colors text-sm font-medium border"
                         >
-                            <History className="h-4 w-4"/> {!isMobile && "History"}
+                            <History className="h-4 w-4" /> {!isMobile && "History"}
                         </button>
 
                         {/* Chat History Dialog */}
@@ -752,7 +780,7 @@ const Chat = ()=>{
                                     )
                                 }] : chatHistory.length > 0 ? [{
                                     id: "chats",
-                                    searchableText: chatHistory.map(chat => 
+                                    searchableText: chatHistory.map(chat =>
                                         `Chat ${chat.chatId.slice(0, 8)} ${chat.totalMessages} messages ${formatTimestamp(chat.lastActivityTime.toString())}`
                                     ).join(' '),
                                     content: (
@@ -820,7 +848,7 @@ const Chat = ()=>{
                                 }])
                             ] as Section[]}
                         />
-                        
+
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <div></div>
@@ -835,76 +863,76 @@ const Chat = ()=>{
                 </div>
 
                 {/*Scrollable area for chat messages*/}
-                    {loadingHistory ? (
-                        <div className="w-full h-[60%] flex flex-col items-center justify-center">
-                            <div className="text-center space-y-4 px-4">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                                <p className="text-muted-foreground">Loading chat messages...</p>
-                            </div>
+                {loadingHistory ? (
+                    <div className="w-full h-[60%] flex flex-col items-center justify-center">
+                        <div className="text-center space-y-4 px-4">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                            <p className="text-muted-foreground">Loading chat messages...</p>
                         </div>
-                    ) : historyMessages.length == 0 ? (
-                        <div className="w-full h-[60%] flex flex-col items-center justify-center">
-                            <div className="text-center space-y-4 px-4">
-                                    <h2 className="text-3xl font-bold">
-                                        Hello, <AuroraText>{user?.teacher_name || 'Teacher'}!</AuroraText>
-                                    </h2>
-                                    <p className="text-muted-foreground max-w-md mx-auto">
-                                        Start a new conversation by clicking "New Chat" or select an existing chat from your history.
-                                    </p>
-                            </div>
+                    </div>
+                ) : historyMessages.length == 0 ? (
+                    <div className="w-full h-[60%] flex flex-col items-center justify-center">
+                        <div className="text-center space-y-4 px-4">
+                            <h2 className="text-3xl font-bold">
+                                Hello, <AuroraText>{user?.teacher_name || 'Teacher'}!</AuroraText>
+                            </h2>
+                            <p className="text-muted-foreground max-w-md mx-auto">
+                                Start a new conversation by clicking "New Chat" or select an existing chat from your history.
+                            </p>
                         </div>
-                    ) : (
-                        <ScrollArea ref={scrollAreaRef} className="w-full h-[60%]">
-                            <div className="w-full flex justify-center">
-                                <div className="w-full max-w-5xl">
-                                    <Conversation>
-                                        <ConversationContent>
-                                            <div className="space-y-6">
-                                                {historyMessages.map((msg, idx) => (
-                                            <div key={idx} className="space-y-4">
-                                                {msg.role === 'user' ? (
-                                                    <div className="flex gap-3 justify-end">
-                                                        <div className="rounded-lg px-4 py-3 max-w-[80%] bg-muted text-primary">
-                                                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                                                        </div>
-                                                        <div className="shrink-0">
-                                                            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                                                                {user?.teacher_name?.charAt(0).toUpperCase() || 'T'}
+                    </div>
+                ) : (
+                    <ScrollArea ref={scrollAreaRef} className="w-full h-[60%]">
+                        <div className="w-full flex justify-center">
+                            <div className="w-full max-w-5xl">
+                                <Conversation>
+                                    <ConversationContent>
+                                        <div className="space-y-6">
+                                            {historyMessages.map((msg, idx) => (
+                                                <div key={idx} className="space-y-4">
+                                                    {msg.role === 'user' ? (
+                                                        <div className="flex gap-3 justify-end">
+                                                            <div className="rounded-lg px-4 py-3 max-w-[80%] bg-muted text-primary">
+                                                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                            </div>
+                                                            <div className="shrink-0">
+                                                                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                                                                    {user?.teacher_name?.charAt(0).toUpperCase() || 'T'}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="p-4">
-                                                        {msg.steps && msg.steps.length > 0 ? (
-                                                            <StreamingMessageRenderer
-                                                                steps={msg.steps}
-                                                                isStreaming={false}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm">{msg.content}</p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                        {streamingState.isStreaming && (
-                                            <div className="p-4 border-primary">
-                                                <StreamingMessageRenderer
-                                                    steps={streamingState.accumulatedSteps}
-                                                    isStreaming={true}
-                                                    currentPhase={streamingState.currentPhase}
-                                                />
-                                            </div>
-                                        )}
-                                      
-                                    </div>
-                                </ConversationContent>
-                                <ConversationScrollButton />
-                            </Conversation>
-                                </div>
+                                                    ) : (
+                                                        <div className="p-4">
+                                                            {msg.steps && msg.steps.length > 0 ? (
+                                                                <StreamingMessageRenderer
+                                                                    steps={msg.steps}
+                                                                    isStreaming={false}
+                                                                />
+                                                            ) : (
+                                                                <p className="text-sm">{msg.content}</p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {streamingState.isStreaming && (
+                                                <div className="p-4 border-primary">
+                                                    <StreamingMessageRenderer
+                                                        steps={streamingState.accumulatedSteps}
+                                                        isStreaming={true}
+                                                        currentPhase={streamingState.currentPhase}
+                                                    />
+                                                </div>
+                                            )}
+
+                                        </div>
+                                    </ConversationContent>
+                                    <ConversationScrollButton />
+                                </Conversation>
                             </div>
-                        </ScrollArea>
-                    )}
+                        </div>
+                    </ScrollArea>
+                )}
                 {/* Div for chat input box */}
                 <div className="w-full h-[30%] flex justify-center items-center py-4">
                     <ChatInput

@@ -1,4 +1,4 @@
-import axios, {type AxiosInstance} from 'axios';
+import axios, { type AxiosInstance } from 'axios';
 
 const API_BASE_URL: string = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -10,50 +10,50 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-export interface SignUp{
+export interface SignUp {
   teacher_name: string,
   email: string,
   password: string,
   verification_code: string
 }
 
-export interface EmailVerification{
+export interface EmailVerification {
   email: string,
   teacher_name: string
 }
 
-export interface SignUpSuccRes{
+export interface SignUpSuccRes {
   message: string,
   teacher_id: string,
   teacher_name: string,
   email: string
 }
 
-export interface VerifyEmailSuccRes{
+export interface VerifyEmailSuccRes {
   message: string,
   email: string
 }
 
-export interface Login{
+export interface Login {
   email: string,
   password: string
 }
 
-export interface ForgotPassword{
+export interface ForgotPassword {
   email: string
 }
 
-export interface ForgotPasswordSuccRes{
+export interface ForgotPasswordSuccRes {
   message: string
 }
 
-export interface ResetPassword{
+export interface ResetPassword {
   email: string,
   code: string,
   new_password: string
 }
 
-export interface Teacher{
+export interface Teacher {
   teacher_id: string,
   teacher_name: string,
   email: string
@@ -71,7 +71,7 @@ export interface ClassroomResponse {
   classroom_id: string;
   teacher_id: string;
   classroom_name: string;
-  created_at: string; 
+  created_at: string;
 }
 
 export interface SubjectCreate {
@@ -139,6 +139,26 @@ export interface ActivityResponse {
   type: ActivityTypeEnum;
   created_at: string;
   files: FileResponse[];
+}
+
+// Performance types
+export interface PerformanceCreate {
+  student_rollno: string;
+  activity_id: string;
+  teacher_feedback?: string;
+  teacher_mark: number;
+}
+
+export interface PerformanceUpdate {
+  teacher_feedback?: string;
+  teacher_mark?: number;
+}
+
+export interface PerformanceResponse {
+  student_rollno: string;
+  activity_id: string;
+  teacher_feedback: string | null;
+  teacher_mark: number;
 }
 
 export interface MinioDocument {
@@ -273,7 +293,7 @@ export interface SSEEventMetadata {
   toolArgs?: any;
   toolResult?: any;
   finishReason?: string;
-  
+
   // Research phase metadata
   researchMode?: string;
   searchQueries?: string[];
@@ -281,13 +301,13 @@ export interface SSEEventMetadata {
   findingsLength?: number;
   totalToolCalls?: number;
   completed?: boolean;
-  
+
   // Generation phase metadata
   worksheetTitle?: string;
   contentLength?: number;
   savedSuccessfully?: boolean;
   pdfLocation?: string;
-  
+
   // Flow summary metadata
   flowSummary?: any;
   researchPhase?: any;
@@ -343,39 +363,39 @@ export interface ListChunksResponse {
   count: number;
 }
 
-export interface IndexedFileResponse{
+export interface IndexedFileResponse {
   file_id: string;
   filename: string;
   minio_path: string;
 }
 
 export const authAPI = {
-  signUp : async (body: SignUp): Promise<SignUpSuccRes | any>=>{
-      try {
-        const response = await apiClient.post(`${API_BASE_URL}/api/auth/signup`, body);
-        if(response.status == 201){
-          return response.data as SignUpSuccRes
-        }
-        else{
-          return {
-            "status": response.status,
-            "message": response.data?.message || response.data?.detail || "Signup failed"
-          }
-        }
-      } catch (error: any) {
+  signUp: async (body: SignUp): Promise<SignUpSuccRes | any> => {
+    try {
+      const response = await apiClient.post(`${API_BASE_URL}/api/auth/signup`, body);
+      if (response.status == 201) {
+        return response.data as SignUpSuccRes
+      }
+      else {
         return {
-          "status": error.response?.status || 500,
-          "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Signup failed"
+          "status": response.status,
+          "message": response.data?.message || response.data?.detail || "Signup failed"
         }
       }
+    } catch (error: any) {
+      return {
+        "status": error.response?.status || 500,
+        "message": error.response?.data?.detail || error.response?.data?.message || error.message || "Signup failed"
+      }
+    }
   },
-  verifyEmail: async (body: EmailVerification): Promise<VerifyEmailSuccRes | any>=>{
+  verifyEmail: async (body: EmailVerification): Promise<VerifyEmailSuccRes | any> => {
     try {
       const response = await apiClient.post(`${API_BASE_URL}/api/auth/send-verification-code`, body);
-      if(response.status == 200){
+      if (response.status == 200) {
         return response.data as VerifyEmailSuccRes;
       }
-      else{
+      else {
         return {
           "status": response.status,
           "message": response.data?.message || response.data?.detail || "Email verification failed"
@@ -388,13 +408,13 @@ export const authAPI = {
       }
     }
   },
-  login: async (body: Login): Promise<SignUpSuccRes | any>=>{
+  login: async (body: Login): Promise<SignUpSuccRes | any> => {
     try {
       const response = await apiClient.post(`${API_BASE_URL}/api/auth/login`, body);
-      if(response.status == 200){
+      if (response.status == 200) {
         return response.data as SignUpSuccRes;
       }
-      else{
+      else {
         return {
           "status": response.status,
           "message": response.data?.message || response.data?.detail || "Login failed"
@@ -407,13 +427,13 @@ export const authAPI = {
       }
     }
   },
-  forgotPassword: async (body: ForgotPassword): Promise<ForgotPasswordSuccRes |any> =>{
+  forgotPassword: async (body: ForgotPassword): Promise<ForgotPasswordSuccRes | any> => {
     try {
       const response = await apiClient.post(`${API_BASE_URL}/api/auth/forgot-password`, body);
-      if(response.status == 200){
+      if (response.status == 200) {
         return response.data as ForgotPasswordSuccRes;
       }
-      else{
+      else {
         return {
           "status": response.status,
           "message": response.data?.message || response.data?.detail || "Forgot password failed"
@@ -426,13 +446,13 @@ export const authAPI = {
       }
     }
   },
-  resetPassword: async (body: ResetPassword): Promise<ForgotPasswordSuccRes | any>=>{
+  resetPassword: async (body: ResetPassword): Promise<ForgotPasswordSuccRes | any> => {
     try {
       const response = await apiClient.post(`${API_BASE_URL}/api/auth/reset-password`, body);
-      if(response.status == 200){
+      if (response.status == 200) {
         return response.data as ForgotPasswordSuccRes;
       }
-      else{
+      else {
         return {
           "status": response.status,
           "message": response.data?.message || response.data?.detail || "Password reset failed"
@@ -445,16 +465,16 @@ export const authAPI = {
       }
     }
   },
-  getStatus: async (): Promise<Teacher | any>=>{
+  getStatus: async (): Promise<Teacher | any> => {
     try {
       const response = await apiClient.get(`${API_BASE_URL}/api/auth/me`);
-      if(response.status == 200){
+      if (response.status == 200) {
         return response.data as Teacher;
       }
-      else{
+      else {
         return {
-            "status": response.status,
-            "message": response.data?.message || response.data?.detail || "Authentication check failed"
+          "status": response.status,
+          "message": response.data?.message || response.data?.detail || "Authentication check failed"
         }
       }
     } catch (error: any) {
@@ -465,16 +485,16 @@ export const authAPI = {
       }
     }
   },
-  logout: async (): Promise<ForgotPasswordSuccRes | any>=>{
+  logout: async (): Promise<ForgotPasswordSuccRes | any> => {
     try {
       const response = await apiClient.post(`${API_BASE_URL}/api/auth/logout`);
-      if(response.status == 200){
+      if (response.status == 200) {
         return response.data as ForgotPasswordSuccRes;
       }
-      else{
+      else {
         return {
-            "status": response.status,
-            "message": response.data?.message || response.data?.detail || "Logout failed"
+          "status": response.status,
+          "message": response.data?.message || response.data?.detail || "Logout failed"
         }
       }
     } catch (error: any) {
@@ -917,6 +937,136 @@ export const activities = {
   },
 }
 
+export const performance = {
+  createPerformance: async (body: PerformanceCreate): Promise<PerformanceResponse | any> => {
+    try {
+      const response = await apiClient.post(
+        `${API_BASE_URL}/api/performance`,
+        body
+      );
+      if (response.status == 201) {
+        return response.data as PerformanceResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Create performance failed",
+      };
+    }
+  },
+
+  getPerformancesByActivity: async (activityId: string): Promise<PerformanceResponse[] | any> => {
+    try {
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/performance/activity/${activityId}`
+      );
+      if (response.status == 200) {
+        return response.data as PerformanceResponse[];
+      } else {
+        return {
+          status: response.status,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get performances failed",
+      };
+    }
+  },
+
+  getPerformancesByStudent: async (studentRollno: string): Promise<PerformanceResponse[] | any> => {
+    try {
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/performance/student/${studentRollno}`
+      );
+      if (response.status == 200) {
+        return response.data as PerformanceResponse[];
+      } else {
+        return {
+          status: response.status,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get performances failed",
+      };
+    }
+  },
+
+  getPerformance: async (studentRollno: string, activityId: string): Promise<PerformanceResponse | any> => {
+    try {
+      const response = await apiClient.get(
+        `${API_BASE_URL}/api/performance/${studentRollno}/${activityId}`
+      );
+      if (response.status == 200) {
+        return response.data as PerformanceResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Get performance failed",
+      };
+    }
+  },
+
+  updatePerformance: async (studentRollno: string, activityId: string, body: PerformanceUpdate): Promise<PerformanceResponse | any> => {
+    try {
+      const response = await apiClient.put(
+        `${API_BASE_URL}/api/performance/${studentRollno}/${activityId}`,
+        body
+      );
+      if (response.status == 200) {
+        return response.data as PerformanceResponse;
+      } else {
+        return {
+          status: response.status,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Update performance failed",
+      };
+    }
+  },
+
+  deletePerformance: async (studentRollno: string, activityId: string): Promise<any> => {
+    try {
+      const response = await apiClient.delete(
+        `${API_BASE_URL}/api/performance/${studentRollno}/${activityId}`
+      );
+      if (response.status == 204) {
+        return { message: "Deleted" };
+      } else {
+        return {
+          status: response.status,
+          message: response.data?.detail || response.data?.message || "Unexpected response",
+        };
+      }
+    } catch (error: any) {
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.detail || error.response?.data?.message || error.message || "Delete performance failed",
+      };
+    }
+  },
+}
+
 export const documents = {
   getInputDocuments: async (
     userId: string,
@@ -1014,7 +1164,7 @@ async function streamSSEPost(
   onError?: (err: any) => void
 ): Promise<() => void> {
   const controller = new AbortController();
-  
+
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -1041,7 +1191,7 @@ async function streamSSEPost(
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          
+
           // Process complete SSE events (separated by double newlines)
           const events = buffer.split(/\n\n|\r\n\r\n/);
           buffer = events.pop() || ''; // Keep incomplete event in buffer
@@ -1107,14 +1257,14 @@ export const sudarAgent = {
   getChatMessages: async (chatId: string): Promise<GetChatMessagesResponse | any> => {
     try {
       const response = await apiClient.get(`${AGENT_BASE}/${chatId}/messages`);
-      if (response.status === 200){
+      if (response.status === 200) {
         console.log('API Response:', response.data);
         return response.data; // Return the data directly instead of wrapping it
       }
     } catch (error: any) {
-      return { 
-        status: error.response?.status || 500, 
-        message: error.response?.data?.message || error.message || 'Failed to get chat messages' 
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || 'Failed to get chat messages'
       };
     }
   },
@@ -1150,9 +1300,9 @@ export const sudarAgent = {
       if (response.status === 200) return response.data as GetChatsBySubjectResponse;
       return { status: response.status, message: response.data };
     } catch (error: any) {
-      return { 
-        status: error.response?.status || 500, 
-        message: error.response?.data?.message || error.message || 'Failed to get chats by subject' 
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || 'Failed to get chats by subject'
       };
     }
   },
@@ -1167,9 +1317,9 @@ export const sudarAgent = {
       if (response.status === 200) return response.data as DeleteChatResponse;
       return { status: response.status, message: response.data };
     } catch (error: any) {
-      return { 
-        status: error.response?.status || 500, 
-        message: error.response?.data?.message || error.message || 'Failed to delete chat' 
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || 'Failed to delete chat'
       };
     }
   },
@@ -1184,9 +1334,9 @@ export const sudarAgent = {
       if (response.status === 200) return response.data;
       return { status: response.status, message: response.data };
     } catch (error: any) {
-      return { 
-        status: error.response?.status || 500, 
-        message: error.response?.data?.message || error.message || 'Agent health check failed' 
+      return {
+        status: error.response?.status || 500,
+        message: error.response?.data?.message || error.message || 'Agent health check failed'
       };
     }
   }
