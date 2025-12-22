@@ -40,11 +40,6 @@ const sidebarContentItems = [
     url: "/home",
     icon: Home,
   },
-  {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-  },
 ]
 
 export function AppSidebar() {
