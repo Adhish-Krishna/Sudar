@@ -1,13 +1,13 @@
-import type {Request, Response} from 'express';
+import type { Request, Response } from 'express';
 import { waitForConnection } from '../config/db';
 import type { UserContext } from '../mcpClient';
 import { worksheetFlow } from '../flows/worksheetFlow';
 import { doubtClearanceFlow } from '../flows/doubtClearanceFlow';
-import { 
-  getConversation, 
-  getChatsBySubject as getChatsBySubjectUtil,
-  countChatsBySubject,
-  deleteConversation 
+import {
+    getConversation,
+    getChatsBySubject as getChatsBySubjectUtil,
+    countChatsBySubject,
+    deleteConversation
 } from '../utils/chatUtils';
 import { contentCreationFlow } from '../flows/contentCreationFlow';
 
@@ -27,7 +27,7 @@ const streamChat = async (req: Request, res: Response) => {
 
         const user_id = req.user_id!;
 
-        const { chat_id, subject_id, classroom_id, query, flow_type, research_mode}: ChatRequest = req.body;
+        const { chat_id, subject_id, classroom_id, query, flow_type, research_mode }: ChatRequest = req.body;
 
         if (!chat_id || !classroom_id || !query) {
             return res.status(400).json({
@@ -72,6 +72,7 @@ const streamChat = async (req: Request, res: Response) => {
                     query: query,
                     userContext: userContext,
                     research_mode: research_mode ? research_mode : 'simple',
+                    accessToken: req.cookies?.access_token,
                     res: res
                 });
                 break;
@@ -80,7 +81,7 @@ const streamChat = async (req: Request, res: Response) => {
                 await contentCreationFlow({
                     query: query,
                     userContext: userContext,
-                    research_mode: research_mode? research_mode : 'simple',
+                    research_mode: research_mode ? research_mode : 'simple',
                     res: res
                 });
                 break;

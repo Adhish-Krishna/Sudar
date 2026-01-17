@@ -19,8 +19,8 @@
  * - Handles errors gracefully with proper error states
  */
 
-import { contentResearcher} from '../agent/contentResearcher';
-import { worksheetGenerator} from '../agent/worksheetGenerator';
+import { contentResearcher } from '../agent/contentResearcher';
+import { worksheetGenerator } from '../agent/worksheetGenerator';
 import { extractFilesFromQuery } from '../utils/fileExtractor';
 import type { UserContext } from '../mcpClient';
 import type { Response } from 'express';
@@ -39,6 +39,7 @@ export interface WorksheetFlowOptions {
   research_mode?: 'simple' | 'moderate' | 'deep';
   systemPromptResearch?: string;
   systemPromptWorksheet?: string;
+  accessToken?: string;
   res: Response
 }
 
@@ -51,6 +52,7 @@ export async function worksheetFlow(
     research_mode = 'moderate',
     systemPromptResearch,
     systemPromptWorksheet,
+    accessToken,
     res
   } = options;
 
@@ -93,20 +95,65 @@ export async function worksheetFlow(
     })) {
       const chunk = { phase: 'research', ...result.chunk };
       res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-      
+
       // Track tool calls
       if (result.chunk.type === 'tool-input-available') {
         toolCallCount++;
       }
-      
+
       // Store step in database (skip if convertChunkToStep returns null)
       const step = convertChunkToStep(result.chunk, 'research', stepNumber + 1);
       if (step) {
         stepNumber++;
         await addStepToAgentMessage(userContext.chatId, messageId, step);
       }
-      
+
       researchFindings = result.fullText;
+    }
+
+    // Fetch student performance insights before generating worksheet
+    let performanceInsights = '';
+    if (userContext.subjectId && accessToken) {
+      try {
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:3006';
+        const axios = await import('axios');
+        const perfResponse = await axios.default.get(
+          `${backendUrl}/performance/subject/${userContext.subjectId}`,
+          {
+            headers: { Cookie: `access_token=${accessToken}` },
+            timeout: 10000
+          }
+        );
+
+        if (perfResponse.data && (perfResponse.data as any).activities) {
+          // Format performance insights
+          const activities = (perfResponse.data as any).activities;
+          if (activities.length > 0) {
+            const insights: string[] = ['STUDENT PERFORMANCE INSIGHTS:\n'];
+            const lowPerforming: string[] = [];
+
+            for (const activity of activities) {
+              if (activity.average_mark !== null) {
+                insights.push(`- ${activity.title}: Average ${activity.average_mark}% (${activity.submissions_count} submissions)`);
+                if (activity.average_mark < 60) {
+                  lowPerforming.push(activity.title);
+                }
+              }
+            }
+
+            if (lowPerforming.length > 0) {
+              insights.push(`\n⚠️ LOW PERFORMING AREAS: ${lowPerforming.join(', ')}`);
+              insights.push('Focus more questions on these topics!');
+            }
+
+            performanceInsights = insights.join('\n');
+            res.write(`data: ${JSON.stringify({ phase: 'performance', type: 'info', message: 'Retrieved student performance data' })}\n\n`);
+          }
+        }
+      } catch (perfError) {
+        // Log but don't fail - performance data is optional enhancement
+        console.log('Performance data fetch skipped:', perfError instanceof Error ? perfError.message : 'Unknown error');
+      }
     }
 
     // Stream worksheet generation phase
@@ -114,20 +161,21 @@ export async function worksheetFlow(
       query,
       content: researchFindings,
       userContext,
+      performanceInsights,
       ...(systemPromptWorksheet && { systemPrompt: systemPromptWorksheet })
     })) {
       res.write(`data: ${JSON.stringify({ phase: 'generation', ...chunk })}\n\n`);
-      
+
       // Track tool calls
       if (chunk.type === 'tool-input-available') {
         toolCallCount++;
       }
-      
+
       // Capture worksheet content from text
       if (chunk.type === 'text-delta' && chunk.delta) {
         worksheetContent += chunk.delta;
       }
-      
+
       // Store step in database (skip if convertChunkToStep returns null)
       const step = convertChunkToStep(chunk, 'generation', stepNumber + 1);
       if (step) {
@@ -153,7 +201,7 @@ export async function worksheetFlow(
         finalStatus: 'completed'
       }
     );
-    
+
     stopHeartbeat();
     res.write(`data: ${JSON.stringify({ type: 'done', phase: 'completion' })}\n\n`);
     res.end();

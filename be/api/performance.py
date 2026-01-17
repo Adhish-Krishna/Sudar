@@ -119,6 +119,65 @@ def get_performances_by_activity(
     return performances
 
 
+@router.get("/subject/{subject_id}")
+def get_performances_by_subject(
+    subject_id: UUID,
+    db: Session = Depends(get_db),
+    current_teacher: Teacher = Depends(get_current_teacher)
+):
+    """
+    Get all performance records for all activities in a subject.
+    Returns performance data with activity details for worksheet optimization.
+    """
+    # Verify subject ownership
+    subject = db.query(Subject).join(
+        Classroom, Subject.classroom_id == Classroom.classroom_id
+    ).filter(
+        Subject.subject_id == subject_id,
+        Classroom.teacher_id == current_teacher.teacher_id
+    ).first()
+    
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subject not found or unauthorized"
+        )
+    
+    # Get all activities for this subject
+    activities_data = db.query(Activity).filter(
+        Activity.subject_id == subject_id
+    ).all()
+    
+    result = []
+    for activity in activities_data:
+        # Get performances for this activity
+        performances = db.query(Performance).filter(
+            Performance.activity_id == activity.activity_id
+        ).all()
+        
+        # Calculate average mark
+        marks = [p.teacher_mark for p in performances]
+        avg_mark = sum(marks) / len(marks) if marks else None
+        
+        # Collect feedback
+        feedbacks = [p.teacher_feedback for p in performances if p.teacher_feedback]
+        
+        result.append({
+            "activity_id": str(activity.activity_id),
+            "title": activity.title,
+            "type": activity.type.value,
+            "average_mark": round(avg_mark, 2) if avg_mark else None,
+            "submissions_count": len(performances),
+            "feedbacks": feedbacks
+        })
+    
+    return {
+        "subject_id": str(subject_id),
+        "activities_count": len(result),
+        "activities": result
+    }
+
+
 @router.get("/student/{student_rollno}", response_model=List[PerformanceResponse])
 def get_performances_by_student(
     student_rollno: str,

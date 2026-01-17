@@ -10,6 +10,7 @@
  * - Maintains state tracking: worksheet title, content length, save status, PDF location
  * - Streams status messages before saving (e.g., "Saving worksheet: [title] as PDF...")
  * - Returns metadata with worksheet details and save confirmation
+ * - Uses student performance data to focus on areas needing improvement
  */
 
 import { Experimental_Agent as Agent, stepCountIs } from 'ai';
@@ -24,6 +25,7 @@ export interface WorksheetOptions {
   content: string;
   userContext: UserContext;
   systemPrompt?: string;
+  performanceInsights?: string;
 }
 
 export async function* worksheetGenerator(
@@ -33,7 +35,8 @@ export async function* worksheetGenerator(
     query,
     content,
     userContext,
-    systemPrompt = worksheetGeneratorPrompt
+    systemPrompt = worksheetGeneratorPrompt,
+    performanceInsights
   } = options;
 
   const mcpClient = await createMCPClientWithContext(userContext);
@@ -52,14 +55,19 @@ export async function* worksheetGenerator(
       system: systemPrompt,
       tools: saveContentTool,
       stopWhen: stepCountIs(5),
-      temperature: 0.7 
+      temperature: 0.7
     });
+
+    // Build performance context section if available
+    const performanceSection = performanceInsights
+      ? `\n\n    ${performanceInsights}\n\n    IMPORTANT: Based on the performance insights above, focus MORE questions on low-scoring areas and topics where students commonly struggle.`
+      : '';
 
     const prompt = `USER QUERY: ${query}
 
     RESEARCH CONTENT (FOR YOUR REFERENCE ONLY - DO NOT INCLUDE THIS IN THE WORKSHEET):
     ${content}
-
+${performanceSection}
     IMPORTANT: The research content above is provided to help you understand the topic and create relevant questions. DO NOT include this research content in the worksheet you save. 
 
     Your task:
@@ -73,9 +81,9 @@ export async function* worksheetGenerator(
     const result = await agent.stream({
       prompt: prompt
     });
-    
+
     const stream = result.toUIMessageStream();
-    
+
     for await (const chunk of stream) {
       yield chunk;
     }
@@ -83,4 +91,3 @@ export async function* worksheetGenerator(
     console.error('Error in worksheet generator:', error);
   }
 }
-
